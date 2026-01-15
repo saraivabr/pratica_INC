@@ -5,9 +5,11 @@ import Link from "next/link"
 import { Search, X, Heart, MapPin, Building2, Maximize2, ArrowRight } from "lucide-react"
 import { useEmpreendimentos } from "@/hooks/use-empreendimentos"
 import { OrganicBackground } from "@/components/svg/SvgBackgrounds"
+import { SearchIllustration } from "@/components/svg/SvgIllustrations"
 import { formatarPreco } from "@/lib/utils"
 import { colors } from "@/lib/theme"
 import { useFavorites } from "@/hooks/use-favorites"
+import { getRandomCopy } from "@/lib/copywriting"
 
 interface Filters {
   status: string[]
@@ -33,6 +35,7 @@ function CatalogoSkeleton() {
 export default function CatalogoPage() {
   const { empreendimentos, isLoading } = useEmpreendimentos()
   const { toggle, isFavorite } = useFavorites()
+  const motivationalCopy = useMemo(() => getRandomCopy("catalogo"), [])
 
   const [searchQuery, setSearchQuery] = useState("")
   const [showFilters, setShowFilters] = useState(false)
@@ -107,7 +110,7 @@ export default function CatalogoPage() {
                 Descobrir
               </h1>
               <p className="text-[13px] mt-1" style={{ color: colors.textTertiary }}>
-                {filteredEmpreendimentos.length} empreendimento{filteredEmpreendimentos.length !== 1 ? 's' : ''}
+                {motivationalCopy}
               </p>
             </div>
           </div>
@@ -186,13 +189,13 @@ export default function CatalogoPage() {
           <CatalogoSkeleton />
         ) : filteredEmpreendimentos.length === 0 ? (
           <div className="text-center py-32">
-            <div className="mx-auto mb-6 w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: colors.bgElevated }}>
-              <Search className="w-8 h-8" style={{ color: colors.textTertiary }} />
+            <div className="mx-auto mb-6 w-20 h-20 animate-float">
+              <SearchIllustration className="w-full h-full" />
             </div>
-            <p className="text-[20px] font-semibold mb-2" style={{ color: colors.text, fontFamily: "var(--font-serif)" }}>
+            <p className="text-[20px] font-semibold mb-2 animate-slideInRight" style={{ color: colors.text, fontFamily: "var(--font-serif)" }}>
               Nenhum resultado
             </p>
-            <p className="text-[14px] max-w-xs mx-auto" style={{ color: colors.textTertiary }}>
+            <p className="text-[14px] max-w-xs mx-auto animate-slideInLeft" style={{ color: colors.textTertiary }}>
               Tente ajustar sua busca ou filtros
             </p>
           </div>

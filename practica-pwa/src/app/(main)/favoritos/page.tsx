@@ -8,7 +8,9 @@ import { useFavoritesStore } from "@/store/favorites"
 import { formatarPreco } from "@/lib/utils"
 import { colors } from "@/lib/theme"
 import { OrganicBackground } from "@/components/svg/SvgBackgrounds"
+import { EmptyHeartIllustration } from "@/components/svg/SvgIllustrations"
 import { useFavorites } from "@/hooks/use-favorites"
+import { getRandomCopy } from "@/lib/copywriting"
 
 function FavoritosSkeleton() {
   return (
@@ -56,6 +58,7 @@ export default function FavoritosPage() {
   const { empreendimentos, isLoading } = useEmpreendimentos()
   const favorites = useFavoritesStore((state) => state.favorites)
   const { toggle, isFavorite } = useFavorites()
+  const motivationalCopy = useMemo(() => getRandomCopy("favoritos"), [])
 
   const favoritedEmpreendimentos = useMemo(() => {
     return empreendimentos.filter((emp) => favorites.includes(emp.id))
@@ -90,7 +93,7 @@ export default function FavoritosPage() {
               Salvos
             </h1>
             <p className="text-[13px] mt-1" style={{ color: colors.textTertiary }}>
-              {favoritedEmpreendimentos.length} favorito{favoritedEmpreendimentos.length !== 1 ? 's' : ''}
+              {motivationalCopy}
             </p>
           </div>
         </div>
@@ -101,7 +104,17 @@ export default function FavoritosPage() {
         {isLoading ? (
           <FavoritosSkeleton />
         ) : favoritedEmpreendimentos.length === 0 ? (
-          <EmptyState />
+          <div className="text-center py-32">
+            <div className="mx-auto mb-6 w-20 h-20 animate-heartbeat">
+              <EmptyHeartIllustration className="w-full h-full" />
+            </div>
+            <p className="text-[20px] font-semibold mb-2 animate-slideInRight" style={{ color: colors.text, fontFamily: "var(--font-serif)" }}>
+              Sua coleção está vazia
+            </p>
+            <p className="text-[14px] max-w-xs mx-auto animate-slideInLeft" style={{ color: colors.textTertiary }}>
+              Explore o portfólio e toque no coração para salvar seus favoritos
+            </p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-6 py-8 pb-32">
             {favoritedEmpreendimentos.map((emp, index) => {

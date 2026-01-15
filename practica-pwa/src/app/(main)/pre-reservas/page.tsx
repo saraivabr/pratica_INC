@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { FileText, Building2, User, Calendar, Zap } from "lucide-react"
 import { PreReserva } from "@/types/pagamento"
 import { StatusPreReserva } from "@/components/reserva/status-pagamento"
 import { colors } from "@/lib/theme"
 import { OrganicBackground } from "@/components/svg/SvgBackgrounds"
+import { EmptyListIllustration } from "@/components/svg/SvgIllustrations"
+import { getRandomCopy } from "@/lib/copywriting"
 
 function PreReservasSkeleton() {
   return (
@@ -28,6 +30,7 @@ export default function PreReservasPage() {
   const router = useRouter()
   const [preReservas, setPreReservas] = useState<PreReserva[]>([])
   const [loading, setLoading] = useState(true)
+  const motivationalCopy = useMemo(() => getRandomCopy("preReservas"), [])
 
   useEffect(() => {
     fetchPreReservas()
@@ -109,7 +112,7 @@ export default function PreReservasPage() {
               Pré-Reservas
             </h1>
             <p className="text-[13px] mt-1" style={{ color: colors.textTertiary }}>
-              {stats.total} pré-reserva{stats.total !== 1 ? 's' : ''} • {formatCurrency(stats.valorTotal)} em VGV
+              {motivationalCopy}
             </p>
           </div>
         </div>
@@ -121,13 +124,13 @@ export default function PreReservasPage() {
           <PreReservasSkeleton />
         ) : preReservas.length === 0 ? (
           <div className="text-center py-32">
-            <div className="mx-auto mb-6 w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: colors.bgElevated }}>
-              <Zap className="w-8 h-8" style={{ color: colors.textTertiary }} />
+            <div className="mx-auto mb-6 w-20 h-20 animate-float">
+              <EmptyListIllustration className="w-full h-full" />
             </div>
-            <p className="text-[20px] font-semibold mb-2" style={{ color: colors.text, fontFamily: "var(--font-serif)" }}>
+            <p className="text-[20px] font-semibold mb-2 animate-slideInRight" style={{ color: colors.text, fontFamily: "var(--font-serif)" }}>
               Nenhuma pré-reserva
             </p>
-            <p className="text-[14px] max-w-xs mx-auto" style={{ color: colors.textTertiary }}>
+            <p className="text-[14px] max-w-xs mx-auto animate-slideInLeft" style={{ color: colors.textTertiary }}>
               Crie sua primeira pré-reserva para começar
             </p>
           </div>

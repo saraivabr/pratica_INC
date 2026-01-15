@@ -1,4 +1,23 @@
 export const copy = {
+  catalogo: [
+    '🔍 Descubra seu próximo grande negócio',
+    '✨ Portfólio de ouro esperando por você',
+    '🚀 As melhores oportunidades estão aqui',
+    '💎 Explore a seleção premium',
+    '🎯 Encontre o imóvel perfeito',
+  ],
+  favoritos: [
+    '❤️ Seus imóveis salvos',
+    '⭐ Sua coleção especial',
+    '🎁 Jóias guardadas pra depois',
+    '🌟 As melhores opções para você',
+  ],
+  preReservas: [
+    '📋 Suas reservas em dia',
+    '✅ Acompanhe seus negócios',
+    '🎯 Suas propostas ativas',
+    '📊 Dashboard de vendas',
+  ],
   motivational: [
     '🔥 Vamos vender hoje?',
     '💪 Você consegue!',
@@ -26,6 +45,11 @@ export const copy = {
     '🎉 Proposta enviada!',
     '✨ Sucesso!',
     '🎊 Partiu fechar essa venda!',
+  ],
+  emptyState: [
+    'Nada por aqui ainda... 🤷',
+    'Em breve algo incrível! ✨',
+    'Espaço em branco, oportunidade em cheio! 🚀',
   ],
 };
 

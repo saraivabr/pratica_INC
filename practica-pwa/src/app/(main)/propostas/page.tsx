@@ -6,6 +6,7 @@ import { PropostaCard } from "@/components/propostas/PropostaCard"
 import { Zap, TrendingUp, CheckCircle2, ArrowRight } from "lucide-react"
 import { colors } from "@/lib/theme"
 import { OrganicBackground } from "@/components/svg/SvgBackgrounds"
+import { EmptyDocumentIllustration } from "@/components/svg/SvgIllustrations"
 
 // Mock data
 const mockPropostas = [
@@ -203,13 +204,13 @@ export default function PropostasPage() {
           {/* Propostas Grid */}
           {propostas.length === 0 ? (
             <div className="text-center py-32">
-              <div className="mx-auto mb-6 w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: colors.bgElevated }}>
-                <Zap className="w-8 h-8" style={{ color: colors.textTertiary }} />
+              <div className="mx-auto mb-6 w-20 h-20 animate-float">
+                <EmptyDocumentIllustration className="w-full h-full" />
               </div>
-              <p className="text-[20px] font-semibold mb-2" style={{ color: colors.text, fontFamily: "var(--font-serif)" }}>
+              <p className="text-[20px] font-semibold mb-2 animate-slideInRight" style={{ color: colors.text, fontFamily: "var(--font-serif)" }}>
                 Nenhuma proposta
               </p>
-              <p className="text-[14px] max-w-xs mx-auto" style={{ color: colors.textTertiary }}>
+              <p className="text-[14px] max-w-xs mx-auto animate-slideInLeft" style={{ color: colors.textTertiary }}>
                 Crie sua primeira proposta para começar a acompanhar suas vendas
               </p>
             </div>
