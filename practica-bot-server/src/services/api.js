@@ -47,6 +47,28 @@ class EvolutionService {
         }
     }
 
+    async sendMedia(number, mediaUrl, type = 'image', caption = '', fileName = 'file') {
+        try {
+            const mimetypes = {
+                'image': 'image/png',
+                'video': 'video/mp4',
+                'document': 'application/pdf'
+            };
+
+            await api.post(`/message/sendMedia/${config.instanceName}`, {
+                number: number,
+                mediatype: type,
+                mimetype: mimetypes[type] || 'application/octet-stream',
+                caption: caption,
+                media: mediaUrl,
+                fileName: fileName
+            });
+            console.log(`✅ Media (${type}) sent to ${number}`);
+        } catch (error) {
+            console.error(`❌ Error sending media (${type}):`, error.response ? error.response.data : error.message);
+        }
+    }
+
     async fetchInstances() {
         try {
             const response = await api.get('/instance/fetchInstances');

@@ -30,7 +30,7 @@ class AIService {
             const chat = this.model.startChat({
                 history: history,
                 generationConfig: {
-                    maxOutputTokens: 2000, // Increased for 2.5
+                    maxOutputTokens: 2000,
                     temperature: 0.7,
                 },
             });
@@ -42,11 +42,40 @@ class AIService {
             return text;
         } catch (error) {
             console.error('❌ Error generating AI response:', error);
-            // Fallback strategy if systemInstruction fails on this specific model version in SDK
             if (error.message && error.message.includes('not supported')) {
                 return this.generateResponseLegacy(userMessage, history);
             }
-            return "Desculpe, estou com uma instabilidade momentânea no meu sistema inteligente. Pode aguardar um instante ou tentar novamente?";
+            return "Puxa, tive um probleminha aqui no meu sistema... 😅 Pode repetir o que você disse? Quero muito te ajudar!";
+        }
+    }
+
+    /**
+     * Extracts structured lead information from the conversation.
+     * Use this for internal tracking and notifications.
+     */
+    async extractLeadInfo(userMessage, history = []) {
+        try {
+            const extractionModel = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            const prompt = `
+                Analise a conversa abaixo e extraia dados do LEAD no formato JSON.
+                JSON Schema: { name: string, property: string, budget: string, intent: 'low'|'medium'|'high', summary: string }
+                
+                Histórico: ${JSON.stringify(history)}
+                Mensagem Atual: ${userMessage}
+                
+                Se não encontrar algum dado, deixe null. 
+                intent 'high' é para quando o cliente quer visitar ou saber preço sério.
+                Retorne APENAS o JSON.
+            `;
+
+            const result = await extractionModel.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text().replace(/```json|```/g, '').trim();
+
+            return JSON.parse(text);
+        } catch (error) {
+            console.warn('⚠️ Could not extract lead info:', error.message);
+            return null;
         }
     }
 

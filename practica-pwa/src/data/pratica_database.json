@@ -24,6 +24,91 @@
   "empreendimentos": {
     "em_construcao": [
       {
+        "id": "station-park",
+        "nome": "Station Park Apartamentos",
+        "status": "em_construcao",
+        "lançamento": "2024-01",
+        "entrega_prevista": "2025-10",
+        "imagemCapa": "https://praticaincorporadora.com.br/assets/new-images/station-garden/fachada/praticaincorporadora-stationgarden-Fachada-(6).jpg",
+        "galeria": [
+          "https://praticaincorporadora.com.br/assets/new-images/station-garden/fachada/praticaincorporadora-stationgarden-Fachada-(7).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/station-garden/fachada/praticaincorporadora-stationgarden-Fachada-(10).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/station-garden/lazer/praticaincorporadora-stationgarden-Lazer-Externo-(1).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/station-garden/lazer/praticaincorporadora-stationgarden-Lazer-Interno-(1).jpg"
+        ],
+        "localizacao": {
+          "endereco": "Próximo ao Metrô Patriarca",
+          "bairro": "Patriarca",
+          "zona": "Leste",
+          "proximidade_metro": "300m do Metrô Patriarca"
+        },
+        "configuracao": {
+          "torres": 1,
+          "pavimentos": 18,
+          "apartamentos_por_andar": 8,
+          "elevadores": 3,
+          "unidades_totais": 144,
+          "terreno_m2": 1100
+        },
+        "tipologias": [
+          {
+            "area_m2": 34.54,
+            "dormitorios": 2,
+            "descricao": "2 dorm compacto",
+            "preco_base": 357588
+          },
+          {
+            "area_m2": 40.26,
+            "dormitorios": 2,
+            "descricao": "2 dorm + varanda",
+            "preco_base": 373121
+          },
+          {
+            "area_m2": 47.84,
+            "dormitorios": 2,
+            "descricao": "2 dorm + suíte",
+            "preco_base": 495281
+          },
+          {
+            "area_m2": 49,
+            "dormitorios": 2,
+            "descricao": "2 dorm + suíte + varanda",
+            "preco_base": 553862
+          },
+          {
+            "area_m2": 58.62,
+            "dormitorios": 2,
+            "descricao": "2 dorm amplo + suíte",
+            "preco_base": 575534
+          },
+          {
+            "area_m2": 60.34,
+            "dormitorios": 3,
+            "descricao": "3 dorm + suíte + varanda gourmet",
+            "preco_base": 649688
+          }
+        ],
+        "diferenciais": [
+          "Varanda gourmet",
+          "Próximo ao metrô",
+          "Lazer completo",
+          "Plano de pagamento facilitado",
+          "ATO + 3 mensais + Financiamento"
+        ],
+        "lazer": [
+          "Piscina adulto",
+          "Churrasqueira",
+          "Salão de festas",
+          "Academia",
+          "Playground",
+          "Pet place",
+          "Brinquedoteca"
+        ],
+        "preco_m2": "~R$ 10.350",
+        "financiamento": ["FGTS", "Caixa Econômica Federal", "Banco do Brasil"],
+        "espelho_disponivel": true
+      },
+      {
         "id": "aura",
         "nome": "Aura by Pratica",
         "status": "em_construcao",

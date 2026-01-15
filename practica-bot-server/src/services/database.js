@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const dbPath = path.join(__dirname, '../../data/pratica_database.json');
+const dbPath = path.join(__dirname, '../data/pratica_database.json');
 
 class DatabaseService {
     constructor() {

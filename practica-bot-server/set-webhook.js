@@ -3,7 +3,7 @@ const config = require('./src/config/evolution');
 
 async function setWebhook() {
     const url = `${config.apiUrl}/webhook/set/${config.instanceName}`;
-    const webhookUrl = 'https://pratica-bot-server-saraiva.netlify.app/webhook';
+    const webhookUrl = 'https://pratica-bot-server-955785827814.us-central1.run.app/webhook';
 
     console.log(`Setting Webhook to: ${webhookUrl}`);
     console.log(`Endpoint: ${url}`);

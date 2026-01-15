@@ -17,9 +17,10 @@ app.get('/health', (req, res) => {
 });
 
 if (require.main === module) {
-    app.listen(config.port, () => {
-        console.log(`🚀 Prática Bot Server running on port ${config.port}`);
-        console.log(`🔗 Webhook endpoint: http://localhost:${config.port}/webhook`);
+    const PORT = process.env.PORT || config.port || 8080;
+    app.listen(PORT, () => {
+        console.log(`🚀 Prática Bot Server running on port ${PORT}`);
+        console.log(`🔗 Webhook endpoint: /webhook`);
     });
 }
 

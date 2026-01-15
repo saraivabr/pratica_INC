@@ -3,14 +3,14 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { ChevronDown, FileText, X, Check, Calendar, Wallet, Home, User } from "lucide-react"
+import { ChevronDown, FileText, X, Check, Calendar, Wallet, Home, User, Share2, Copy, ArrowRight, CircleDollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { stationParkUnidades, stationParkInfo, criarPlanoFromUnidade, UnidadeStationPark } from "@/data/station-park"
 import { PlanoPagamentoTable } from "@/components/reserva/plano-pagamento"
 import { ClienteForm } from "@/components/reserva/cliente-form"
 import { Cliente, PlanoPagamento, PreReserva } from "@/types/pagamento"
 
-type ModalStep = "detalhes" | "cliente" | "confirmacao"
+type ModalStep = "detalhes" | "fluxo" | "cliente" | "confirmacao"
 
 export default function EspelhoPage() {
   const router = useRouter()
@@ -46,7 +46,7 @@ export default function EspelhoPage() {
     unidadesPorAndar[andar].push(u)
   })
 
-  const andares = Object.keys(unidadesPorAndar).map(Number).sort((a, b) => b - a)
+  const andares = Object.keys(unidadesPorAndar).map(Number).sort((a, b) => a - b)
 
   const stats = {
     total: stationParkUnidades.length,
@@ -196,14 +196,14 @@ export default function EspelhoPage() {
                           onClick={() => handleUnidadeClick(unidade)}
                           disabled={unidade.status !== "disponivel"}
                           className={cn(
-                            "min-w-[70px] h-12 rounded-xl text-white font-medium transition-all",
+                            "min-w-[72px] h-14 rounded-xl text-white font-medium transition-all px-2",
                             statusColor,
                             unidade.status === "disponivel" && "active:scale-95",
                             unidade.status !== "disponivel" && "opacity-60 cursor-not-allowed"
                           )}
                         >
-                          <span className="text-[13px] font-semibold">{unidade.unidade}</span>
-                          <span className="text-[10px] block opacity-80">{unidade.dormitorios}D</span>
+                          <span className="text-[13px] font-semibold block">{unidade.unidade}</span>
+                          <span className="text-[9px] block opacity-90">{unidade.area}m²</span>
                         </button>
                       )
                     })}
@@ -269,6 +269,7 @@ export default function EspelhoPage() {
                   </h2>
                   <p className="text-[13px] text-[#86868b]">
                     {modalStep === "detalhes" && `${selectedUnidade.area}m² | ${selectedUnidade.tipologia}`}
+                    {modalStep === "fluxo" && "Cronograma de pagamentos"}
                     {modalStep === "cliente" && "Dados do cliente"}
                     {modalStep === "confirmacao" && `ID: ${preReserva?.id.slice(0, 8).toUpperCase()}`}
                   </p>
@@ -358,14 +359,191 @@ export default function EspelhoPage() {
                     </div>
                   </div>
 
-                  {/* Botão Pré-Reservar */}
-                  <button
-                    onClick={() => setModalStep("cliente")}
-                    className="w-full h-14 bg-[#0071e3] hover:bg-[#0077ed] text-white text-[17px] font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
-                  >
-                    <FileText className="w-5 h-5" />
-                    Pré-Reservar Esta Unidade
-                  </button>
+                  {/* Botões de Ação */}
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => setModalStep("fluxo")}
+                      className="w-full h-14 bg-[#34c759] hover:bg-[#2db550] text-white text-[17px] font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <CircleDollarSign className="w-5 h-5" />
+                      Criar Fluxo de Pagamento
+                    </button>
+
+                    <button
+                      onClick={() => setModalStep("cliente")}
+                      className="w-full h-14 bg-[#0071e3] hover:bg-[#0077ed] text-white text-[17px] font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <FileText className="w-5 h-5" />
+                      Pré-Reservar Esta Unidade
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step: Fluxo de Pagamento */}
+              {modalStep === "fluxo" && planoAtual && (
+                <>
+                  {/* Header do Fluxo */}
+                  <div className="bg-gradient-to-br from-[#34c759] to-[#30b350] rounded-2xl p-5 mb-5 text-white">
+                    <div className="flex items-center gap-3 mb-3">
+                      <CircleDollarSign className="w-8 h-8" />
+                      <div>
+                        <p className="text-[11px] opacity-80 font-medium">FLUXO DE PAGAMENTO</p>
+                        <p className="text-[20px] font-bold">{formatCurrency(selectedUnidade.valorTotal)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[13px] opacity-90">
+                      <span>Unidade {selectedUnidade.unidade}</span>
+                      <span>{selectedUnidade.area}m² | {selectedUnidade.dormitorios} dorm</span>
+                    </div>
+                  </div>
+
+                  {/* Timeline de Pagamentos */}
+                  <div className="mb-5">
+                    <p className="text-[13px] font-semibold text-[#1d1d1f] mb-4">Cronograma de Pagamentos</p>
+
+                    <div className="relative">
+                      {/* Linha vertical */}
+                      <div className="absolute left-[18px] top-6 bottom-6 w-0.5 bg-[#e8e8ed]" />
+
+                      {/* ATO */}
+                      <div className="relative flex gap-4 mb-4">
+                        <div className="w-9 h-9 rounded-full bg-[#0071e3] flex items-center justify-center flex-shrink-0 z-10">
+                          <span className="text-[11px] font-bold text-white">1</span>
+                        </div>
+                        <div className="flex-1 bg-white border border-[#e8e8ed] rounded-xl p-4">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] font-semibold text-[#0071e3]">ATO (SINAL)</span>
+                            <span className="text-[15px] font-bold text-[#1d1d1f]">{formatCurrency(selectedUnidade.plano.ato.valor)}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[12px] text-[#86868b]">
+                            <Calendar className="w-3 h-3" />
+                            {formatDate(selectedUnidade.plano.ato.vencimento)}
+                          </div>
+                          <p className="text-[11px] text-[#86868b] mt-1">Na assinatura do contrato</p>
+                        </div>
+                      </div>
+
+                      {/* MENSAIS */}
+                      {Array.from({ length: selectedUnidade.plano.mensais.quantidade }).map((_, i) => {
+                        const data = new Date(selectedUnidade.plano.mensais.primeiroVencimento)
+                        data.setMonth(data.getMonth() + i)
+                        return (
+                          <div key={i} className="relative flex gap-4 mb-4">
+                            <div className="w-9 h-9 rounded-full bg-[#ff9500] flex items-center justify-center flex-shrink-0 z-10">
+                              <span className="text-[11px] font-bold text-white">{i + 2}</span>
+                            </div>
+                            <div className="flex-1 bg-white border border-[#e8e8ed] rounded-xl p-4">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-semibold text-[#ff9500]">MENSAL {i + 1}/{selectedUnidade.plano.mensais.quantidade}</span>
+                                <span className="text-[15px] font-bold text-[#1d1d1f]">{formatCurrency(selectedUnidade.plano.mensais.valor)}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-[12px] text-[#86868b]">
+                                <Calendar className="w-3 h-3" />
+                                {formatDate(data.toISOString().split("T")[0])}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      {/* FINANCIAMENTO */}
+                      <div className="relative flex gap-4">
+                        <div className="w-9 h-9 rounded-full bg-[#5856d6] flex items-center justify-center flex-shrink-0 z-10">
+                          <span className="text-[11px] font-bold text-white">{selectedUnidade.plano.mensais.quantidade + 2}</span>
+                        </div>
+                        <div className="flex-1 bg-white border border-[#e8e8ed] rounded-xl p-4">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] font-semibold text-[#5856d6]">FINANCIAMENTO</span>
+                            <span className="text-[15px] font-bold text-[#1d1d1f]">{formatCurrency(selectedUnidade.plano.financiamento.valor)}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[12px] text-[#86868b]">
+                            <Calendar className="w-3 h-3" />
+                            {formatDate(selectedUnidade.plano.financiamento.vencimento)}
+                          </div>
+                          <p className="text-[11px] text-[#86868b] mt-1">Saldo via banco (FGTS/Caixa/BB)</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resumo */}
+                  <div className="bg-[#f5f5f7] rounded-xl p-4 mb-5">
+                    <p className="text-[11px] font-semibold text-[#86868b] mb-2">RESUMO DO INVESTIMENTO</p>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[13px]">
+                        <span className="text-[#1d1d1f]">ATO (1x)</span>
+                        <span className="font-semibold">{formatCurrency(selectedUnidade.plano.ato.valor)}</span>
+                      </div>
+                      <div className="flex justify-between text-[13px]">
+                        <span className="text-[#1d1d1f]">Mensais ({selectedUnidade.plano.mensais.quantidade}x)</span>
+                        <span className="font-semibold">{formatCurrency(selectedUnidade.plano.mensais.valor * selectedUnidade.plano.mensais.quantidade)}</span>
+                      </div>
+                      <div className="flex justify-between text-[13px]">
+                        <span className="text-[#1d1d1f]">Financiamento (1x)</span>
+                        <span className="font-semibold">{formatCurrency(selectedUnidade.plano.financiamento.valor)}</span>
+                      </div>
+                      <div className="border-t border-[#d2d2d7] pt-2 mt-2">
+                        <div className="flex justify-between text-[15px]">
+                          <span className="font-semibold text-[#1d1d1f]">TOTAL</span>
+                          <span className="font-bold text-[#0071e3]">{formatCurrency(selectedUnidade.valorTotal)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ações */}
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => {
+                        const mensaisText = Array.from({ length: selectedUnidade.plano.mensais.quantidade }).map((_, i) => {
+                          const data = new Date(selectedUnidade.plano.mensais.primeiroVencimento)
+                          data.setMonth(data.getMonth() + i)
+                          return `${i + 1}ª Mensal: ${formatCurrency(selectedUnidade.plano.mensais.valor)} - ${formatDate(data.toISOString().split("T")[0])}`
+                        }).join("\n")
+
+                        const msg = `*FLUXO DE PAGAMENTO*\n\n*${stationParkInfo.nome}*\nUnidade ${selectedUnidade.unidade} | ${selectedUnidade.area}m² | ${selectedUnidade.dormitorios} dorm\n\n*VALOR TOTAL: ${formatCurrency(selectedUnidade.valorTotal)}*\n\n📅 *CRONOGRAMA:*\n\n*ATO (Sinal):*\n${formatCurrency(selectedUnidade.plano.ato.valor)} - ${formatDate(selectedUnidade.plano.ato.vencimento)}\n\n*MENSAIS:*\n${mensaisText}\n\n*FINANCIAMENTO:*\n${formatCurrency(selectedUnidade.plano.financiamento.valor)} - ${formatDate(selectedUnidade.plano.financiamento.vencimento)}\n\n_Corretor: ${session?.user?.name}_`
+                        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank")
+                      }}
+                      className="w-full h-12 bg-[#25D366] hover:bg-[#20BD5A] text-white text-[15px] font-medium rounded-xl flex items-center justify-center gap-2"
+                    >
+                      <Share2 className="w-5 h-5" />
+                      Compartilhar via WhatsApp
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const mensaisText = Array.from({ length: selectedUnidade.plano.mensais.quantidade }).map((_, i) => {
+                          const data = new Date(selectedUnidade.plano.mensais.primeiroVencimento)
+                          data.setMonth(data.getMonth() + i)
+                          return `${i + 1}ª Mensal: ${formatCurrency(selectedUnidade.plano.mensais.valor)} - ${formatDate(data.toISOString().split("T")[0])}`
+                        }).join("\n")
+
+                        const text = `FLUXO DE PAGAMENTO\n\n${stationParkInfo.nome}\nUnidade ${selectedUnidade.unidade} | ${selectedUnidade.area}m² | ${selectedUnidade.dormitorios} dorm\n\nVALOR TOTAL: ${formatCurrency(selectedUnidade.valorTotal)}\n\nCRONOGRAMA:\n\nATO (Sinal):\n${formatCurrency(selectedUnidade.plano.ato.valor)} - ${formatDate(selectedUnidade.plano.ato.vencimento)}\n\nMENSAIS:\n${mensaisText}\n\nFINANCIAMENTO:\n${formatCurrency(selectedUnidade.plano.financiamento.valor)} - ${formatDate(selectedUnidade.plano.financiamento.vencimento)}\n\nCorretor: ${session?.user?.name}`
+                        navigator.clipboard.writeText(text)
+                        alert("Fluxo copiado para área de transferência!")
+                      }}
+                      className="w-full h-12 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] text-[15px] font-medium rounded-xl flex items-center justify-center gap-2"
+                    >
+                      <Copy className="w-5 h-5" />
+                      Copiar Fluxo
+                    </button>
+
+                    <button
+                      onClick={() => setModalStep("cliente")}
+                      className="w-full h-12 bg-[#0071e3] hover:bg-[#0077ed] text-white text-[15px] font-medium rounded-xl flex items-center justify-center gap-2"
+                    >
+                      Continuar para Pré-Reserva
+                      <ArrowRight className="w-5 h-5" />
+                    </button>
+
+                    <button
+                      onClick={() => setModalStep("detalhes")}
+                      className="w-full h-10 text-[#0071e3] text-[15px] font-medium"
+                    >
+                      Voltar
+                    </button>
+                  </div>
                 </>
               )}
 

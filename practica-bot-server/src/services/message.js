@@ -46,10 +46,33 @@ class MessageService {
 
             // 1. Generate AI Response (Single Block)
             const history = []; // TODO: Add persistent history
-            const aiResponse = await aiService.generateResponse(text, history);
+
+            // Start AI response and lead extraction in parallel to optimize response time
+            const [aiResponse, leadInfo] = await Promise.all([
+                aiService.generateResponse(text, history),
+                aiService.extractLeadInfo(text, history)
+            ]);
+
             console.log(`🤖 AI Full Answer: ${aiResponse}`);
 
-            // 2. Advanced Humanization: Split and Send
+            // 2. Check if it's a "Hot Lead" and notify
+            if (leadInfo && (leadInfo.intent === 'high' || text.toLowerCase().includes('visita') || text.toLowerCase().includes('marcar'))) {
+                const notifier = require('./notifier');
+                notifier.notifyHotLead({
+                    ...leadInfo,
+                    pushName: pushName,
+                    phoneNumber: sender.split('@')[0]
+                });
+
+                // Auto-send Catalog/Material if they seem interested in details
+                if (text.toLowerCase().includes('foto') || text.toLowerCase().includes('material') || text.toLowerCase().includes('catálogo') || text.toLowerCase().includes('catalogo')) {
+                    // Placeholder: In a real scenario, we'd map property name to a specific URL
+                    const catalogUrl = 'https://pratica-inc.com.br/wp-content/uploads/2023/10/Book-Aura-Vila-Guilhermina.pdf';
+                    await apiService.sendMedia(sender, catalogUrl, 'document', 'Oi! Separei aqui o material completo do empreendimento pra vc dar uma olhada. 😉', 'Catalogo_Pratica.pdf');
+                }
+            }
+
+            // 3. Advanced Humanization: Split and Send
             await this.sendHumanizedResponse(sender, aiResponse);
 
         } catch (error) {
