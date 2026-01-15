@@ -92,6 +92,7 @@ model AuthCode {
   id        String   @id @default(uuid())
   whatsapp  String
   code      String
+  token     String?  @unique
   expiresAt DateTime @map("expires_at")
   used      Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendOTP } from "@/services/whatsapp"
+import crypto from "crypto"
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,10 +11,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "WhatsApp é obrigatório" }, { status: 400 })
     }
 
-    // Remove tudo que não é número
     const cleanPhone = whatsapp.replace(/\D/g, "")
     
-    // Gera variações para busca (com e sem 55)
     let phoneWith55 = cleanPhone
     let phoneWithout55 = cleanPhone
 
@@ -23,9 +22,6 @@ export async function POST(req: NextRequest) {
       phoneWith55 = "55" + cleanPhone
     }
 
-    console.log(`Buscando corretor por: ${phoneWith55} ou ${phoneWithout55}`)
-
-    // Verifica se o corretor existe (busca por qualquer uma das variações)
     const corretor = await prisma.corretor.findFirst({
       where: {
         whatsapp: {
@@ -35,35 +31,32 @@ export async function POST(req: NextRequest) {
     })
 
     if (!corretor) {
-      console.log("Corretor não encontrado")
       return NextResponse.json({ error: "Corretor não encontrado ou não autorizado" }, { status: 404 })
     }
 
-    console.log(`Corretor encontrado: ${corretor.nome}`)
-
     // Gera código aleatório de 6 dígitos
     const code = Math.floor(100000 + Math.random() * 900000).toString()
-
-    // Expira em 10 minutos
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
-
-    // O WhatsApp salvo no authCode deve ser o que vamos usar para validar depois (vamos padronizar para o que está no banco do corretor para facilitar, ou salvar o que foi usado no envio)
-    // Mas para o envio via Z-API, TEM que ser com 55.
     
-    // Vamos salvar no AuthCode o número exato que está no cadastro do corretor, para garantir o match no login
+    // Gera token único para o link de login
+    const token = crypto.randomBytes(32).toString("hex")
+
+    // Expira em 15 minutos
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
+
+    // Salva no banco com o token do link
     await prisma.authCode.create({
       data: {
-        whatsapp: corretor.whatsapp, // Salva vinculado ao número do cadastro
+        whatsapp: corretor.whatsapp,
         code,
+        token,
         expiresAt
       }
     })
 
-    // Envia via WhatsApp (garantindo o 55 para a API)
-    const result = await sendOTP(phoneWith55, code)
+    // Envia via WhatsApp usando o novo método de botões
+    const result = await sendOTP(phoneWith55, code, token)
 
     if (!result.success) {
-      console.error("Erro Z-API:", result)
       return NextResponse.json({ error: "Erro ao enviar mensagem via WhatsApp" }, { status: 500 })
     }
 

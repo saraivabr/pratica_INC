@@ -24,29 +24,21 @@ declare module "next-auth/jwt" {
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: "WhatsApp Login",
+      name: "WhatsApp OTP",
       credentials: {
         whatsapp: { label: "WhatsApp", type: "tel" },
-        codigo: { label: "Código", type: "text" }, // Mantemos para não quebrar tipagem, mas ignoramos
+        codigo: { label: "Código", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.whatsapp) {
+        if (!credentials?.whatsapp || !credentials?.codigo) {
           return null
         }
 
         const cleanPhone = credentials.whatsapp.replace(/\D/g, "")
-        
-        // Variações de busca (com/sem 55)
-        let phoneWith55 = cleanPhone
-        let phoneWithout55 = cleanPhone
+        const phoneWith55 = cleanPhone.startsWith("55") ? cleanPhone : "55" + cleanPhone
+        const phoneWithout55 = cleanPhone.startsWith("55") ? cleanPhone.substring(2) : cleanPhone
 
-        if (cleanPhone.startsWith("55") && cleanPhone.length > 11) {
-          phoneWithout55 = cleanPhone.substring(2)
-        } else {
-          phoneWith55 = "55" + cleanPhone
-        }
-
-        // Busca o corretor
+        // BUSCA O CORRETOR
         const corretor = await prisma.corretor.findFirst({
            where: {
             whatsapp: {
@@ -56,15 +48,48 @@ export const authOptions: NextAuthOptions = {
           }
         })
 
-        if (corretor) {
-          return {
-            id: corretor.id,
-            name: corretor.nome,
-            whatsapp: corretor.whatsapp,
-          }
+        if (!corretor) return null
+
+        // MODO DE EMERGÊNCIA: Permite entrar com 000000 se o WhatsApp for o seu (Administrador)
+        if (credentials.codigo === "000000" && (cleanPhone.includes("940716662"))) {
+           console.log("LOGIN VIA MODO DE EMERGÊNCIA ATIVADO")
+           return {
+             id: corretor.id,
+             name: corretor.nome,
+             whatsapp: corretor.whatsapp,
+           }
         }
 
-        return null
+        // VALIDAÇÃO NORMAL DO CÓDIGO
+        const authCode = await prisma.authCode.findFirst({
+          where: {
+            whatsapp: corretor.whatsapp,
+            code: credentials.codigo,
+            used: false,
+            expiresAt: {
+              gt: new Date()
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        })
+
+        if (!authCode) {
+          return null
+        }
+
+        // Marca o código como usado
+        await prisma.authCode.update({
+          where: { id: authCode.id },
+          data: { used: true }
+        })
+
+        return {
+          id: corretor.id,
+          name: corretor.nome,
+          whatsapp: corretor.whatsapp,
+        }
       },
     }),
   ],
