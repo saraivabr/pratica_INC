@@ -237,6 +237,112 @@ async function main() {
     console.log(`   Total: ${unidades.length} unidades\n`);
   }
 
+  // ============================================
+  // 4. INSERIR UNIDADES AURA GUILHERMINA (AGOSTO 2025)
+  // ============================================
+  console.log("4. Inserindo unidades Aura Guilhermina (Agosto 2025)...");
+
+  const auraUnidades: UnidadeStationPark[] = [
+    { id: "AG405", unidade: "405", area: 33, dormitorios: 2, tipologia: "2 Dormitórios", status: "disponivel", valorTotal: 286865, plano: { ato: { valor: 28686, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 229492, vencimento: "2026-10-15" } } },
+    { id: "AG702", unidade: "702", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 368825, plano: { ato: { valor: 36883, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 295060, vencimento: "2026-10-15" } } },
+    { id: "AG1001", unidade: "1001", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG - DEP)", status: "disponivel", valorTotal: 358849, plano: { ato: { valor: 35885, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 287079, vencimento: "2026-10-15" } } },
+    { id: "AG1103", unidade: "1103", area: 33, dormitorios: 2, tipologia: "2 Dormitórios", status: "disponivel", valorTotal: 276987, plano: { ato: { valor: 27699, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 221589, vencimento: "2026-10-15" } } },
+    { id: "AG1107", unidade: "1107", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 358849, plano: { ato: { valor: 35885, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 287079, vencimento: "2026-10-15" } } },
+    { id: "AG1304", unidade: "1304", area: 33, dormitorios: 2, tipologia: "2 Dormitórios", status: "disponivel", valorTotal: 286865, plano: { ato: { valor: 28686, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 229492, vencimento: "2026-10-15" } } },
+    { id: "AG1405", unidade: "1405", area: 33, dormitorios: 2, tipologia: "2 Dormitórios", status: "disponivel", valorTotal: 286865, plano: { ato: { valor: 28686, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 229492, vencimento: "2026-10-15" } } },
+    { id: "AG1606", unidade: "1606", area: 33, dormitorios: 2, tipologia: "2 Dormitórios", status: "disponivel", valorTotal: 276987, plano: { ato: { valor: 27699, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 221589, vencimento: "2026-10-15" } } },
+    { id: "AG1801", unidade: "1801", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 459429, plano: { ato: { valor: 45943, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 367544, vencimento: "2026-10-15" } } },
+    { id: "AG1805", unidade: "1805", area: 33, dormitorios: 2, tipologia: "2 Dormitórios", status: "disponivel", valorTotal: 358599, plano: { ato: { valor: 35860, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 286879, vencimento: "2026-10-15" } } },
+    { id: "AG2001", unidade: "2001", area: 88, dormitorios: 3, tipologia: "3 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 986834, plano: { ato: { valor: 98683, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 789467, vencimento: "2026-10-15" } } },
+    { id: "AG2002", unidade: "2002", area: 66, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 740126, plano: { ato: { valor: 74013, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 592101, vencimento: "2026-10-15" } } },
+    { id: "AG2003", unidade: "2003", area: 66, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 740126, plano: { ato: { valor: 74013, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 592101, vencimento: "2026-10-15" } } },
+    { id: "AG2004", unidade: "2004", area: 88, dormitorios: 3, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 986834, plano: { ato: { valor: 98683, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 789467, vencimento: "2026-10-15" } } },
+  ];
+
+  for (const unidade of auraUnidades) {
+    await prisma.unidade.upsert({
+      where: { id: unidade.id },
+      update: {
+        empreendimentoId: "aura",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+      create: {
+        id: unidade.id,
+        empreendimentoId: "aura",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+    });
+    console.log(`   - Unidade: ${unidade.unidade} - R$ ${unidade.valorTotal.toLocaleString("pt-BR")}`);
+  }
+
+  console.log(`   Total: ${auraUnidades.length} unidades\n`);
+
+  // ============================================
+  // 5. INSERIR UNIDADES COLATINNA (AGOSTO 2025)
+  // ============================================
+  console.log("5. Inserindo unidades Colatinna (Agosto 2025)...");
+
+  const colatinnaUnidades: UnidadeStationPark[] = [
+    { id: "COL604", unidade: "604", area: 49, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG)", status: "disponivel", valorTotal: 667937, plano: { ato: { valor: 66794, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 467556, vencimento: "2027-10-15" } } },
+    { id: "COL803", unidade: "803", area: 51, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG)", status: "disponivel", valorTotal: 704835, plano: { ato: { valor: 70484, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 493385, vencimento: "2027-10-15" } } },
+    { id: "COL902", unidade: "902", area: 43, dormitorios: 2, tipologia: "2 Dormitórios (MOTO)", status: "disponivel", valorTotal: 538843, plano: { ato: { valor: 53884, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 377190, vencimento: "2027-10-15" } } },
+    { id: "COL903", unidade: "903", area: 51, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG)", status: "disponivel", valorTotal: 725756, plano: { ato: { valor: 72576, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 508030, vencimento: "2027-10-15" } } },
+    { id: "COL904", unidade: "904", area: 50, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG - DEP)", status: "disponivel", valorTotal: 697344, plano: { ato: { valor: 69734, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 488141, vencimento: "2027-10-15" } } },
+    { id: "COL1001", unidade: "1001", area: 46, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG - DEP)", status: "disponivel", valorTotal: 674064, plano: { ato: { valor: 67406, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 471844, vencimento: "2027-10-15" } } },
+    { id: "COL1002", unidade: "1002", area: 43, dormitorios: 2, tipologia: "2 Dormitórios (MOTO - DEP)", status: "disponivel", valorTotal: 561166, plano: { ato: { valor: 56117, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 392816, vencimento: "2027-10-15" } } },
+    { id: "COL1003", unidade: "1003", area: 51, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG - DEP)", status: "disponivel", valorTotal: 730446, plano: { ato: { valor: 73045, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 511312, vencimento: "2027-10-15" } } },
+    { id: "COL1004", unidade: "1004", area: 49, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG - DEP)", status: "disponivel", valorTotal: 701846, plano: { ato: { valor: 70185, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 491292, vencimento: "2027-10-15" } } },
+    { id: "COL1102", unidade: "1102", area: 43, dormitorios: 2, tipologia: "2 Dormitórios (MOTO - DEP)", status: "disponivel", valorTotal: 568994, plano: { ato: { valor: 56899, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 398296, vencimento: "2027-10-15" } } },
+    { id: "COL1202", unidade: "1202", area: 43, dormitorios: 2, tipologia: "2 Dormitórios (VG - DEP)", status: "disponivel", valorTotal: 636974, plano: { ato: { valor: 63697, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 445882, vencimento: "2027-10-15" } } },
+    { id: "COL1203", unidade: "1203", area: 51, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG - DEP)", status: "disponivel", valorTotal: 768067, plano: { ato: { valor: 76807, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 537647, vencimento: "2027-10-15" } } },
+    { id: "COL1204", unidade: "1204", area: 49, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG - DEP)", status: "disponivel", valorTotal: 710938, plano: { ato: { valor: 71094, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 497657, vencimento: "2027-10-15" } } },
+    { id: "COL1302", unidade: "1302", area: 43, dormitorios: 2, tipologia: "2 Dormitórios (VG - DEP)", status: "disponivel", valorTotal: 594387, plano: { ato: { valor: 59439, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 416071, vencimento: "2027-10-15" } } },
+    { id: "COL1303", unidade: "1303", area: 51, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG - DEP)", status: "disponivel", valorTotal: 765257, plano: { ato: { valor: 76526, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 535680, vencimento: "2027-10-15" } } },
+    { id: "COL1304", unidade: "1304", area: 49, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte (VG - DEP)", status: "disponivel", valorTotal: 743866, plano: { ato: { valor: 74387, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 520706, vencimento: "2027-10-15" } } },
+  ];
+
+  for (const unidade of colatinnaUnidades) {
+    await prisma.unidade.upsert({
+      where: { id: unidade.id },
+      update: {
+        empreendimentoId: "colatinna",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+      create: {
+        id: unidade.id,
+        empreendimentoId: "colatinna",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+    });
+    console.log(`   - Unidade: ${unidade.unidade} - R$ ${unidade.valorTotal.toLocaleString("pt-BR")}`);
+  }
+
+  console.log(`   Total: ${colatinnaUnidades.length} unidades\n`);
+
   console.log("========================================");
   console.log("Seed concluido com sucesso!");
   console.log("========================================");
