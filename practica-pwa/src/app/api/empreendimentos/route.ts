@@ -1,25 +1,53 @@
 import { NextResponse } from "next/server"
-import database from "@/data/pratica_database.json"
-import { Empreendimento } from "@/types/empreendimento"
+import prisma from "@/lib/prisma"
 
 export async function GET() {
   try {
-    const empreendimentos: Empreendimento[] = [
-      ...database.empreendimentos.em_construcao.map((e) => ({
-        ...e,
-        status: "em_construcao" as const,
-      })),
-      ...database.empreendimentos.em_lancamento.map((e) => ({
-        ...e,
-        status: "lancamento" as const,
-      })),
-      ...database.empreendimentos.entregues.map((e) => ({
-        ...e,
-        status: "entregue" as const,
-      })),
-    ]
+    const empreendimentos = await prisma.empreendimento.findMany({
+      include: {
+        unidades: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
 
-    return NextResponse.json(empreendimentos)
+    // Transform to match the expected format
+    const formatted = empreendimentos.map((emp) => {
+      const dados = emp.dadosJson as Record<string, unknown> || {}
+
+      return {
+        id: emp.id,
+        nome: emp.nome,
+        status: emp.status,
+        entrega_prevista: emp.entregaPrevista?.toISOString().split('T')[0],
+        imagemCapa: emp.imagemCapa,
+        localizacao: {
+          bairro: emp.bairro || '',
+          zona: emp.zona,
+          ...(dados.localizacao as object || {})
+        },
+        tipologias: dados.tipologias || [],
+        lazer: dados.lazer || [],
+        diferenciais: dados.diferenciais || [],
+        galeria: dados.galeria || [],
+        configuracao: dados.configuracao || {},
+        preco_m2: dados.preco_m2,
+        financiamento: dados.financiamento || [],
+        unidades: emp.unidades.map(u => ({
+          id: u.id,
+          numero: u.numero,
+          area_m2: Number(u.areaM2),
+          dormitorios: u.dormitorios,
+          tipologia: u.tipologia,
+          valorTotal: Number(u.valorTotal),
+          status: u.status,
+          plano: u.planoJson
+        }))
+      }
+    })
+
+    return NextResponse.json(formatted)
   } catch (error) {
     console.error("Error fetching empreendimentos:", error)
     return NextResponse.json(

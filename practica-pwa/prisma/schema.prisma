@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Corretor {
+  id        String   @id @default(uuid())
+  nome      String
+  whatsapp  String   @unique
+  codigo    String   @unique
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  preReservas PreReserva[]
+
+  @@map("corretores")
+}
+
+model Empreendimento {
+  id              String   @id
+  nome            String
+  status          String
+  bairro          String?
+  zona            String   @default("Leste")
+  entregaPrevista DateTime? @map("entrega_prevista")
+  imagemCapa      String?  @map("imagem_capa")
+  dadosJson       Json?    @map("dados_json")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  unidades    Unidade[]
+  preReservas PreReserva[]
+
+  @@map("empreendimentos")
+}
+
+model Unidade {
+  id               String  @id
+  empreendimentoId String  @map("empreendimento_id")
+  numero           String
+  areaM2           Decimal @map("area_m2") @db.Decimal(6, 2)
+  dormitorios      Int
+  tipologia        String?
+  valorTotal       Decimal @map("valor_total") @db.Decimal(12, 2)
+  status           String  @default("disponivel")
+  planoJson        Json?   @map("plano_json")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  empreendimento Empreendimento @relation(fields: [empreendimentoId], references: [id])
+  preReservas    PreReserva[]
+
+  @@map("unidades")
+}
+
+model Cliente {
+  id        String   @id @default(uuid())
+  nome      String
+  cpf       String   @unique
+  whatsapp  String
+  email     String?
+  endereco  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  preReservas PreReserva[]
+
+  @@map("clientes")
+}
+
+model PreReserva {
+  id               String   @id @default(uuid())
+  corretorId       String   @map("corretor_id")
+  empreendimentoId String   @map("empreendimento_id")
+  unidadeId        String   @map("unidade_id")
+  clienteId        String   @map("cliente_id")
+  status           String   @default("pendente")
+  planoJson        Json     @map("plano_json")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  corretor       Corretor       @relation(fields: [corretorId], references: [id])
+  empreendimento Empreendimento @relation(fields: [empreendimentoId], references: [id])
+  unidade        Unidade        @relation(fields: [unidadeId], references: [id])
+  cliente        Cliente        @relation(fields: [clienteId], references: [id])
+
+  @@map("pre_reservas")
+}

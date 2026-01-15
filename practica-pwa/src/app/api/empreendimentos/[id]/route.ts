@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
-import database from "@/data/pratica_database.json"
-import { Empreendimento } from "@/types/empreendimento"
+import prisma from "@/lib/prisma"
 
 export async function GET(
   request: Request,
@@ -9,31 +8,53 @@ export async function GET(
   try {
     const { id } = await params
 
-    const todosEmpreendimentos: Empreendimento[] = [
-      ...database.empreendimentos.em_construcao.map((e) => ({
-        ...e,
-        status: "em_construcao" as const,
-      })),
-      ...database.empreendimentos.em_lancamento.map((e) => ({
-        ...e,
-        status: "lancamento" as const,
-      })),
-      ...database.empreendimentos.entregues.map((e) => ({
-        ...e,
-        status: "entregue" as const,
-      })),
-    ]
+    const emp = await prisma.empreendimento.findUnique({
+      where: { id },
+      include: {
+        unidades: true
+      }
+    })
 
-    const empreendimento = todosEmpreendimentos.find((e) => e.id === id)
-
-    if (!empreendimento) {
+    if (!emp) {
       return NextResponse.json(
         { error: "Empreendimento not found" },
         { status: 404 }
       )
     }
 
-    return NextResponse.json(empreendimento)
+    const dados = emp.dadosJson as Record<string, unknown> || {}
+
+    const formatted = {
+      id: emp.id,
+      nome: emp.nome,
+      status: emp.status,
+      entrega_prevista: emp.entregaPrevista?.toISOString().split('T')[0],
+      imagemCapa: emp.imagemCapa,
+      localizacao: {
+        bairro: emp.bairro || '',
+        zona: emp.zona,
+        ...(dados.localizacao as object || {})
+      },
+      tipologias: dados.tipologias || [],
+      lazer: dados.lazer || [],
+      diferenciais: dados.diferenciais || [],
+      galeria: dados.galeria || [],
+      configuracao: dados.configuracao || {},
+      preco_m2: dados.preco_m2,
+      financiamento: dados.financiamento || [],
+      unidades: emp.unidades.map(u => ({
+        id: u.id,
+        numero: u.numero,
+        area_m2: Number(u.areaM2),
+        dormitorios: u.dormitorios,
+        tipologia: u.tipologia,
+        valorTotal: Number(u.valorTotal),
+        status: u.status,
+        plano: u.planoJson
+      }))
+    }
+
+    return NextResponse.json(formatted)
   } catch (error) {
     console.error("Error fetching empreendimento:", error)
     return NextResponse.json(

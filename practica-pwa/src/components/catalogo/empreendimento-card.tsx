@@ -11,18 +11,21 @@ interface EmpreendimentoCardProps {
   empreendimento: Empreendimento
 }
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; className: string }> = {
   em_construcao: { label: "Em Obras", className: "bg-[#ff9500] text-white" },
   lancamento: { label: "Lançamento", className: "bg-[#1d1d1f] text-white" },
+  em_lancamento: { label: "Lançamento", className: "bg-[#1d1d1f] text-white" },
   entregue: { label: "Pronto", className: "bg-[#34c759] text-white" },
 }
+
+const defaultStatus = { label: "Disponível", className: "bg-[#86868b] text-white" }
 
 const defaultPlaceholder = "https://praticaincorporadora.com.br/assets/new-images/aura-guilhermina/praticaincorporadora-aura-guilhermina-hero.jpg"
 
 export function EmpreendimentoCard({ empreendimento: emp }: EmpreendimentoCardProps) {
   const { toggle, isFavorite } = useFavorites()
   const favorited = isFavorite(emp.id)
-  const status = statusConfig[emp.status]
+  const status = statusConfig[emp.status] || defaultStatus
   const preco = emp.tipologias?.[0]?.preco_base
   const imageUrl = emp.imagemCapa || defaultPlaceholder
   const menorArea = emp.tipologias?.[0]?.area_m2
@@ -96,8 +99,8 @@ export function EmpreendimentoCard({ empreendimento: emp }: EmpreendimentoCardPr
           {/* Location */}
           <div className="flex items-center gap-1.5 text-[#86868b] mb-4">
             <MapPin className="w-3.5 h-3.5" />
-            <span className="text-[13px]">{emp.localizacao.bairro}</span>
-            {emp.localizacao.proximidade_metro && (
+            <span className="text-[13px]">{emp.localizacao?.bairro || 'São Paulo'}</span>
+            {emp.localizacao?.proximidade_metro && (
               <>
                 <span className="text-[#d2d2d7]">·</span>
                 <span className="text-[13px] text-[#0071e3] font-medium">

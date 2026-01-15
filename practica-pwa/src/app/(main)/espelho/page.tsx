@@ -1,25 +1,68 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { ChevronDown, FileText, X, Check, Calendar, Wallet, Home, User, Share2, Copy, ArrowRight, CircleDollarSign } from "lucide-react"
+import { ChevronDown, FileText, X, Check, Calendar, Wallet, Home, User, Share2, Copy, ArrowRight, CircleDollarSign, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { stationParkUnidades, stationParkInfo, criarPlanoFromUnidade, UnidadeStationPark } from "@/data/station-park"
 import { PlanoPagamentoTable } from "@/components/reserva/plano-pagamento"
 import { ClienteForm } from "@/components/reserva/cliente-form"
 import { Cliente, PlanoPagamento, PreReserva } from "@/types/pagamento"
+
+// Interface para unidade vinda do banco
+interface UnidadeDB {
+  id: string
+  empreendimentoId: string
+  empreendimentoNome: string
+  numero: string
+  unidade: string
+  area: number
+  area_m2: number
+  dormitorios: number
+  tipologia: string
+  valorTotal: number
+  status: string
+  plano: {
+    ato: { valor: number; vencimento: string }
+    mensais: { quantidade: number; valor: number; primeiroVencimento: string }
+    financiamento: { valor: number; vencimento: string }
+  } | null
+}
 
 type ModalStep = "detalhes" | "fluxo" | "cliente" | "confirmacao"
 
 export default function EspelhoPage() {
   const router = useRouter()
   const { data: session } = useSession()
-  const [selectedUnidade, setSelectedUnidade] = useState<UnidadeStationPark | null>(null)
+  const [unidades, setUnidades] = useState<UnidadeDB[]>([])
+  const [empreendimentoNome, setEmpreendimentoNome] = useState("Station Park Apartamentos")
+  const [loading, setLoading] = useState(true)
+  const [selectedUnidade, setSelectedUnidade] = useState<UnidadeDB | null>(null)
   const [modalStep, setModalStep] = useState<ModalStep>("detalhes")
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [preReserva, setPreReserva] = useState<PreReserva | null>(null)
   const [cliente, setCliente] = useState<Cliente | null>(null)
+
+  // Fetch unidades from API
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const res = await fetch("/api/unidades?empreendimentoId=station-park")
+        if (res.ok) {
+          const data = await res.json()
+          setUnidades(data)
+          if (data.length > 0) {
+            setEmpreendimentoNome(data[0].empreendimentoNome)
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao buscar unidades:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -39,9 +82,9 @@ export default function EspelhoPage() {
   }
 
   // Agrupar unidades por andar
-  const unidadesPorAndar: Record<number, UnidadeStationPark[]> = {}
-  stationParkUnidades.forEach(u => {
-    const andar = parseInt(u.unidade.slice(0, -2)) || parseInt(u.unidade.slice(0, -1))
+  const unidadesPorAndar: Record<number, UnidadeDB[]> = {}
+  unidades.forEach(u => {
+    const andar = parseInt(u.numero.slice(0, -2)) || parseInt(u.numero.slice(0, -1))
     if (!unidadesPorAndar[andar]) unidadesPorAndar[andar] = []
     unidadesPorAndar[andar].push(u)
   })
@@ -49,12 +92,12 @@ export default function EspelhoPage() {
   const andares = Object.keys(unidadesPorAndar).map(Number).sort((a, b) => a - b)
 
   const stats = {
-    total: stationParkUnidades.length,
-    disponiveis: stationParkUnidades.filter(u => u.status === "disponivel").length,
-    vgv: stationParkUnidades.reduce((sum, u) => sum + u.valorTotal, 0)
+    total: unidades.length,
+    disponiveis: unidades.filter(u => u.status === "disponivel").length,
+    vgv: unidades.reduce((sum, u) => sum + u.valorTotal, 0)
   }
 
-  const handleUnidadeClick = (unidade: UnidadeStationPark) => {
+  const handleUnidadeClick = (unidade: UnidadeDB) => {
     setSelectedUnidade(unidade)
     setModalStep("detalhes")
     setPreReserva(null)
@@ -66,10 +109,54 @@ export default function EspelhoPage() {
     setModalStep("detalhes")
   }
 
+  // Criar plano de pagamento a partir da unidade
+  const criarPlanoFromUnidade = (unidade: UnidadeDB): PlanoPagamento | null => {
+    if (!unidade.plano) return null
+
+    const valorTotal = unidade.valorTotal
+    const valorAto = unidade.plano.ato.valor
+    const valorMensal = unidade.plano.mensais.valor
+    const qtdMensais = unidade.plano.mensais.quantidade
+    const valorFinanciamento = unidade.plano.financiamento.valor
+
+    return {
+      valorTotal,
+      percentualAto: (valorAto / valorTotal) * 100,
+      percentualMensais: ((valorMensal * qtdMensais) / valorTotal) * 100,
+      percentualFinanciamento: (valorFinanciamento / valorTotal) * 100,
+      quantidadeMensais: qtdMensais,
+      ato: {
+        tipo: "ato",
+        numero: 1,
+        valor: valorAto,
+        vencimento: unidade.plano.ato.vencimento,
+        status: "pendente"
+      },
+      mensais: Array.from({ length: qtdMensais }, (_, i) => {
+        const data = new Date(unidade.plano!.mensais.primeiroVencimento)
+        data.setMonth(data.getMonth() + i)
+        return {
+          tipo: "mensal" as const,
+          numero: i + 1,
+          valor: valorMensal,
+          vencimento: data.toISOString().split("T")[0],
+          status: "pendente" as const
+        }
+      }),
+      financiamento: {
+        tipo: "financiamento",
+        numero: 1,
+        valor: valorFinanciamento,
+        vencimento: unidade.plano.financiamento.vencimento,
+        status: "pendente"
+      }
+    }
+  }
+
   const handleClienteSubmit = async (dadosCliente: Cliente) => {
     if (!selectedUnidade || !session?.user) return
 
-    setLoading(true)
+    setSubmitting(true)
     setCliente(dadosCliente)
 
     const plano = criarPlanoFromUnidade(selectedUnidade)
@@ -81,9 +168,9 @@ export default function EspelhoPage() {
         body: JSON.stringify({
           corretorId: session.user.id,
           corretorNome: session.user.name,
-          empreendimentoId: stationParkInfo.id,
-          empreendimentoNome: stationParkInfo.nome,
-          unidade: selectedUnidade.unidade,
+          empreendimentoId: "station-park",
+          empreendimentoNome: empreendimentoNome,
+          unidade: selectedUnidade.numero,
           tipologia: {
             area_m2: selectedUnidade.area,
             dormitorios: selectedUnidade.dormitorios,
@@ -99,15 +186,31 @@ export default function EspelhoPage() {
       const data = await response.json()
       setPreReserva(data.preReserva)
       setModalStep("confirmacao")
+
+      // Atualizar lista de unidades
+      setUnidades(prev => prev.map(u =>
+        u.id === selectedUnidade.id ? { ...u, status: "reservado" } : u
+      ))
     } catch (error) {
       console.error("Erro:", error)
       alert("Erro ao criar pré-reserva. Tente novamente.")
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
   const planoAtual = selectedUnidade ? criarPlanoFromUnidade(selectedUnidade) : null
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-[#0071e3] animate-spin" />
+          <p className="text-[15px] text-[#86868b]">Carregando espelho...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f5f7]">
@@ -120,7 +223,7 @@ export default function EspelhoPage() {
                 Espelho de Vendas
               </h1>
               <p className="text-[13px] text-[#86868b] mt-0.5">
-                {stationParkInfo.nome}
+                {empreendimentoNome}
               </p>
             </div>
             <button
@@ -136,8 +239,8 @@ export default function EspelhoPage() {
 
           {/* Info Card */}
           <div className="bg-white rounded-xl p-4 border border-[#e8e8ed]">
-            <p className="text-[11px] text-[#86868b] font-medium mb-1">{stationParkInfo.tabelaVigente}</p>
-            <p className="text-[15px] font-semibold text-[#1d1d1f]">{stationParkInfo.nome}</p>
+            <p className="text-[11px] text-[#86868b] font-medium mb-1">Tabela Vigente - JAN/2025</p>
+            <p className="text-[15px] font-semibold text-[#1d1d1f]">{empreendimentoNome}</p>
             <div className="flex items-center gap-4 mt-2">
               <span className="text-[12px] text-[#86868b]">
                 <span className="text-[#34c759] font-semibold">{stats.disponiveis}</span> disponíveis
@@ -182,13 +285,13 @@ export default function EspelhoPage() {
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {unidadesPorAndar[andar]
-                    .sort((a, b) => a.unidade.localeCompare(b.unidade))
+                    .sort((a, b) => a.numero.localeCompare(b.numero))
                     .map(unidade => {
                       const statusColor = {
                         disponivel: "bg-[#34c759] hover:bg-[#2db550]",
                         reservado: "bg-[#ff9500]",
                         vendido: "bg-[#ff3b30]"
-                      }[unidade.status]
+                      }[unidade.status] || "bg-[#34c759] hover:bg-[#2db550]"
 
                       return (
                         <button
@@ -202,7 +305,7 @@ export default function EspelhoPage() {
                             unidade.status !== "disponivel" && "opacity-60 cursor-not-allowed"
                           )}
                         >
-                          <span className="text-[13px] font-semibold block">{unidade.unidade}</span>
+                          <span className="text-[13px] font-semibold block">{unidade.numero}</span>
                           <span className="text-[9px] block opacity-90">{unidade.area}m²</span>
                         </button>
                       )
@@ -216,7 +319,7 @@ export default function EspelhoPage() {
         {/* Lista Detalhada */}
         <div className="mt-5 space-y-3">
           <p className="text-[13px] font-semibold text-[#1d1d1f] px-1">Lista de Unidades</p>
-          {stationParkUnidades
+          {unidades
             .filter(u => u.status === "disponivel")
             .sort((a, b) => a.valorTotal - b.valorTotal)
             .map(unidade => (
@@ -228,7 +331,7 @@ export default function EspelhoPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[15px] font-semibold text-[#1d1d1f]">
-                      Unidade {unidade.unidade}
+                      Unidade {unidade.numero}
                     </p>
                     <p className="text-[12px] text-[#86868b]">
                       {unidade.area}m² | {unidade.tipologia}
@@ -238,9 +341,11 @@ export default function EspelhoPage() {
                     <p className="text-[17px] font-bold text-[#0071e3]">
                       {formatCurrency(unidade.valorTotal)}
                     </p>
-                    <p className="text-[11px] text-[#86868b]">
-                      ATO {formatCurrency(unidade.plano.ato.valor)}
-                    </p>
+                    {unidade.plano && (
+                      <p className="text-[11px] text-[#86868b]">
+                        ATO {formatCurrency(unidade.plano.ato.valor)}
+                      </p>
+                    )}
                   </div>
                 </div>
               </button>
@@ -249,7 +354,7 @@ export default function EspelhoPage() {
       </main>
 
       {/* Modal/Sheet Bottom */}
-      {selectedUnidade && (
+      {selectedUnidade && selectedUnidade.plano && (
         <div className="fixed inset-0 z-50">
           {/* Backdrop */}
           <div
@@ -265,7 +370,7 @@ export default function EspelhoPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-[20px] font-semibold text-[#1d1d1f]">
-                    {modalStep === "confirmacao" ? "Pré-Reserva Confirmada" : `Unidade ${selectedUnidade.unidade}`}
+                    {modalStep === "confirmacao" ? "Pré-Reserva Confirmada" : `Unidade ${selectedUnidade.numero}`}
                   </h2>
                   <p className="text-[13px] text-[#86868b]">
                     {modalStep === "detalhes" && `${selectedUnidade.area}m² | ${selectedUnidade.tipologia}`}
@@ -381,7 +486,7 @@ export default function EspelhoPage() {
               )}
 
               {/* Step: Fluxo de Pagamento */}
-              {modalStep === "fluxo" && planoAtual && (
+              {modalStep === "fluxo" && planoAtual && selectedUnidade.plano && (
                 <>
                   {/* Header do Fluxo */}
                   <div className="bg-gradient-to-br from-[#34c759] to-[#30b350] rounded-2xl p-5 mb-5 text-white">
@@ -393,7 +498,7 @@ export default function EspelhoPage() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-[13px] opacity-90">
-                      <span>Unidade {selectedUnidade.unidade}</span>
+                      <span>Unidade {selectedUnidade.numero}</span>
                       <span>{selectedUnidade.area}m² | {selectedUnidade.dormitorios} dorm</span>
                     </div>
                   </div>
@@ -426,7 +531,7 @@ export default function EspelhoPage() {
 
                       {/* MENSAIS */}
                       {Array.from({ length: selectedUnidade.plano.mensais.quantidade }).map((_, i) => {
-                        const data = new Date(selectedUnidade.plano.mensais.primeiroVencimento)
+                        const data = new Date(selectedUnidade.plano!.mensais.primeiroVencimento)
                         data.setMonth(data.getMonth() + i)
                         return (
                           <div key={i} className="relative flex gap-4 mb-4">
@@ -435,8 +540,8 @@ export default function EspelhoPage() {
                             </div>
                             <div className="flex-1 bg-white border border-[#e8e8ed] rounded-xl p-4">
                               <div className="flex items-center justify-between mb-1">
-                                <span className="text-[11px] font-semibold text-[#ff9500]">MENSAL {i + 1}/{selectedUnidade.plano.mensais.quantidade}</span>
-                                <span className="text-[15px] font-bold text-[#1d1d1f]">{formatCurrency(selectedUnidade.plano.mensais.valor)}</span>
+                                <span className="text-[11px] font-semibold text-[#ff9500]">MENSAL {i + 1}/{selectedUnidade.plano!.mensais.quantidade}</span>
+                                <span className="text-[15px] font-bold text-[#1d1d1f]">{formatCurrency(selectedUnidade.plano!.mensais.valor)}</span>
                               </div>
                               <div className="flex items-center gap-1 text-[12px] text-[#86868b]">
                                 <Calendar className="w-3 h-3" />
@@ -496,13 +601,13 @@ export default function EspelhoPage() {
                   <div className="space-y-3">
                     <button
                       onClick={() => {
-                        const mensaisText = Array.from({ length: selectedUnidade.plano.mensais.quantidade }).map((_, i) => {
-                          const data = new Date(selectedUnidade.plano.mensais.primeiroVencimento)
+                        const mensaisText = Array.from({ length: selectedUnidade.plano!.mensais.quantidade }).map((_, i) => {
+                          const data = new Date(selectedUnidade.plano!.mensais.primeiroVencimento)
                           data.setMonth(data.getMonth() + i)
-                          return `${i + 1}ª Mensal: ${formatCurrency(selectedUnidade.plano.mensais.valor)} - ${formatDate(data.toISOString().split("T")[0])}`
+                          return `${i + 1}ª Mensal: ${formatCurrency(selectedUnidade.plano!.mensais.valor)} - ${formatDate(data.toISOString().split("T")[0])}`
                         }).join("\n")
 
-                        const msg = `*FLUXO DE PAGAMENTO*\n\n*${stationParkInfo.nome}*\nUnidade ${selectedUnidade.unidade} | ${selectedUnidade.area}m² | ${selectedUnidade.dormitorios} dorm\n\n*VALOR TOTAL: ${formatCurrency(selectedUnidade.valorTotal)}*\n\n📅 *CRONOGRAMA:*\n\n*ATO (Sinal):*\n${formatCurrency(selectedUnidade.plano.ato.valor)} - ${formatDate(selectedUnidade.plano.ato.vencimento)}\n\n*MENSAIS:*\n${mensaisText}\n\n*FINANCIAMENTO:*\n${formatCurrency(selectedUnidade.plano.financiamento.valor)} - ${formatDate(selectedUnidade.plano.financiamento.vencimento)}\n\n_Corretor: ${session?.user?.name}_`
+                        const msg = `*FLUXO DE PAGAMENTO*\n\n*${empreendimentoNome}*\nUnidade ${selectedUnidade.numero} | ${selectedUnidade.area}m² | ${selectedUnidade.dormitorios} dorm\n\n*VALOR TOTAL: ${formatCurrency(selectedUnidade.valorTotal)}*\n\n📅 *CRONOGRAMA:*\n\n*ATO (Sinal):*\n${formatCurrency(selectedUnidade.plano!.ato.valor)} - ${formatDate(selectedUnidade.plano!.ato.vencimento)}\n\n*MENSAIS:*\n${mensaisText}\n\n*FINANCIAMENTO:*\n${formatCurrency(selectedUnidade.plano!.financiamento.valor)} - ${formatDate(selectedUnidade.plano!.financiamento.vencimento)}\n\n_Corretor: ${session?.user?.name}_`
                         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank")
                       }}
                       className="w-full h-12 bg-[#25D366] hover:bg-[#20BD5A] text-white text-[15px] font-medium rounded-xl flex items-center justify-center gap-2"
@@ -513,13 +618,13 @@ export default function EspelhoPage() {
 
                     <button
                       onClick={() => {
-                        const mensaisText = Array.from({ length: selectedUnidade.plano.mensais.quantidade }).map((_, i) => {
-                          const data = new Date(selectedUnidade.plano.mensais.primeiroVencimento)
+                        const mensaisText = Array.from({ length: selectedUnidade.plano!.mensais.quantidade }).map((_, i) => {
+                          const data = new Date(selectedUnidade.plano!.mensais.primeiroVencimento)
                           data.setMonth(data.getMonth() + i)
-                          return `${i + 1}ª Mensal: ${formatCurrency(selectedUnidade.plano.mensais.valor)} - ${formatDate(data.toISOString().split("T")[0])}`
+                          return `${i + 1}ª Mensal: ${formatCurrency(selectedUnidade.plano!.mensais.valor)} - ${formatDate(data.toISOString().split("T")[0])}`
                         }).join("\n")
 
-                        const text = `FLUXO DE PAGAMENTO\n\n${stationParkInfo.nome}\nUnidade ${selectedUnidade.unidade} | ${selectedUnidade.area}m² | ${selectedUnidade.dormitorios} dorm\n\nVALOR TOTAL: ${formatCurrency(selectedUnidade.valorTotal)}\n\nCRONOGRAMA:\n\nATO (Sinal):\n${formatCurrency(selectedUnidade.plano.ato.valor)} - ${formatDate(selectedUnidade.plano.ato.vencimento)}\n\nMENSAIS:\n${mensaisText}\n\nFINANCIAMENTO:\n${formatCurrency(selectedUnidade.plano.financiamento.valor)} - ${formatDate(selectedUnidade.plano.financiamento.vencimento)}\n\nCorretor: ${session?.user?.name}`
+                        const text = `FLUXO DE PAGAMENTO\n\n${empreendimentoNome}\nUnidade ${selectedUnidade.numero} | ${selectedUnidade.area}m² | ${selectedUnidade.dormitorios} dorm\n\nVALOR TOTAL: ${formatCurrency(selectedUnidade.valorTotal)}\n\nCRONOGRAMA:\n\nATO (Sinal):\n${formatCurrency(selectedUnidade.plano!.ato.valor)} - ${formatDate(selectedUnidade.plano!.ato.vencimento)}\n\nMENSAIS:\n${mensaisText}\n\nFINANCIAMENTO:\n${formatCurrency(selectedUnidade.plano!.financiamento.valor)} - ${formatDate(selectedUnidade.plano!.financiamento.vencimento)}\n\nCorretor: ${session?.user?.name}`
                         navigator.clipboard.writeText(text)
                         alert("Fluxo copiado para área de transferência!")
                       }}
@@ -548,13 +653,13 @@ export default function EspelhoPage() {
               )}
 
               {/* Step: Cliente */}
-              {modalStep === "cliente" && planoAtual && (
+              {modalStep === "cliente" && planoAtual && selectedUnidade.plano && (
                 <>
                   {/* Resumo Compacto */}
                   <div className="bg-[#f5f5f7] rounded-xl p-4 mb-5 flex items-center justify-between">
                     <div>
                       <p className="text-[15px] font-semibold text-[#1d1d1f]">
-                        Unidade {selectedUnidade.unidade}
+                        Unidade {selectedUnidade.numero}
                       </p>
                       <p className="text-[12px] text-[#86868b]">
                         {selectedUnidade.area}m² | {selectedUnidade.tipologia}
@@ -583,7 +688,7 @@ export default function EspelhoPage() {
                   </div>
 
                   {/* Formulário */}
-                  <ClienteForm onSubmit={handleClienteSubmit} loading={loading} />
+                  <ClienteForm onSubmit={handleClienteSubmit} loading={submitting} />
 
                   {/* Voltar */}
                   <button
@@ -596,7 +701,7 @@ export default function EspelhoPage() {
               )}
 
               {/* Step: Confirmação */}
-              {modalStep === "confirmacao" && preReserva && planoAtual && (
+              {modalStep === "confirmacao" && preReserva && planoAtual && selectedUnidade.plano && (
                 <>
                   {/* Success Banner */}
                   <div className="bg-[#34c759]/10 rounded-2xl p-5 mb-5 flex items-center gap-4">
@@ -606,7 +711,7 @@ export default function EspelhoPage() {
                     <div>
                       <h3 className="text-[17px] font-semibold text-[#1d1d1f]">Pré-Reserva Criada!</h3>
                       <p className="text-[13px] text-[#86868b]">
-                        {stationParkInfo.nome} - Unidade {selectedUnidade.unidade}
+                        {empreendimentoNome} - Unidade {selectedUnidade.numero}
                       </p>
                     </div>
                   </div>
@@ -633,7 +738,7 @@ export default function EspelhoPage() {
                   <div className="mt-5 space-y-3">
                     <button
                       onClick={() => {
-                        const msg = `*PRÉ-RESERVA CONFIRMADA*\n\n*${stationParkInfo.nome}*\nUnidade: ${selectedUnidade.unidade}\n${selectedUnidade.area}m² | ${selectedUnidade.tipologia}\n\n*Cliente:* ${cliente?.nome}\n\n*PLANO DE PAGAMENTO:*\n- ATO: ${formatCurrency(selectedUnidade.plano.ato.valor)}\n- Mensais: ${selectedUnidade.plano.mensais.quantidade}x ${formatCurrency(selectedUnidade.plano.mensais.valor)}\n- Financiamento: ${formatCurrency(selectedUnidade.plano.financiamento.valor)}\n\n*Total: ${formatCurrency(selectedUnidade.valorTotal)}*\n\nCorretor: ${session?.user?.name}`
+                        const msg = `*PRÉ-RESERVA CONFIRMADA*\n\n*${empreendimentoNome}*\nUnidade: ${selectedUnidade.numero}\n${selectedUnidade.area}m² | ${selectedUnidade.tipologia}\n\n*Cliente:* ${cliente?.nome}\n\n*PLANO DE PAGAMENTO:*\n- ATO: ${formatCurrency(selectedUnidade.plano!.ato.valor)}\n- Mensais: ${selectedUnidade.plano!.mensais.quantidade}x ${formatCurrency(selectedUnidade.plano!.mensais.valor)}\n- Financiamento: ${formatCurrency(selectedUnidade.plano!.financiamento.valor)}\n\n*Total: ${formatCurrency(selectedUnidade.valorTotal)}*\n\nCorretor: ${session?.user?.name}`
                         window.open(`https://wa.me/55${cliente?.whatsapp}?text=${encodeURIComponent(msg)}`, "_blank")
                       }}
                       className="w-full h-12 bg-[#25D366] hover:bg-[#20BD5A] text-white text-[15px] font-medium rounded-xl flex items-center justify-center gap-2"

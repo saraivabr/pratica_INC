@@ -36,22 +36,23 @@ export default function CatalogoPage() {
   })
 
   const availableBairros = useMemo(() => {
-    const bairros = empreendimentos.map((emp) => emp.localizacao.bairro)
+    const bairros = empreendimentos.map((emp) => emp.localizacao?.bairro).filter(Boolean) as string[]
     return [...new Set(bairros)].sort()
   }, [empreendimentos])
 
   const filteredEmpreendimentos = useMemo(() => {
     return empreendimentos.filter((emp) => {
+      const bairro = emp.localizacao?.bairro || ''
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
         const matchesName = emp.nome.toLowerCase().includes(query)
-        const matchesBairro = emp.localizacao.bairro.toLowerCase().includes(query)
+        const matchesBairro = bairro.toLowerCase().includes(query)
         if (!matchesName && !matchesBairro) return false
       }
       if (filters.status.length > 0 && !filters.status.includes(emp.status)) {
         return false
       }
-      if (filters.bairro.length > 0 && !filters.bairro.includes(emp.localizacao.bairro)) {
+      if (filters.bairro.length > 0 && !filters.bairro.includes(bairro)) {
         return false
       }
       return true
