@@ -2,34 +2,27 @@
 
 import { useState, useMemo } from "react"
 import Link from "next/link"
-import { Search, SlidersHorizontal, X, Grid3X3, List, ArrowRight } from "lucide-react"
-import { EmpreendimentoCard } from "@/components/catalogo/empreendimento-card"
-import { FilterBar, Filters } from "@/components/catalogo/filter-bar"
+import { Search, X, Heart, MapPin, Building2, Maximize2, ArrowRight } from "lucide-react"
 import { useEmpreendimentos } from "@/hooks/use-empreendimentos"
-import { useAppMode } from "@/hooks/useAppMode"
 import { OrganicBackground } from "@/components/svg/SvgBackgrounds"
 import { formatarPreco } from "@/lib/utils"
+import { colors } from "@/lib/theme"
+import { useFavorites } from "@/hooks/use-favorites"
 
-function CatalogoSkeletonPresentation() {
+interface Filters {
+  status: string[]
+  bairro: string[]
+}
+
+function CatalogoSkeleton() {
   return (
-    <div className="space-y-6">
-      {[1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className="bg-white rounded-3xl overflow-hidden"
-          style={{
-            boxShadow: '0 2px 20px rgba(0,0,0,0.04)',
-            animationDelay: `${i * 100}ms`
-          }}
-        >
-          <div className="h-56 bg-gradient-to-br from-stone-100 to-stone-50 animate-pulse" />
-          <div className="p-6 space-y-4">
-            <div className="h-6 bg-stone-100 rounded-full w-2/3 animate-pulse" />
-            <div className="h-4 bg-stone-50 rounded-full w-1/2 animate-pulse" />
-            <div className="flex gap-4 pt-4">
-              <div className="h-14 bg-stone-50 rounded-2xl flex-1 animate-pulse" />
-              <div className="h-14 bg-stone-50 rounded-2xl flex-1 animate-pulse" />
-            </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-6 py-6">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={i} className="rounded-2xl overflow-hidden">
+          <div className="h-80 bg-gradient-to-br animate-pulse" style={{ backgroundColor: colors.bgElevated }} />
+          <div className="p-4 space-y-3">
+            <div className="h-4 rounded-full w-2/3 animate-pulse" style={{ backgroundColor: colors.bgElevated }} />
+            <div className="h-4 rounded-full w-1/2 animate-pulse" style={{ backgroundColor: colors.bgElevated }} />
           </div>
         </div>
       ))}
@@ -37,27 +30,9 @@ function CatalogoSkeletonPresentation() {
   )
 }
 
-function CatalogoSkeletonWork() {
-  return (
-    <div className="space-y-3">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <div
-          key={i}
-          className="h-20 bg-white rounded-xl animate-pulse"
-          style={{
-            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-            animationDelay: `${i * 50}ms`
-          }}
-        />
-      ))}
-    </div>
-  )
-}
-
 export default function CatalogoPage() {
   const { empreendimentos, isLoading } = useEmpreendimentos()
-  const { mode } = useAppMode()
-  const isPresentation = mode === "presentation"
+  const { toggle, isFavorite } = useFavorites()
 
   const [searchQuery, setSearchQuery] = useState("")
   const [showFilters, setShowFilters] = useState(false)
@@ -92,10 +67,18 @@ export default function CatalogoPage() {
 
   const activeFiltersCount = filters.status.length + filters.bairro.length
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "em_construcao": return "Em Obras"
+      case "lancamento":
+      case "em_lancamento": return "Lançamento"
+      case "entregue": return "Pronto"
+      default: return "Disponível"
+    }
+  }
+
   return (
-    <div className={`min-h-screen transition-colors duration-500 ${
-      isPresentation ? "bg-[#FDFCFA]" : "bg-white"
-    }`}>
+    <div className="min-h-screen" style={{ backgroundColor: colors.bg }}>
       {/* Subtle grain texture overlay */}
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.015] z-50"
@@ -104,288 +87,260 @@ export default function CatalogoPage() {
         }}
       />
 
-      {/* Organic background in presentation mode */}
-      {isPresentation && (
-        <div className="fixed inset-0 -z-10 opacity-30">
-          <OrganicBackground className="pointer-events-none opacity-20" />
-        </div>
-      )}
+      {/* Organic background */}
+      <div className="fixed inset-0 -z-10 opacity-20">
+        <OrganicBackground className="pointer-events-none opacity-20" />
+      </div>
 
-      {/* Header */}
-      <header className={`sticky top-0 z-40 backdrop-blur-2xl border-b transition-colors duration-500 ${
-        isPresentation
-          ? "bg-[#FDFCFA]/90 border-stone-200/50"
-          : "bg-white/80 border-stone-100/50"
-      }`}>
-        <div className="px-6 pt-16 pb-5">
-          {/* Title Section */}
-          <div className="flex items-end justify-between mb-6">
+      {/* Header - Minimalist Airbnb Style */}
+      <header className="sticky top-0 z-40 backdrop-blur-xl border-b" style={{
+        backgroundColor: colors.bgElevated,
+        borderColor: colors.surface
+      }}>
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-5">
             <div>
-              {/* Gold accent line */}
-              <div className="w-8 h-0.5 bg-gradient-to-r from-amber-600 to-amber-400 mb-3 rounded-full" />
-              <h1
-                className="text-[32px] font-semibold text-stone-900 tracking-tight leading-none"
-                style={{ fontFamily: "var(--font-serif)" }}
-              >
-                {isPresentation ? "Portfólio" : "Catálogo"}
+              <h1 className="text-[28px] font-bold tracking-tight leading-none" style={{
+                fontFamily: "var(--font-serif)",
+                color: colors.text
+              }}>
+                Descobrir
               </h1>
-              <p className="text-[14px] text-stone-500 mt-1.5 tracking-wide">
-                {isPresentation ? "Empreendimentos selecionados" : `${filteredEmpreendimentos.length} imóvel(is)`}
+              <p className="text-[13px] mt-1" style={{ color: colors.textTertiary }}>
+                {filteredEmpreendimentos.length} empreendimento{filteredEmpreendimentos.length !== 1 ? 's' : ''}
               </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {isPresentation && (
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`relative p-3 rounded-2xl transition-all duration-300 ${
-                    showFilters || activeFiltersCount > 0
-                      ? "bg-stone-900 text-white shadow-lg shadow-stone-900/20"
-                      : "bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700"
-                  }`}
-                >
-                  <SlidersHorizontal className="w-5 h-5" strokeWidth={1.5} />
-                  {activeFiltersCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg">
-                      {activeFiltersCount}
-                    </span>
-                  )}
-                </button>
-              )}
             </div>
           </div>
 
-          {/* Search */}
-          <div className="relative group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 transition-colors group-focus-within:text-amber-600" />
+          {/* Search Bar */}
+          <div className="relative group mb-4">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: colors.textTertiary }} />
             <input
               type="search"
-              placeholder={isPresentation ? "Buscar empreendimentos..." : "Nome, bairro..."}
+              placeholder="Buscar empreendimentos..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full h-14 pl-14 pr-12 bg-white border rounded-2xl text-[16px] text-stone-800 placeholder-stone-400 focus:outline-none transition-all duration-300 ${
-                isPresentation
-                  ? "border-stone-200 focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 shadow-sm"
-                  : "border-stone-100 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/10 shadow-none"
-              }`}
+              className="w-full h-14 pl-14 pr-12 border rounded-xl text-[16px] focus:outline-none transition-all duration-300"
+              style={{
+                backgroundColor: colors.surface,
+                borderColor: colors.surface,
+                color: colors.text,
+              }}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-stone-100 transition-colors text-stone-400 hover:text-stone-600"
-                title="Limpar busca"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-colors"
+                style={{ color: colors.textTertiary }}
+                title="Limpar"
               >
                 <X className="w-4 h-4" strokeWidth={2} />
               </button>
             )}
           </div>
 
-          {/* Filters Badge Indicator - Work Mode */}
-          {!isPresentation && activeFiltersCount > 0 && (
-            <div className="mt-4 flex items-center gap-2 flex-wrap">
-              <span className="text-[12px] text-stone-500 font-medium">Filtros ativos:</span>
-              <div className="flex gap-2 flex-wrap">
-                {filters.status.map((status) => (
-                  <span
-                    key={status}
-                    className="px-2.5 py-1 bg-amber-100 text-amber-700 text-[11px] font-medium rounded-full flex items-center gap-1.5"
-                  >
-                    {status}
-                    <button
-                      onClick={() => setFilters({
-                        ...filters,
-                        status: filters.status.filter((s) => s !== status)
-                      })}
-                      className="hover:text-amber-900"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-                {filters.bairro.map((bairro) => (
-                  <span
+          {/* Filters */}
+          <div className="flex items-center gap-3 overflow-x-auto pb-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex-shrink-0 px-4 py-2 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all"
+              style={{
+                backgroundColor: showFilters || activeFiltersCount > 0 ? colors.primary : colors.surface,
+                color: colors.text
+              }}
+            >
+              Filtros {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+            </button>
+
+            {showFilters && (
+              <div className="flex gap-2 animate-in fade-in">
+                {availableBairros.map((bairro) => (
+                  <button
                     key={bairro}
-                    className="px-2.5 py-1 bg-amber-100 text-amber-700 text-[11px] font-medium rounded-full flex items-center gap-1.5"
+                    onClick={() => {
+                      setFilters({
+                        ...filters,
+                        bairro: filters.bairro.includes(bairro)
+                          ? filters.bairro.filter((b) => b !== bairro)
+                          : [...filters.bairro, bairro]
+                      })
+                    }}
+                    className="flex-shrink-0 px-3 py-2 rounded-full text-[12px] font-medium transition-all"
+                    style={{
+                      backgroundColor: filters.bairro.includes(bairro) ? colors.primary : colors.surface,
+                      color: colors.text
+                    }}
                   >
                     {bairro}
-                    <button
-                      onClick={() => setFilters({
-                        ...filters,
-                        bairro: filters.bairro.filter((b) => b !== bairro)
-                      })}
-                      className="hover:text-amber-900"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
+                  </button>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Filters - Presentation Mode */}
-          {isPresentation && showFilters && (
-            <div className="mt-5 pt-5 border-t border-stone-100 animate-slideDown">
-              <FilterBar
-                filters={filters}
-                onFiltersChange={setFilters}
-                availableBairros={availableBairros}
-              />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </header>
 
       {/* Content */}
-      <main className={`transition-all duration-500 ${
-        isPresentation ? "px-6 py-6 pb-32" : "px-4 py-4 pb-24 max-w-4xl mx-auto"
-      }`}>
+      <main className="max-w-7xl mx-auto">
         {isLoading ? (
-          isPresentation ? <CatalogoSkeletonPresentation /> : <CatalogoSkeletonWork />
+          <CatalogoSkeleton />
         ) : filteredEmpreendimentos.length === 0 ? (
-          <div className={`text-center transition-all duration-300 ${isPresentation ? "py-24" : "py-16"}`}>
-            <div className={`mx-auto mb-6 rounded-3xl bg-gradient-to-br from-stone-100 to-stone-50 flex items-center justify-center shadow-inner ${
-              isPresentation ? "w-20 h-20" : "w-16 h-16"
-            }`}>
-              <Search className={`text-stone-300 ${isPresentation ? "w-8 h-8" : "w-6 h-6"}`} strokeWidth={1.5} />
+          <div className="text-center py-32">
+            <div className="mx-auto mb-6 w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: colors.bgElevated }}>
+              <Search className="w-8 h-8" style={{ color: colors.textTertiary }} />
             </div>
-            <p
-              className={`font-medium text-stone-800 mb-2 ${isPresentation ? "text-[22px]" : "text-[18px]"}`}
-              style={{ fontFamily: "var(--font-serif)" }}
-            >
-              Nenhum resultado encontrado
+            <p className="text-[20px] font-semibold mb-2" style={{ color: colors.text, fontFamily: "var(--font-serif)" }}>
+              Nenhum resultado
             </p>
-            <p className="text-[14px] text-stone-500 max-w-[280px] mx-auto mb-4">
-              {isPresentation
-                ? "Tente ajustar seus filtros ou buscar por outro termo"
-                : "Nenhum imóvel corresponde aos critérios selecionados"}
+            <p className="text-[14px] max-w-xs mx-auto" style={{ color: colors.textTertiary }}>
+              Tente ajustar sua busca ou filtros
             </p>
-            {activeFiltersCount > 0 && (
-              <button
-                onClick={() => setFilters({ status: [], bairro: [] })}
-                className="px-4 py-2 bg-amber-500 text-white text-[13px] font-medium rounded-full hover:bg-amber-600 transition-colors shadow-sm hover:shadow-md"
-              >
-                Limpar filtros
-              </button>
-            )}
           </div>
         ) : (
           <>
-            {/* Results count - Presentation mode */}
-            {isPresentation && (
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-px flex-1 bg-gradient-to-r from-stone-200 to-transparent" />
-                <span className="text-[12px] text-stone-400 tracking-widest uppercase font-medium">
-                  {filteredEmpreendimentos.length} {filteredEmpreendimentos.length === 1 ? 'empreendimento' : 'empreendimentos'}
-                </span>
-                <div className="h-px flex-1 bg-gradient-to-l from-stone-200 to-transparent" />
-              </div>
-            )}
+            {/* Airbnb-style Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-6 py-8 pb-32">
+              {filteredEmpreendimentos.map((emp, index) => {
+                const preco = emp.tipologias?.[0]?.preco_base
+                const menorArea = emp.tipologias?.[0]?.area_m2
+                const maiorArea = emp.tipologias?.[emp.tipologias.length - 1]?.area_m2
+                const minDorms = emp.tipologias?.[0]?.dormitorios || 2
+                const maxDorms = emp.tipologias?.[emp.tipologias.length - 1]?.dormitorios || 3
+                const imageUrl = emp.imagemCapa || "https://praticaincorporadora.com.br/assets/new-images/aura-guilhermina/praticaincorporadora-aura-guilhermina-hero.jpg"
+                const favorited = isFavorite(emp.id)
 
-            {/* Cards Grid - Presentation Mode */}
-            {isPresentation ? (
-              <div className="space-y-6">
-                {filteredEmpreendimentos.map((emp, index) => (
-                  <div
+                return (
+                  <Link
                     key={emp.id}
-                    className="animate-slideUp"
-                    style={{ animationDelay: `${index * 80}ms` }}
+                    href={`/catalogo/${emp.id}`}
+                    className="group block animate-fadeIn"
+                    style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    <EmpreendimentoCard
-                      empreendimento={emp}
-                      featured={index === 0}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              /* List - Work Mode */
-              <div className="space-y-2">
-                {filteredEmpreendimentos.map((emp, index) => {
-                  const status = emp.status === "lancamento" ? "Lançamento" : emp.status === "em_construcao" ? "Em Obras" : emp.status === "entregue" ? "Pronto" : "Disponível";
-                  const preco = emp.tipologias?.[0]?.preco_base;
-                  const menorArea = emp.tipologias?.[0]?.area_m2;
-                  const maiorArea = emp.tipologias?.[emp.tipologias.length - 1]?.area_m2;
+                    <div className="rounded-2xl overflow-hidden transition-transform duration-300 hover:shadow-2xl" style={{
+                      backgroundColor: colors.surface
+                    }}>
+                      {/* Image Container */}
+                      <div className="relative overflow-hidden h-80 bg-center bg-cover" style={{ backgroundImage: `url(${imageUrl})` }}>
+                        {/* Image fallback with gradient */}
+                        {!imageUrl && (
+                          <div className="absolute inset-0 bg-gradient-to-br" style={{
+                            background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`
+                          }} />
+                        )}
 
-                  return (
-                    <Link
-                      key={emp.id}
-                      href={`/catalogo/${emp.id}`}
-                      className="block group"
-                    >
-                      <div
-                        className="h-20 bg-white rounded-lg border border-stone-100 p-4 flex items-center justify-between hover:bg-stone-50 hover:border-amber-300 transition-all duration-300 cursor-pointer animate-slideUp"
-                        style={{ animationDelay: `${index * 40}ms` }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1">
-                              <h3 className="text-[14px] font-medium text-stone-900 truncate">
-                                {emp.nome}
-                              </h3>
-                              <p className="text-[12px] text-stone-500 truncate">
-                                {emp.localizacao?.bairro || "São Paulo"}
+                        {/* Gradient overlays */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                        {/* Status Badge - Top Left */}
+                        <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-[11px] font-semibold backdrop-blur-md uppercase tracking-wider" style={{
+                          backgroundColor: `${colors.primary}cc`,
+                          color: colors.text
+                        }}>
+                          {getStatusLabel(emp.status)}
+                        </div>
+
+                        {/* Favorite Button - Top Right */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            toggle(emp.id)
+                          }}
+                          className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-all backdrop-blur-md"
+                          style={{
+                            backgroundColor: favorited ? colors.text : "rgba(255,255,255,0.2)"
+                          }}
+                        >
+                          <Heart
+                            className="w-5 h-5 transition-all"
+                            fill={favorited ? colors.primary : "none"}
+                            stroke={favorited ? colors.primary : "white"}
+                            strokeWidth={favorited ? 0 : 2}
+                          />
+                        </button>
+
+                        {/* Price - Bottom Left */}
+                        <div className="absolute bottom-0 left-0 right-0 p-5">
+                          <div className="flex items-end justify-between">
+                            <div>
+                              <p className="text-white/70 text-[11px] font-medium tracking-widest uppercase mb-1">
+                                A partir de
                               </p>
+                              <p className="text-white text-[28px] font-light leading-none" style={{ fontFamily: "var(--font-serif)" }}>
+                                R$ {formatarPreco(preco)}
+                              </p>
+                            </div>
+
+                            {/* Arrow indicator */}
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center group-hover:bg-amber-500 transition-all duration-300" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>
+                              <ArrowRight className="w-5 h-5 text-white transition-transform duration-300 group-hover:translate-x-0.5" strokeWidth={1.5} />
                             </div>
                           </div>
                         </div>
-                        <div className="hidden sm:flex items-center gap-4 ml-4">
-                          <span className="text-[12px] font-medium bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full whitespace-nowrap">
-                            {status}
-                          </span>
-                          <span className="text-[13px] font-medium text-stone-700 whitespace-nowrap">
-                            R$ {formatarPreco(preco)}
-                          </span>
-                          <span className="text-[12px] text-stone-500 whitespace-nowrap">
-                            {menorArea === maiorArea ? `${menorArea}m²` : `${menorArea}-${maiorArea}m²`}
-                          </span>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-stone-300 group-hover:text-amber-500 transition-colors ml-2 flex-shrink-0" strokeWidth={1.5} />
                       </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
 
-            {/* Bottom flourish - Presentation mode */}
-            {isPresentation && (
-              <div className="flex items-center justify-center mt-10 gap-2">
-                <div className="w-1 h-1 rounded-full bg-amber-400" />
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                <div className="w-1 h-1 rounded-full bg-amber-400" />
-              </div>
-            )}
+                      {/* Content */}
+                      <div className="p-5">
+                        {/* Title */}
+                        <h3 className="text-[18px] font-semibold leading-tight mb-2 group-hover:text-primary transition-colors duration-300" style={{
+                          fontFamily: "var(--font-serif)",
+                          color: colors.text
+                        }}>
+                          {emp.nome}
+                        </h3>
+
+                        {/* Location */}
+                        <div className="flex items-center gap-2 mb-4" style={{ color: colors.textTertiary }}>
+                          <MapPin className="w-4 h-4" strokeWidth={1.5} />
+                          <span className="text-[13px]">{emp.localizacao?.bairro || 'São Paulo'}</span>
+                        </div>
+
+                        {/* Specs */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 rounded-xl transition-colors duration-300 group-hover/spec:bg-opacity-80" style={{ backgroundColor: colors.bgElevated }}>
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <Maximize2 className="w-3.5 h-3.5" strokeWidth={1.5} style={{ color: colors.primary }} />
+                              <span className="text-[10px] uppercase tracking-wider font-medium" style={{ color: colors.textTertiary }}>Área</span>
+                            </div>
+                            <p className="text-[14px] font-semibold" style={{ color: colors.text }}>
+                              {menorArea === maiorArea ? `${menorArea}m²` : `${menorArea}-${maiorArea}m²`}
+                            </p>
+                          </div>
+
+                          <div className="p-3 rounded-xl transition-colors duration-300" style={{ backgroundColor: colors.bgElevated }}>
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <Building2 className="w-3.5 h-3.5" strokeWidth={1.5} style={{ color: colors.secondary }} />
+                              <span className="text-[10px] uppercase tracking-wider font-medium" style={{ color: colors.textTertiary }}>Dorms</span>
+                            </div>
+                            <p className="text-[14px] font-semibold" style={{ color: colors.text }}>
+                              {minDorms === maxDorms ? `${minDorms}` : `${minDorms}-${maxDorms}`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
           </>
         )}
       </main>
 
       <style jsx>{`
-        @keyframes slideUp {
+        @keyframes fadeIn {
           from {
             opacity: 0;
-            transform: translateY(30px);
+            transform: translateY(20px);
           }
           to {
             opacity: 1;
             transform: translateY(0);
           }
         }
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-slideUp {
-          animation: slideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-        }
-        .animate-slideDown {
-          animation: slideDown 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+        .animate-fadeIn {
+          animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
         }
       `}</style>
     </div>

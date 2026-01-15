@@ -2,16 +2,32 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { FileText, Building2, User, ChevronRight, Calendar, Search } from "lucide-react"
+import { FileText, Building2, User, Calendar, Zap } from "lucide-react"
 import { PreReserva } from "@/types/pagamento"
 import { StatusPreReserva } from "@/components/reserva/status-pagamento"
+import { colors } from "@/lib/theme"
+import { OrganicBackground } from "@/components/svg/SvgBackgrounds"
+
+function PreReservasSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-6 py-6">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={i} className="rounded-2xl overflow-hidden" style={{ backgroundColor: colors.surface }}>
+          <div className="h-40 bg-gradient-to-br animate-pulse" style={{ backgroundColor: colors.bgElevated }} />
+          <div className="p-4 space-y-3">
+            <div className="h-4 rounded-full w-2/3 animate-pulse" style={{ backgroundColor: colors.bgElevated }} />
+            <div className="h-4 rounded-full w-1/2 animate-pulse" style={{ backgroundColor: colors.bgElevated }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function PreReservasPage() {
   const router = useRouter()
   const [preReservas, setPreReservas] = useState<PreReserva[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<"todas" | "pendente" | "ativa" | "concluida">("todas")
-  const [search, setSearch] = useState("")
 
   useEffect(() => {
     fetchPreReservas()
@@ -39,23 +55,6 @@ export default function PreReservasPage() {
     }).format(value)
   }
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "short"
-    })
-  }
-
-  const filteredPreReservas = preReservas
-    .filter(r => filter === "todas" || r.status === filter)
-    .filter(r =>
-      search === "" ||
-      r.cliente.nome.toLowerCase().includes(search.toLowerCase()) ||
-      r.empreendimentoNome.toLowerCase().includes(search.toLowerCase()) ||
-      r.unidade.includes(search)
-    )
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-
   const stats = {
     total: preReservas.length,
     pendentes: preReservas.filter(r => r.status === "pendente").length,
@@ -63,133 +62,175 @@ export default function PreReservasPage() {
     valorTotal: preReservas.reduce((sum, r) => sum + r.plano.valorTotal, 0)
   }
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "ativa": return colors.success
+      case "pendente": return colors.warning
+      case "concluida": return colors.secondary
+      default: return colors.textTertiary
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "ativa": return "Ativa"
+      case "pendente": return "Pendente"
+      case "concluida": return "Concluída"
+      default: return "Desconhecido"
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
+    <div className="min-h-screen" style={{ backgroundColor: colors.bg }}>
+      {/* Subtle grain texture overlay */}
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.015] z-50"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+        }}
+      />
+
+      {/* Organic background */}
+      <div className="fixed inset-0 -z-10 opacity-20">
+        <OrganicBackground className="pointer-events-none opacity-20" />
+      </div>
+
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-[#f5f5f7]/80 backdrop-blur-xl border-b border-[#d2d2d7]/50">
-        <div className="px-5 pt-14 pb-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-[28px] font-semibold text-[#1d1d1f] tracking-tight">
-                Pré-Reservas
-              </h1>
-              <p className="text-[13px] text-[#86868b] mt-0.5">
-                {stats.total} pré-reserva{stats.total !== 1 ? "s" : ""} | {formatCurrency(stats.valorTotal)} em VGV
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#34c759]/10 rounded-full">
-              <FileText className="w-3.5 h-3.5 text-[#34c759]" />
-              <span className="text-[11px] font-semibold text-[#34c759]">
-                {stats.ativas} ativa{stats.ativas !== 1 ? "s" : ""}
-              </span>
-            </div>
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868b]" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por cliente, empreendimento..."
-              className="w-full h-11 pl-12 pr-4 bg-white rounded-xl border border-[#e8e8ed] text-[15px] text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:border-[#0071e3]"
-            />
-          </div>
-
-          {/* Filters */}
-          <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-hide">
-            {(["todas", "pendente", "ativa", "concluida"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors ${
-                  filter === f
-                    ? "bg-[#0071e3] text-white"
-                    : "bg-white text-[#1d1d1f] border border-[#e8e8ed]"
-                }`}
-              >
-                {f === "todas" ? "Todas" : f.charAt(0).toUpperCase() + f.slice(1)}
-                {f !== "todas" && (
-                  <span className="ml-1 opacity-70">
-                    ({preReservas.filter(r => r.status === f).length})
-                  </span>
-                )}
-              </button>
-            ))}
+      <header className="sticky top-0 z-40 backdrop-blur-xl border-b" style={{
+        backgroundColor: colors.bgElevated,
+        borderColor: colors.surface
+      }}>
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div>
+            <h1 className="text-[28px] font-bold tracking-tight leading-none" style={{
+              fontFamily: "var(--font-serif)",
+              color: colors.text
+            }}>
+              Pré-Reservas
+            </h1>
+            <p className="text-[13px] mt-1" style={{ color: colors.textTertiary }}>
+              {stats.total} pré-reserva{stats.total !== 1 ? 's' : ''} • {formatCurrency(stats.valorTotal)} em VGV
+            </p>
           </div>
         </div>
       </header>
 
-      <main className="px-5 py-5 pb-28">
+      {/* Content */}
+      <main className="max-w-7xl mx-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-3 border-[#0071e3]/30 border-t-[#0071e3] rounded-full animate-spin" />
-          </div>
-        ) : filteredPreReservas.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-16 h-16 rounded-full bg-[#f5f5f7] flex items-center justify-center mb-4">
-              <FileText className="w-8 h-8 text-[#86868b]" />
+          <PreReservasSkeleton />
+        ) : preReservas.length === 0 ? (
+          <div className="text-center py-32">
+            <div className="mx-auto mb-6 w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: colors.bgElevated }}>
+              <Zap className="w-8 h-8" style={{ color: colors.textTertiary }} />
             </div>
-            <p className="text-[17px] font-medium text-[#1d1d1f]">
-              {search || filter !== "todas" ? "Nenhuma pré-reserva encontrada" : "Nenhuma pré-reserva ainda"}
+            <p className="text-[20px] font-semibold mb-2" style={{ color: colors.text, fontFamily: "var(--font-serif)" }}>
+              Nenhuma pré-reserva
             </p>
-            <p className="text-[13px] text-[#86868b] mt-1">
-              {search || filter !== "todas"
-                ? "Tente ajustar os filtros"
-                : "Comece pelo Espelho de Vendas"}
+            <p className="text-[14px] max-w-xs mx-auto" style={{ color: colors.textTertiary }}>
+              Crie sua primeira pré-reserva para começar
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {filteredPreReservas.map((preReserva) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-6 py-8 pb-32">
+            {preReservas.map((reserva, index) => (
               <button
-                key={preReserva.id}
-                onClick={() => router.push(`/pre-reservas/${preReserva.id}`)}
-                className="w-full bg-white rounded-2xl border border-[#e8e8ed] p-4 text-left transition-all hover:border-[#0071e3]/30 hover:shadow-sm"
+                key={reserva.id}
+                onClick={() => router.push(`/pre-reservas/${reserva.id}`)}
+                className="group text-left animate-fadeIn rounded-2xl overflow-hidden transition-transform duration-300 hover:shadow-2xl"
+                style={{
+                  animationDelay: `${index * 50}ms`,
+                  backgroundColor: colors.surface
+                }}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#0071e3]/10 flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-[#0071e3]" />
-                    </div>
-                    <div>
-                      <p className="text-[15px] font-semibold text-[#1d1d1f]">
-                        {preReserva.empreendimentoNome}
-                      </p>
-                      <p className="text-[12px] text-[#86868b]">
-                        Unidade {preReserva.unidade} | {preReserva.tipologia.area_m2}m²
-                      </p>
-                    </div>
+                {/* Top Section - Status & Info */}
+                <div className="p-5 border-b" style={{ borderColor: colors.bgElevated }}>
+                  {/* Status Badge */}
+                  <div className="mb-3 inline-block px-3 py-1.5 rounded-full text-[11px] font-semibold backdrop-blur-md uppercase tracking-wider" style={{
+                    backgroundColor: `${getStatusColor(reserva.status)}20`,
+                    color: getStatusColor(reserva.status)
+                  }}>
+                    {getStatusLabel(reserva.status)}
                   </div>
-                  <StatusPreReserva status={preReserva.status} size="sm" />
+
+                  {/* Client Name */}
+                  <h3 className="text-[16px] font-semibold leading-tight mb-1 group-hover:text-primary transition-colors duration-300" style={{
+                    fontFamily: "var(--font-serif)",
+                    color: colors.text
+                  }}>
+                    {reserva.cliente.nome}
+                  </h3>
+
+                  {/* Empreendimento */}
+                  <p className="text-[13px]" style={{ color: colors.textTertiary }}>
+                    {reserva.empreendimentoNome} • Apt {reserva.unidade}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex items-center gap-2 text-[13px] text-[#86868b]">
-                    <User className="w-4 h-4" />
-                    <span>{preReserva.cliente.nome}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[13px] text-[#86868b]">
-                    <Calendar className="w-4 h-4" />
-                    <span>{formatDate(preReserva.createdAt)}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-[#f5f5f7]">
+                {/* Middle Section - Details */}
+                <div className="p-5 space-y-3 border-b" style={{ borderColor: colors.bgElevated }}>
+                  {/* Valor */}
                   <div>
-                    <p className="text-[11px] text-[#86868b] mb-0.5">Valor Total</p>
-                    <p className="text-[17px] font-bold text-[#0071e3]">
-                      {formatCurrency(preReserva.plano.valorTotal)}
+                    <p className="text-[11px] uppercase tracking-wider font-medium" style={{ color: colors.textTertiary }}>
+                      Valor Total
+                    </p>
+                    <p className="text-[18px] font-semibold" style={{ color: colors.secondary }}>
+                      {formatCurrency(reserva.plano.valorTotal)}
                     </p>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-[#86868b]" />
+
+                  {/* Specs Grid */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div style={{ backgroundColor: colors.bgElevated }} className="p-2.5 rounded-lg">
+                      <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: colors.textTertiary }}>
+                        Ato
+                      </p>
+                      <p className="text-[12px] font-semibold" style={{ color: colors.text }}>
+                        {formatCurrency(reserva.plano.ato.valor)}
+                      </p>
+                    </div>
+                    <div style={{ backgroundColor: colors.bgElevated }} className="p-2.5 rounded-lg">
+                      <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: colors.textTertiary }}>
+                        Mensais
+                      </p>
+                      <p className="text-[12px] font-semibold" style={{ color: colors.text }}>
+                        {reserva.plano.quantidadeMensais}x
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Section - CTA */}
+                <div className="p-4 flex items-center justify-between" style={{ backgroundColor: colors.bgElevated }}>
+                  <div className="flex items-center gap-2" style={{ color: colors.textTertiary }}>
+                    <Calendar className="w-4 h-4" strokeWidth={1.5} />
+                    <span className="text-[12px]">Ver detalhes</span>
+                  </div>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center group-hover:bg-primary transition-all duration-300" style={{ backgroundColor: colors.surface }}>
+                    <FileText className="w-4 h-4 transition-colors duration-300 group-hover:text-white" strokeWidth={1.5} style={{ color: colors.textTertiary }} />
+                  </div>
                 </div>
               </button>
             ))}
           </div>
         )}
       </main>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+      `}</style>
     </div>
   )
 }
