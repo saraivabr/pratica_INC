@@ -1,0 +1,32 @@
+{
+  "corretores": [
+    {
+      "id": "corretor_001",
+      "nome": "Maria Silva",
+      "whatsapp": "5511999998888",
+      "codigo": "PRT2024MS",
+      "ativo": true
+    },
+    {
+      "id": "corretor_002",
+      "nome": "Joao Santos",
+      "whatsapp": "5511988887777",
+      "codigo": "PRT2024JS",
+      "ativo": true
+    },
+    {
+      "id": "corretor_003",
+      "nome": "Ana Oliveira",
+      "whatsapp": "5511977776666",
+      "codigo": "PRT2024AO",
+      "ativo": true
+    },
+    {
+      "id": "corretor_admin",
+      "nome": "Administrador",
+      "whatsapp": "5511999999999",
+      "codigo": "ADMIN2024",
+      "ativo": true
+    }
+  ]
+}

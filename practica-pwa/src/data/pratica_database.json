@@ -1,0 +1,481 @@
+{
+  "empresa": {
+    "nome": "Prática Construtora e Incorporadora LTDA",
+    "cnpj": "04.498.612/0001-07",
+    "fundacao": "1998-12-09",
+    "cnpj_registro": "2001-06-13",
+    "tempo_atuacao_anos": 25,
+    "clientes_atendidos": "3000+",
+    "site": "https://pratica-inc.com.br",
+    "contatos": {
+      "telefone": "(11) 2042-3206",
+      "whatsapp": "Disponível via site/Instagram",
+      "email": "administrativo@praticaconstrutora.com.br",
+      "instagram": "@pratica.inc",
+      "endereco": "Rua Antonio de Barros, 2391 - Sala 41, Tatuapé, São Paulo - SP - 03401-001"
+    },
+    "horario_funcionamento": {
+      "segunda_sexta": "08:00 - 17:00",
+      "sabado": "Fechado",
+      "domingo": "Fechado",
+      "atendimento_whatsapp": true
+    }
+  },
+  "empreendimentos": {
+    "em_construcao": [
+      {
+        "id": "aura",
+        "nome": "Aura by Pratica",
+        "status": "em_construcao",
+        "lançamento": "2023-10",
+        "entrega_prevista": "2026-10",
+        "imagemCapa": "https://praticaincorporadora.com.br/assets/new-images/aura-guilhermina/praticaincorporadora-aura-guilhermina-hero.jpg",
+        "galeria": [
+          "https://praticaincorporadora.com.br/assets/new-images/aura-guilhermina/fachada/praticaincorporadora-aura-guilhermina-externa-01b.jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/aura-guilhermina/fachada/praticaincorporadora-aura-guilhermina-externa-02.jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/aura-guilhermina/fachada/praticaincorporadora-aura-guilhermina-externa-03.jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/aura-guilhermina/fachada/praticaincorporadora-aura-guilhermina-externa-04.jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/aura-guilhermina/lazer/praticaincorporadora-aura-guilhermina-Lazer-Externo-(1).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/aura-guilhermina/lazer/praticaincorporadora-aura-guilhermina-Lazer-Interno-(1).jpg"
+        ],
+        "localizacao": {
+          "endereco": "Rua Astorga, 1005",
+          "bairro": "Vila Guilhermina",
+          "zona": "Leste",
+          "proximidade_metro": "260m (Estação Guilhermina Esperança)"
+        },
+        "configuracao": {
+          "torres": 1,
+          "pavimentos": 22,
+          "apartamentos_por_andar": 4,
+          "elevadores": 3,
+          "unidades_totais": "148-175",
+          "terreno_m2": 1200
+        },
+        "tipologias": [
+          {
+            "area_m2": 40,
+            "dormitorios": 2,
+            "descricao": "2 dorm + varanda gourmet + com/sem vaga",
+            "preco_base": 389940
+          },
+          {
+            "area_m2": 44,
+            "dormitorios": 2,
+            "descricao": "2 dorm + suíte + varanda gourmet + 1 vaga",
+            "preco_base": 417000
+          },
+          {
+            "area_m2": 45,
+            "dormitorios": 2,
+            "descricao": "2 dorm + suíte + varanda gourmet + 1 vaga"
+          },
+          {
+            "area_m2": 81,
+            "dormitorios": 3
+          },
+          {
+            "area_m2": 88,
+            "dormitorios": 3
+          }
+        ],
+        "diferenciais": [
+          "Varanda gourmet em todas unidades",
+          "Churrasqueira a carvão",
+          "Áreas comuns mobiliadas e decoradas",
+          "Piso nivelado sala-terraço",
+          "Dreno para AC",
+          "Tomadas com porta USB",
+          "Wi-Fi em áreas comuns",
+          "Mensageria e depósito delivery",
+          "Infraestrutura água quente/fria",
+          "Persiana de enrolar"
+        ],
+        "lazer": [
+          "Hall social",
+          "Churrasqueira",
+          "Quadra poliesportiva",
+          "Salão de jogos",
+          "Salão de festas",
+          "Brinquedoteca",
+          "Pet care",
+          "Pet place",
+          "Espaço mulher",
+          "Espaço descanso",
+          "Playground",
+          "Sala de massagem",
+          "Espaço gourmet com terraço",
+          "Sauna",
+          "Coworking",
+          "Piscina adulto com deck",
+          "Academia"
+        ],
+        "arquitetura": "Wesley Assouz Arquitetura",
+        "preco_m2": "~R$ 9.700",
+        "financiamento": ["FGTS", "Caixa Econômica Federal", "Banco do Brasil", "MCMV"]
+      },
+      {
+        "id": "colatinna",
+        "nome": "Colatinna 56 by Pratica",
+        "status": "em_construcao",
+        "entrega_prevista": "2027-10",
+        "imagemCapa": "https://praticaincorporadora.com.br/assets/images/colatinna-56/res-colatinna-hero.jpg",
+        "galeria": [
+          "https://praticaincorporadora.com.br/assets/new-images/colatinna-56/fachada/praticaincorporadora-colatinna56-externa-01.jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/colatinna-56/fachada/praticaincorporadora-colatinna56-externa-02.jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/colatinna-56/lazer/praticaincorporadora-colatinna56-Lazer-Externo(1).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/colatinna-56/lazer/praticaincorporadora-colatinna56-Lazer-Interno(1).jpg"
+        ],
+        "localizacao": {
+          "endereco": "Rua Colatina, 56",
+          "bairro": "Cidade Patriarca",
+          "zona": "Leste",
+          "proximidade_metro": "Ao lado (Metrô Vila Patriarca)"
+        },
+        "configuracao": {
+          "torres": 1,
+          "pavimentos": 21,
+          "apartamentos_por_andar": 8,
+          "elevadores": 3,
+          "unidades_totais": 132,
+          "terreno_m2": 1050
+        },
+        "tipologias": [
+          {
+            "area_m2": 33,
+            "dormitorios": 2,
+            "descricao": "2 dorm + varanda gourmet, sem vaga",
+            "preco_base": 339000
+          },
+          {
+            "area_m2": 44,
+            "dormitorios": 2,
+            "descricao": "2 dorm + suíte + varanda gourmet + 1 vaga"
+          },
+          {
+            "area_m2": 88,
+            "dormitorios": 3
+          }
+        ],
+        "lazer": [
+          "Hall social",
+          "Salão de festas",
+          "Espaço gourmet",
+          "Brinquedoteca",
+          "Playground",
+          "Espaço juvenil",
+          "Academia",
+          "Espaço mulher",
+          "Espaço adulto",
+          "Piscina",
+          "Sauna",
+          "Churrasqueira",
+          "Pet wash",
+          "Pet place"
+        ],
+        "arquitetura": "Wesley Assouz Arquitetura",
+        "preco_m2": "~R$ 10.200",
+        "financiamento": ["FGTS", "Caixa Econômica Federal", "Banco do Brasil"]
+      },
+      {
+        "id": "giardino",
+        "nome": "Giardino Verticale di Pratica",
+        "status": "em_construcao",
+        "entrega_prevista": "2026-10",
+        "imagemCapa": "https://praticaincorporadora.com.br/assets/new-images/giardino-verticale/fachada/praticaincorporadora-giardinoverticale-Fachada-(1).jpg",
+        "galeria": [
+          "https://praticaincorporadora.com.br/assets/new-images/giardino-verticale/fachada/praticaincorporadora-giardinoverticale-Fachada-(2).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/giardino-verticale/fachada/praticaincorporadora-giardinoverticale-Fachada-(3).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/giardino-verticale/fachada/praticaincorporadora-giardinoverticale-Fachada-(4).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/giardino-verticale/lazer/praticaincorporadora-giardinoverticale-Lazer-Externo-(1).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/giardino-verticale/lazer/praticaincorporadora-giardinoverticale-Lazer-Interno-(1).jpg"
+        ],
+        "localizacao": {
+          "endereco": "Rua Madre de Deus, 121",
+          "bairro": "Mooca",
+          "zona": "Leste",
+          "proximidade_metro": "1,4km (Futura Estação Juventus Mooca)"
+        },
+        "configuracao": {
+          "torres": 1,
+          "pavimentos": 15,
+          "apartamentos_por_andar": 4,
+          "elevadores": 3,
+          "unidades_totais": 60,
+          "terreno_m2": 650
+        },
+        "tipologias": [
+          {
+            "area_m2": 43,
+            "dormitorios": 2,
+            "descricao": "2 dorm + varanda gourmet + 1 vaga",
+            "preco_base": 563000
+          },
+          {
+            "area_m2": 46,
+            "dormitorios": 2,
+            "descricao": "2 dorm + suíte + varanda gourmet + 1 vaga"
+          },
+          {
+            "area_m2": 51,
+            "dormitorios": 2,
+            "descricao": "2 dorm + suíte + varanda gourmet + 1 vaga"
+          },
+          {
+            "area_m2": 103,
+            "dormitorios": 3
+          }
+        ],
+        "conceito": "Giardino Verticale - Integração com natureza em ambiente urbano",
+        "lazer": [
+          "Academia",
+          "Brinquedoteca interna/externa",
+          "Coworking",
+          "Espaço descanso",
+          "Espaço leitura",
+          "Espaço meditação",
+          "Espaço mulher",
+          "Espaço massagem",
+          "Sauna",
+          "Spa",
+          "Piscina",
+          "Salão de jogos",
+          "Salão de festas"
+        ],
+        "arquitetura": "Wesley Assouz Arquitetura",
+        "preco_m2": "~R$ 13.000",
+        "financiamento": ["FGTS", "Caixa Econômica Federal", "Banco do Brasil"]
+      }
+    ],
+    "em_lancamento": [
+      {
+        "id": "alta_floresta",
+        "nome": "Alta Floresta Tatuapé",
+        "status": "lancamento",
+        "padrao": "ALTO PADRÃO",
+        "imagemCapa": "https://praticaincorporadora.com.br/assets/new-images/alta-floresta/praticaincorporadora-altafloresta-00-hero.jpg",
+        "galeria": [
+          "https://praticaincorporadora.com.br/assets/new-images/alta-floresta/fachada/praticaincorporadora-altafloresta-externa-01.jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/alta-floresta/fachada/praticaincorporadora-altafloresta-externa-02.jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/alta-floresta/fachada/praticaincorporadora-altafloresta-externa-03.jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/alta-floresta/fachada/praticaincorporadora-altafloresta-externa-04.jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/alta-floresta/lazer/praticaincorporadora-altafloresta-interna-piscina.jpg"
+        ],
+        "localizacao": {
+          "endereco": "Rua Serra de Botucatu / Rua Monte Serrat",
+          "bairro": "Tatuapé",
+          "zona": "Leste",
+          "showroom": "Rua Serra de Botucatu, 1491"
+        },
+        "configuracao": {
+          "torres": 1,
+          "subsolos": 4,
+          "terreo": 1,
+          "pavimentos": 30,
+          "tipo": "Edifício de Luxo"
+        },
+        "tipologias": [
+          {
+            "area_m2": "138-139",
+            "dormitorios": 3,
+            "suites": 3,
+            "vagas": 2,
+            "preco_base": 2113150
+          },
+          {
+            "area_m2": "100-140",
+            "tipo": "variado"
+          }
+        ],
+        "conceito": [
+          "Arte da biofilia",
+          "Elementos naturais em design contemporâneo",
+          "Design surpreendente",
+          "Redefine o conceito de viver bem"
+        ],
+        "diferenciais_premium": [
+          "Personalização Firmato Due",
+          "Projeto arquitetônico exclusivo",
+          "Acabamentos premium",
+          "Soluções customizadas",
+          "Irrigação automatizada com sensores",
+          "Foco em sustentabilidade"
+        ],
+        "arquitetura": "Wesley Assouz Arquitetura",
+        "parceiros": ["Firmato Pratica", "Intrépida Engenharia"],
+        "preco_m2": "~R$ 15.200",
+        "segmento": "Alto poder aquisitivo"
+      },
+      {
+        "id": "serra_botucatu_studios",
+        "nome": "Serra de Botucatu Studios/Lofts",
+        "status": "lancamento",
+        "entrega_prevista": "2025-12",
+        "imagemCapa": "https://praticaincorporadora.com.br/assets/new-images/alta-floresta/fachada/praticaincorporadora-altafloresta-externa-02.jpg",
+        "galeria": [
+          "https://praticaincorporadora.com.br/assets/new-images/alta-floresta/fachada/praticaincorporadora-altafloresta-externa-01.jpg"
+        ],
+        "localizacao": {
+          "bairro": "Tatuapé",
+          "zona": "Leste"
+        },
+        "tipologias": [
+          {
+            "area_m2": 22,
+            "tipo": "Studio/Loft"
+          },
+          {
+            "area_m2": 42,
+            "dormitorios": 2
+          }
+        ],
+        "diferenciais": [
+          "Infraestrutura de lazer completa no terraço",
+          "Piscina",
+          "Churrasqueira",
+          "Salão de festas",
+          "Sala de reunião",
+          "Pet place",
+          "Mercadinho no condomínio",
+          "2 Elevadores",
+          "Acabamento: Porcelanato, granito, aço inox"
+        ],
+        "financiamento": [
+          "Parcelamento direto com construtora",
+          "Até 120 vezes SEM consulta SPC/Serasa"
+        ]
+      }
+    ],
+    "entregues": [
+      {
+        "id": "station_garden",
+        "nome": "Station Garden Patriarca",
+        "status": "entregue",
+        "entrega": "2024",
+        "imagemCapa": "https://praticaincorporadora.com.br/assets/new-images/station-garden/fachada/praticaincorporadora-stationgarden-Fachada-(6).jpg",
+        "galeria": [
+          "https://praticaincorporadora.com.br/assets/new-images/station-garden/fachada/praticaincorporadora-stationgarden-Fachada-(7).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/station-garden/fachada/praticaincorporadora-stationgarden-Fachada-(10).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/station-garden/lazer/praticaincorporadora-stationgarden-Lazer-Externo-(1).jpg",
+          "https://praticaincorporadora.com.br/assets/new-images/station-garden/lazer/praticaincorporadora-stationgarden-Lazer-Interno-(1).jpg"
+        ],
+        "localizacao": {
+          "endereco": "Rua Jarauara, 458/470",
+          "bairro": "Vila Ré/Patriarca",
+          "zona": "Leste",
+          "proximidade_metro": "Próximo ao Metrô Patriarca"
+        },
+        "configuracao": {
+          "torres": 1,
+          "apartamentos_por_andar": 12,
+          "terreno_m2": 1225
+        },
+        "tipologias": [
+          {
+            "area_m2": "42-44",
+            "dormitorios": 2
+          },
+          {
+            "area_m2": 86,
+            "dormitorios": "2-3"
+          }
+        ],
+        "conceito": "Arquitetura moderna"
+      }
+    ]
+  },
+  "dados_mercado": {
+    "area_atuacao": "Zona Leste de São Paulo",
+    "bairros": [
+      "Vila Guilhermina",
+      "Cidade Patriarca",
+      "Vila Ré",
+      "Mooca",
+      "Tatuapé"
+    ],
+    "mercado_zona_leste": {
+      "crescimento_2025": "47%",
+      "valorizacao_anual": "12%",
+      "tendencia": "Alta"
+    },
+    "vgv_total_desenvolvimento": "~R$ 316 milhões",
+    "unidades_em_desenvolvimento": "~425 apartamentos"
+  },
+  "financiamento": {
+    "opcoes": [
+      "FGTS",
+      "Caixa Econômica Federal",
+      "Banco do Brasil",
+      "Minha Casa Minha Vida (MCMV)",
+      "Parcelamento direto (até 120x)"
+    ],
+    "programa_mcmv": "Disponível em projetos selecionados",
+    "consulta_spc": "Não necessária em alguns casos"
+  },
+  "valores_empresa": [
+    "Transparência",
+    "Respeito à comunidade",
+    "Capitalismo Consciente",
+    "Qualidade Construtiva",
+    "Responsabilidade Social",
+    "Valorização Patrimonial"
+  ],
+  "diferenciais_competitivos": [
+    "Localização estratégica próxima ao metrô",
+    "Parceria com Wesley Assouz Arquitetura",
+    "Lazer completo e diferenciado",
+    "Inovação em acabamentos",
+    "Diversificação de segmentos",
+    "25+ anos de experiência"
+  ],
+  "faq": {
+    "melhor_empreendimento_primeira_habitacao": {
+      "resposta": "Aura by Pratica (R$ 389.940) e Colatinna 56 (R$ 339.000) têm bom custo-benefício com proximidade ao metrô"
+    },
+    "quando_morar": {
+      "station_garden": "Agora (pronto)",
+      "aura_e_giardino": "Out/2026",
+      "colatinna_56": "Out/2027",
+      "alta_floresta": "A confirmar"
+    },
+    "fgts_aceito": {
+      "resposta": "Sim, todos os empreendimentos em construção aceitam FGTS + Financiamento"
+    },
+    "como_agendar_visita": {
+      "resposta": "Envie mensagem pelo WhatsApp com o empreendimento de interesse. Estamos disponíveis seg-sex 08:00-17:00"
+    }
+  },
+  "informacoes_importantes": {
+    "pontos_positivos": [
+      "25+ anos de experiência",
+      "Localização próxima ao metrô",
+      "Lazer abrangente",
+      "Parcerias sólidas",
+      "Múltiplas opções de financiamento",
+      "Atendimento via WhatsApp"
+    ],
+    "desafios_conhecidos": [
+      "Atrasos em entregas (Station Garden)",
+      "Reclamações em Reclame Aqui",
+      "Transparência limitada em certificações",
+      "Escala moderada vs. grandes players"
+    ],
+    "recomendacoes": [
+      "Verificar histórico de entregas",
+      "Visitar obras em andamento",
+      "Confirmar prazos contratuais",
+      "Consultar financiamento direto",
+      "Solicitar documentação completa"
+    ]
+  },
+  "scripts": {
+    "primeiro_contato": "Bem-vindo à Prática Construtora! Como posso ajudá-lo?",
+    "menor_preco": "O menor preço é Colatinna 56 - R$ 339.000 para 33m² com 2 dorm. É ao lado do Metrô Vila Patriarca.",
+    "metro_proximo": "Aura (260m da estação) e Colatinna (ao lado da estação) são nossas melhores opções de proximidade com metrô.",
+    "lazer_premium": "Giardino Verticale tem diferenciais especiais: Spa, Sauna, Espaço de Meditação e Coworking.",
+    "alto_padrao": "Alta Floresta é nosso lançamento premium com 100-140m², 3 suítes e design exclusivo.",
+    "fgts": "Ótimo! Aura, Colatinna e Giardino aceitam FGTS + Financiamento com Caixa ou Banco do Brasil."
+  },
+  "horario_atualizacao": "2026-01-14",
+  "proxima_atualizacao": "2026-07-14"
+}
