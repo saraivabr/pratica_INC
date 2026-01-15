@@ -33,7 +33,7 @@ export function EmpreendimentoCard({ empreendimento: emp }: EmpreendimentoCardPr
     <Link href={`/catalogo/${emp.id}`} className="block group">
       <article className="luxury-card overflow-hidden">
         {/* Image Container */}
-        <div className="relative h-56 overflow-hidden">
+        <div className="relative h-56 overflow-hidden bg-[#E5E2DC]">
           <img
             src={imageUrl}
             alt={emp.nome}
@@ -41,15 +41,18 @@ export function EmpreendimentoCard({ empreendimento: emp }: EmpreendimentoCardPr
             loading="lazy"
           />
 
-          {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          {/* Enhanced Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-90 group-hover:opacity-95 transition-opacity duration-500" />
+
+          {/* Decorative Corner Accent */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#C9A962]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
           {/* Status Badge */}
-          <div className={cn("badge-premium absolute top-4 left-4", status.className)}>
+          <div className={cn("badge-premium absolute top-4 left-4 z-10", status.className)}>
             {status.label}
           </div>
 
-          {/* Favorite Button */}
+          {/* Favorite Button with Ripple */}
           <button
             onClick={(e) => {
               e.preventDefault()
@@ -57,43 +60,51 @@ export function EmpreendimentoCard({ empreendimento: emp }: EmpreendimentoCardPr
               toggle(emp.id)
             }}
             className={cn(
-              "absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300",
+              "absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 z-10 ripple",
               favorited
-                ? "bg-white text-red-500"
-                : "bg-white/20 backdrop-blur-sm text-white hover:bg-white/30"
+                ? "bg-white text-red-500 shadow-lg"
+                : "bg-white/20 backdrop-blur-sm text-white hover:bg-white/30 hover:scale-110"
             )}
           >
             <Heart
-              className={cn("w-5 h-5 transition-transform", favorited && "fill-current scale-110")}
+              className={cn(
+                "w-5 h-5 transition-all duration-300",
+                favorited && "fill-current scale-110"
+              )}
             />
           </button>
 
-          {/* Price Tag */}
-          <div className="absolute bottom-4 left-4 right-4">
-            <p className="text-white/70 text-xs font-medium tracking-wider uppercase mb-1">
-              A partir de
-            </p>
-            <p className="text-white text-2xl font-display font-semibold">
-              R$ {formatarPreco(preco)}
-            </p>
+          {/* Price Tag with Enhanced Design */}
+          <div className="absolute bottom-4 left-4 right-4 transform transition-transform duration-500 group-hover:translate-y-[-4px]">
+            <div className="backdrop-blur-sm bg-black/20 rounded-xl p-3 border border-white/10">
+              <p className="text-white/70 text-xs font-medium tracking-wider uppercase mb-1">
+                A partir de
+              </p>
+              <p className="text-white text-2xl font-display font-semibold">
+                R$ {formatarPreco(preco)}
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-5">
+        <div className="p-5 bg-white relative">
+          {/* Decorative Top Border */}
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#C9A962]/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
           {/* Title Row */}
           <div className="flex items-start justify-between gap-3 mb-3">
-            <h3 className="font-display text-xl font-semibold text-[#1A1A1A] leading-tight group-hover:text-[#1B4332] transition-colors">
+            <h3 className="font-display text-xl font-semibold text-[#1A1A1A] leading-tight group-hover:text-[#1B4332] transition-colors duration-300">
               {emp.nome}
             </h3>
-            <div className="w-8 h-8 rounded-full bg-[#F0EDE8] flex items-center justify-center flex-shrink-0 group-hover:bg-[#1B4332] transition-colors">
-              <ArrowUpRight className="w-4 h-4 text-[#5C5C5C] group-hover:text-white transition-colors" />
+            <div className="w-8 h-8 rounded-full bg-[#F0EDE8] flex items-center justify-center flex-shrink-0 group-hover:bg-[#1B4332] group-hover:shadow-lg transition-all duration-300">
+              <ArrowUpRight className="w-4 h-4 text-[#5C5C5C] group-hover:text-white group-hover:scale-110 transition-all duration-300" />
             </div>
           </div>
 
           {/* Location */}
           <div className="flex items-center gap-2 text-[#5C5C5C] mb-4">
-            <MapPin className="w-4 h-4 text-[#C9A962]" />
+            <MapPin className="w-4 h-4 text-[#C9A962] group-hover:scale-110 transition-transform duration-300" />
             <span className="text-sm">{emp.localizacao.bairro}</span>
             {emp.localizacao.proximidade_metro && (
               <>

@@ -107,31 +107,38 @@ export default function EmpreendimentoDetailPage() {
           <button
             onClick={() => toggle(empreendimento.id)}
             className={cn(
-              "p-2 rounded-full transition-all",
+              "p-2 rounded-full transition-all duration-300 ripple",
               favorited
-                ? "bg-red-100 text-red-500"
-                : "hover:bg-[#F0EDE8] text-[#5C5C5C]"
+                ? "bg-red-100 text-red-500 shadow-md"
+                : "hover:bg-[#F0EDE8] text-[#5C5C5C] hover:shadow-sm"
             )}
           >
             <Heart
-              className={cn("w-5 h-5", favorited && "fill-current")}
+              className={cn(
+                "w-5 h-5 transition-all duration-300",
+                favorited && "fill-current scale-110"
+              )}
             />
           </button>
         }
       />
 
-      {/* Image Gallery */}
-      <div className="relative h-72 bg-[#E5E2DC]">
+      {/* Image Gallery with Parallax Effect */}
+      <div className="relative h-72 bg-[#E5E2DC] overflow-hidden">
         <img
           src={imageUrl}
           alt={empreendimento.nome}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover animate-fade-in"
+          style={{ transform: 'translateZ(0)' }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        
+        {/* Decorative Corner Gradient */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[#C9A962]/10 to-transparent opacity-50" />
 
         <Badge
           variant={status.variant}
-          className="absolute top-4 left-4 shadow-sm px-3 py-1.5"
+          className="absolute top-4 left-4 shadow-lg px-3 py-1.5 animate-slide-in-left backdrop-blur-sm"
         >
           {status.label}
         </Badge>
@@ -140,10 +147,13 @@ export default function EmpreendimentoDetailPage() {
       {/* Content */}
       <div className="px-5 py-6 space-y-6 max-w-lg mx-auto">
         {/* Title and Location */}
-        <section>
-          <h1 className="font-display text-2xl font-semibold text-[#1A1A1A]">
+        <section className="animate-fade-up stagger-1">
+          <h1 className="font-display text-2xl font-semibold text-[#1A1A1A] mb-3">
             {empreendimento.nome}
           </h1>
+          
+          {/* Decorative Line */}
+          <div className="h-0.5 w-16 bg-gradient-to-r from-[#C9A962] to-transparent mb-4 animate-reveal" />
 
           <div className="flex items-center gap-2 text-[#5C5C5C] mt-2">
             <MapPin className="w-4 h-4 flex-shrink-0 text-[#C9A962]" />
@@ -169,33 +179,43 @@ export default function EmpreendimentoDetailPage() {
         </section>
 
         {/* Price */}
-        <section className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] rounded-2xl p-5 text-white">
-          <p className="text-sm text-white/70">A partir de</p>
-          <p className="text-3xl font-display font-semibold">
-            R$ {formatarPreco(preco)}
-          </p>
-          {empreendimento.preco_m2 && (
-            <p className="text-sm text-white/60 mt-1">
-              {empreendimento.preco_m2}
+        <section className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] rounded-2xl p-5 text-white shadow-lg animate-fade-up stagger-2 relative overflow-hidden">
+          {/* Decorative Pattern */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/5 to-transparent rounded-full blur-2xl" />
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-[#C9A962]/20 to-transparent rounded-full blur-xl" />
+          
+          <div className="relative z-10">
+            <p className="text-sm text-white/70">A partir de</p>
+            <p className="text-3xl font-display font-semibold">
+              R$ {formatarPreco(preco)}
             </p>
-          )}
+            {empreendimento.preco_m2 && (
+              <p className="text-sm text-white/60 mt-1">
+                {empreendimento.preco_m2}
+              </p>
+            )}
+          </div>
         </section>
 
         {/* Tipologias */}
         {empreendimento.tipologias && empreendimento.tipologias.length > 0 && (
-          <section>
-            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3">
+          <section className="animate-fade-up stagger-3">
+            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3 flex items-center">
               Tipologias
+              <span className="ml-3 h-px flex-1 bg-gradient-to-r from-[#E5E2DC] to-transparent" />
             </h2>
             <div className="grid grid-cols-2 gap-3">
               {empreendimento.tipologias.map((tip, i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-2xl p-4 border border-[#E5E2DC] shadow-sm hover:shadow-md transition-shadow"
+                  className="bg-white rounded-2xl p-4 border border-[#E5E2DC] shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group"
                 >
-                  <p className="text-lg font-display font-semibold text-[#1A1A1A]">
-                    {tip.area_m2}m²
-                  </p>
+                  <div className="flex items-baseline gap-1">
+                    <p className="text-lg font-display font-semibold text-[#1A1A1A] group-hover:text-[#1B4332] transition-colors">
+                      {tip.area_m2}
+                    </p>
+                    <span className="text-xs text-[#8A8A8A]">m²</span>
+                  </div>
                   <div className="space-y-1 mt-2 text-sm text-[#5C5C5C]">
                     {tip.dormitorios && (
                       <p>{tip.dormitorios} dormitorio{Number(tip.dormitorios) > 1 ? "s" : ""}</p>
@@ -220,18 +240,19 @@ export default function EmpreendimentoDetailPage() {
 
         {/* Diferenciais */}
         {empreendimento.diferenciais && empreendimento.diferenciais.length > 0 && (
-          <section>
-            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3">
+          <section className="animate-fade-up stagger-4">
+            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3 flex items-center">
               Diferenciais
+              <span className="ml-3 h-px flex-1 bg-gradient-to-r from-[#E5E2DC] to-transparent" />
             </h2>
-            <div className="bg-white rounded-2xl border border-[#E5E2DC] p-4">
+            <div className="bg-white rounded-2xl border border-[#E5E2DC] p-4 shadow-sm hover:shadow-md transition-shadow duration-300">
               <div className="space-y-2">
                 {empreendimento.diferenciais.map((item, i) => (
                   <div
                     key={i}
-                    className="flex items-start gap-3 text-[#5C5C5C]"
+                    className="flex items-start gap-3 text-[#5C5C5C] group"
                   >
-                    <Check className="w-5 h-5 text-[#1B4332] flex-shrink-0 mt-0.5" />
+                    <Check className="w-5 h-5 text-[#1B4332] flex-shrink-0 mt-0.5 group-hover:scale-110 transition-transform duration-300" />
                     <span className="text-sm">{item}</span>
                   </div>
                 ))}
@@ -242,19 +263,20 @@ export default function EmpreendimentoDetailPage() {
 
         {/* Diferenciais Premium */}
         {empreendimento.diferenciais_premium && empreendimento.diferenciais_premium.length > 0 && (
-          <section>
-            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3">
-              Diferenciais Premium
+          <section className="animate-fade-up stagger-5">
+            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3 flex items-center">
+              <span className="gradient-text">Diferenciais Premium</span>
+              <span className="ml-3 h-px flex-1 bg-gradient-to-r from-[#C9A962]/30 to-transparent" />
             </h2>
-            <div className="bg-gradient-to-br from-[#C9A962]/10 to-[#C9A962]/20 rounded-2xl p-4 border border-[#C9A962]/30">
+            <div className="bg-gradient-to-br from-[#C9A962]/10 to-[#C9A962]/20 rounded-2xl p-4 border border-[#C9A962]/30 shadow-sm hover:shadow-lg transition-all duration-300">
               <div className="space-y-2">
                 {empreendimento.diferenciais_premium.map((item, i) => (
                   <div
                     key={i}
-                    className="flex items-start gap-3 text-[#5C5C5C]"
+                    className="flex items-start gap-3 text-[#5C5C5C] group"
                   >
-                    <Check className="w-5 h-5 text-[#C9A962] flex-shrink-0 mt-0.5" />
-                    <span className="text-sm">{item}</span>
+                    <Check className="w-5 h-5 text-[#C9A962] flex-shrink-0 mt-0.5 group-hover:scale-110 transition-transform duration-300" />
+                    <span className="text-sm font-medium">{item}</span>
                   </div>
                 ))}
               </div>
