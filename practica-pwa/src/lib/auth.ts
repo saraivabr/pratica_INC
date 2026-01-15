@@ -34,12 +34,33 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const whatsappNormalizado = credentials.whatsapp.replace(/\D/g, "")
+        const cleanPhone = credentials.whatsapp.replace(/\D/g, "")
+        
+        let phoneWith55 = cleanPhone
+        let phoneWithout55 = cleanPhone
 
-        // Busca o código mais recente e não usado para este WhatsApp
+        if (cleanPhone.startsWith("55") && cleanPhone.length > 11) {
+          phoneWithout55 = cleanPhone.substring(2)
+        } else {
+          phoneWith55 = "55" + cleanPhone
+        }
+
+        // Primeiro encontra o corretor para saber qual número ele usa no cadastro
+        const corretor = await prisma.corretor.findFirst({
+           where: {
+            whatsapp: {
+              in: [phoneWith55, phoneWithout55, cleanPhone]
+            },
+            ativo: true
+          }
+        })
+
+        if (!corretor) return null
+
+        // Agora busca o código usando o whatsapp DO CORRETOR (que foi usado para salvar o AuthCode)
         const authCode = await prisma.authCode.findFirst({
           where: {
-            whatsapp: whatsappNormalizado,
+            whatsapp: corretor.whatsapp,
             code: credentials.codigo,
             used: false,
             expiresAt: {
@@ -61,20 +82,11 @@ export const authOptions: NextAuthOptions = {
           data: { used: true }
         })
 
-        // Busca o corretor
-        const corretor = await prisma.corretor.findUnique({
-          where: { whatsapp: whatsappNormalizado }
-        })
-
-        if (corretor && corretor.ativo) {
-          return {
-            id: corretor.id,
-            name: corretor.nome,
-            whatsapp: corretor.whatsapp,
-          }
+        return {
+          id: corretor.id,
+          name: corretor.nome,
+          whatsapp: corretor.whatsapp,
         }
-
-        return null
       },
     }),
   ],

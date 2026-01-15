@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { Check, Send, Smartphone, ShieldCheck, Loader2, ArrowRight, MessageSquare } from "lucide-react"
+import { Check, Send, Smartphone, ShieldCheck, Loader2, ArrowRight, MessageSquare, XCircle } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -27,14 +27,26 @@ export default function LoginPage() {
   }, [timer])
 
   const formatWhatsApp = (value: string) => {
-    const numbers = value.replace(/\D/g, "")
-    if (numbers.length <= 2) return numbers
-    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`
-    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`
+    // Remove tudo que não é número
+    let numbers = value.replace(/\D/g, "")
+    
+    // Se começar com 55, remove para formatar apenas o resto
+    if (numbers.startsWith("55") && numbers.length > 2) {
+      numbers = numbers.slice(2)
+    }
+
+    if (numbers.length === 0) return ""
+    if (numbers.length <= 2) return `+55 (${numbers}`
+    if (numbers.length <= 7) return `+55 (${numbers.slice(0, 2)}) ${numbers.slice(2)}`
+    return `+55 (${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`
   }
 
   const handleSendCode = async () => {
-    if (whatsapp.length < 14) {
+    // Limpa o número para envio (mantendo o 55)
+    const cleanWhatsApp = whatsapp.replace(/\D/g, "")
+    const fullPhone = cleanWhatsApp.startsWith("55") ? cleanWhatsApp : "55" + cleanWhatsApp
+
+    if (fullPhone.length < 13) {
       setError("Por favor, insira um número de WhatsApp válido.")
       return
     }
@@ -43,11 +55,10 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const cleanWhatsApp = whatsapp.replace(/\D/g, "")
       const response = await fetch("/api/auth/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ whatsapp: cleanWhatsApp }),
+        body: JSON.stringify({ whatsapp: fullPhone }),
       })
 
       const data = await response.json()
@@ -78,8 +89,10 @@ export default function LoginPage() {
 
     try {
       const cleanWhatsApp = whatsapp.replace(/\D/g, "")
+      const fullPhone = cleanWhatsApp.startsWith("55") ? cleanWhatsApp : "55" + cleanWhatsApp
+
       const result = await signIn("credentials", {
-        whatsapp: cleanWhatsApp,
+        whatsapp: fullPhone,
         codigo,
         redirect: false,
       })
@@ -143,10 +156,14 @@ export default function LoginPage() {
                 <input
                   type="tel"
                   value={whatsapp}
+                  placeholder="+55 (11) 99999-9999"
                   onChange={(e) => setWhatsapp(formatWhatsApp(e.target.value))}
-                  onFocus={() => setFocusedField('whatsapp')}
+                  onFocus={() => {
+                    setFocusedField('whatsapp')
+                    if (!whatsapp) setWhatsapp("+55 (")
+                  }}
                   onBlur={() => setFocusedField(null)}
-                  maxLength={16}
+                  maxLength={19}
                   required
                   disabled={loading || sendingCode || codeSent}
                   className="w-full h-[64px] pt-5 pb-1 px-4 bg-[#f5f5f7] border-2 border-transparent rounded-2xl text-[17px] font-medium text-[#1d1d1f] transition-all duration-300 focus:outline-none focus:bg-white focus:border-[#0071e3] focus:ring-8 focus:ring-[#0071e3]/5 disabled:opacity-70"
@@ -193,7 +210,7 @@ export default function LoginPage() {
               {error && (
                 <div className="flex items-start gap-3 py-4 px-4 bg-red-50 border border-red-100 rounded-2xl animate-[shake_0.5s_ease-in-out]">
                   <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                    <XCircle className="w-3.5 h-3.5 text-red-600" />
+                    <XCircle className="w-4 h-4 text-red-600" />
                   </div>
                   <p className="text-[13px] text-red-700 font-medium leading-relaxed">{error}</p>
                 </div>
@@ -283,13 +300,5 @@ export default function LoginPage() {
         }
       `}</style>
     </div>
-  )
-}
-
-function XCircle(props: any) {
-  return (
-    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
   )
 }
