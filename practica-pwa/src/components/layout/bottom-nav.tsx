@@ -17,7 +17,16 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-[#E5E2DC] pb-safe">
-      <div className="flex justify-around items-center h-18 max-w-lg mx-auto">
+      <div className="flex justify-around items-center h-18 max-w-lg mx-auto relative">
+        {/* Animated Background Indicator */}
+        <div
+          className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-[#1B4332] via-[#C9A962] to-[#1B4332] rounded-full transition-all duration-500 ease-out"
+          style={{
+            width: '25%',
+            transform: `translateX(${tabs.findIndex(t => pathname?.startsWith(t.href)) * 100}%)`,
+          }}
+        />
+        
         {tabs.map(({ href, icon: Icon, label }) => {
           const isActive = pathname?.startsWith(href)
           return (
@@ -25,7 +34,7 @@ export function BottomNav() {
               key={href}
               href={href}
               className={cn(
-                "flex flex-col items-center justify-center w-full py-3",
+                "flex flex-col items-center justify-center w-full py-3 relative",
                 "transition-all duration-300",
                 isActive ? "text-[#1B4332]" : "text-[#8A8A8A]"
               )}
@@ -33,7 +42,7 @@ export function BottomNav() {
               <div
                 className={cn(
                   "relative flex items-center justify-center w-10 h-8 rounded-full transition-all duration-300",
-                  isActive && "bg-[#1B4332]/10"
+                  isActive && "bg-[#1B4332]/10 scale-110"
                 )}
               >
                 <Icon
@@ -43,14 +52,20 @@ export function BottomNav() {
                   )}
                   strokeWidth={isActive ? 2.5 : 1.8}
                 />
+                {/* Animated Dot */}
                 {isActive && (
-                  <span className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-[#C9A962]" />
+                  <span className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-[#C9A962] animate-scale-in shadow-lg" />
+                )}
+                
+                {/* Ripple effect on active */}
+                {isActive && (
+                  <span className="absolute inset-0 rounded-full bg-[#1B4332]/10 animate-ping opacity-75" style={{ animationDuration: '2s' }} />
                 )}
               </div>
               <span
                 className={cn(
-                  "text-[10px] mt-1 tracking-wide uppercase transition-all",
-                  isActive ? "font-semibold" : "font-medium"
+                  "text-[10px] mt-1 tracking-wide uppercase transition-all duration-300",
+                  isActive ? "font-semibold opacity-100" : "font-medium opacity-80"
                 )}
               >
                 {label}
