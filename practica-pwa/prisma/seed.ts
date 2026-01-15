@@ -343,6 +343,184 @@ async function main() {
 
   console.log(`   Total: ${colatinnaUnidades.length} unidades\n`);
 
+  // ============================================
+  // 6. INSERIR UNIDADES STATION GARDEN (AGOSTO 2025)
+  // ============================================
+  console.log("6. Inserindo unidades Station Garden (Agosto 2025)...");
+
+  const stationGardenUnidades: UnidadeStationPark[] = [
+    { id: "SG14", unidade: "14", area: 115, dormitorios: 2, tipologia: "2 dormitórios - garden", status: "disponivel", valorTotal: 644862, plano: { ato: { valor: 128972, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 515890, vencimento: "2025-12-15" } } },
+    { id: "SG23", unidade: "23", area: 45, dormitorios: 2, tipologia: "2 dormitórios", status: "disponivel", valorTotal: 311905, plano: { ato: { valor: 62381, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 249524, vencimento: "2025-12-15" } } },
+    { id: "SG124", unidade: "124", area: 45, dormitorios: 2, tipologia: "2 dormitórios", status: "disponivel", valorTotal: 334427, plano: { ato: { valor: 66885, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 267542, vencimento: "2025-12-15" } } },
+  ];
+
+  for (const unidade of stationGardenUnidades) {
+    await prisma.unidade.upsert({
+      where: { id: unidade.id },
+      update: {
+        empreendimentoId: "station-garden",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+      create: {
+        id: unidade.id,
+        empreendimentoId: "station-garden",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+    });
+    console.log(`   - Unidade: ${unidade.unidade} - R$ ${unidade.valorTotal.toLocaleString("pt-BR")}`);
+  }
+
+  console.log(`   Total: ${stationGardenUnidades.length} unidades\n`);
+
+  // ============================================
+  // 7. INSERIR UNIDADES MIRANTE DA VILA (AGOSTO 2025)
+  // ============================================
+  console.log("7. Inserindo unidades Mirante da Vila (Agosto 2025)...");
+
+  const miranteUnidades: UnidadeStationPark[] = [
+    { id: "MV112", unidade: "112", area: 61, dormitorios: 2, tipologia: "Garden - 2 dormitórios", status: "disponivel", valorTotal: 487136, plano: { ato: { valor: 97427, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 360436, vencimento: "2025-12-15" } } },
+  ];
+
+  for (const unidade of miranteUnidades) {
+    await prisma.unidade.upsert({
+      where: { id: unidade.id },
+      update: {
+        empreendimentoId: "mirante-vila",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+      create: {
+        id: unidade.id,
+        empreendimentoId: "mirante-vila",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+    });
+    console.log(`   - Unidade: ${unidade.unidade} - R$ ${unidade.valorTotal.toLocaleString("pt-BR")}`);
+  }
+
+  console.log(`   Total: ${miranteUnidades.length} unidades\n`);
+
+  // ============================================
+  // 8. INSERIR UNIDADES MOMENT METRÔ CONCEIÇÃO (AGOSTO 2025)
+  // ============================================
+  console.log("8. Inserindo unidades Moment Metrô Conceição (Agosto 2025)...");
+
+  const momentUnidades: UnidadeStationPark[] = [
+    { id: "MMC301", unidade: "301", area: 60, dormitorios: 3, tipologia: "3 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 685110, plano: { ato: { valor: 68511, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 548088, vencimento: "2025-12-15" } } },
+    { id: "MMC401", unidade: "401", area: 60, dormitorios: 3, tipologia: "3 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 695832, plano: { ato: { valor: 69583, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 556666, vencimento: "2025-12-15" } } },
+    { id: "MMC407", unidade: "407", area: 49, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 500583, plano: { ato: { valor: 50058, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 400466, vencimento: "2025-12-15" } } },
+    { id: "MMC1101", unidade: "1101", area: 60, dormitorios: 3, tipologia: "3 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 711986, plano: { ato: { valor: 71199, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 569589, vencimento: "2025-12-15" } } },
+    { id: "MMC2001", unidade: "2001", area: 60, dormitorios: 3, tipologia: "3 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 724491, plano: { ato: { valor: 72449, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 579593, vencimento: "2025-12-15" } } },
+    { id: "MMC2101", unidade: "2101", area: 60, dormitorios: 3, tipologia: "3 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 726925, plano: { ato: { valor: 72692, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 581540, vencimento: "2025-12-15" } } },
+    { id: "MMC2303", unidade: "2303", area: 40, dormitorios: 2, tipologia: "2 Dormitórios", status: "disponivel", valorTotal: 400988, plano: { ato: { valor: 40099, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 320790, vencimento: "2025-12-15" } } },
+    { id: "MMC2401", unidade: "2401", area: 60, dormitorios: 3, tipologia: "3 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 791254, plano: { ato: { valor: 79125, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 633003, vencimento: "2025-12-15" } } },
+    { id: "MMC2501", unidade: "2501", area: 60, dormitorios: 3, tipologia: "3 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 792326, plano: { ato: { valor: 79233, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 633861, vencimento: "2025-12-15" } } },
+  ];
+
+  for (const unidade of momentUnidades) {
+    await prisma.unidade.upsert({
+      where: { id: unidade.id },
+      update: {
+        empreendimentoId: "moment-metro",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+      create: {
+        id: unidade.id,
+        empreendimentoId: "moment-metro",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+    });
+    console.log(`   - Unidade: ${unidade.unidade} - R$ ${unidade.valorTotal.toLocaleString("pt-BR")}`);
+  }
+
+  console.log(`   Total: ${momentUnidades.length} unidades\n`);
+
+  // ============================================
+  // 9. INSERIR UNIDADES ESSÊNCIA DA VILA (AGOSTO 2025)
+  // ============================================
+  console.log("9. Inserindo unidades Essência da Vila (Agosto 2025)...");
+
+  const essenciaUnidades: UnidadeStationPark[] = [
+    { id: "EV408", unidade: "408", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 375187, plano: { ato: { valor: 37519, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 300149, vencimento: "2026-04-15" } } },
+    { id: "EV1101", unidade: "1101", area: 45, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 495155, plano: { ato: { valor: 49516, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 396124, vencimento: "2026-04-15" } } },
+    { id: "EV1402", unidade: "1402", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 505223, plano: { ato: { valor: 50522, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 404179, vencimento: "2026-04-15" } } },
+    { id: "EV1801", unidade: "1801", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 516948, plano: { ato: { valor: 51695, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 413558, vencimento: "2026-04-15" } } },
+    { id: "EV1802", unidade: "1802", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 516948, plano: { ato: { valor: 51695, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 413558, vencimento: "2026-04-15" } } },
+    { id: "EV1901", unidade: "1901", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 516948, plano: { ato: { valor: 51695, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 413558, vencimento: "2026-04-15" } } },
+    { id: "EV1902", unidade: "1902", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 516948, plano: { ato: { valor: 51695, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 413558, vencimento: "2026-04-15" } } },
+    { id: "EV2001", unidade: "2001", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 522277, plano: { ato: { valor: 52228, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 417822, vencimento: "2026-04-15" } } },
+    { id: "EV2002", unidade: "2002", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 522277, plano: { ato: { valor: 52228, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 417821, vencimento: "2026-04-15" } } },
+    { id: "EV2101", unidade: "2101", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 522277, plano: { ato: { valor: 52228, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 417821, vencimento: "2026-04-15" } } },
+    { id: "EV2102", unidade: "2102", area: 44, dormitorios: 2, tipologia: "2 Dormitórios, sendo 1 suíte", status: "disponivel", valorTotal: 522277, plano: { ato: { valor: 52228, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 417821, vencimento: "2026-04-15" } } },
+    { id: "EV2202", unidade: "2202", area: 81, dormitorios: 2, tipologia: "COBERTURA - 2 Dormitórios", status: "disponivel", valorTotal: 924704, plano: { ato: { valor: 92470, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 739763, vencimento: "2026-04-15" } } },
+    { id: "EV2203", unidade: "2203", area: 81, dormitorios: 2, tipologia: "COBERTURA - 2 Dormitórios", status: "disponivel", valorTotal: 925177, plano: { ato: { valor: 92518, vencimento: "2025-08-15" }, mensais: { quantidade: 1, valor: 0, primeiroVencimento: "2025-08-15" }, financiamento: { valor: 740141, vencimento: "2026-04-15" } } },
+  ];
+
+  for (const unidade of essenciaUnidades) {
+    await prisma.unidade.upsert({
+      where: { id: unidade.id },
+      update: {
+        empreendimentoId: "essencia-vila",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+      create: {
+        id: unidade.id,
+        empreendimentoId: "essencia-vila",
+        numero: unidade.unidade,
+        areaM2: unidade.area,
+        dormitorios: unidade.dormitorios,
+        tipologia: unidade.tipologia,
+        status: unidade.status,
+        valorTotal: unidade.valorTotal,
+        planoJson: unidade.plano,
+      },
+    });
+    console.log(`   - Unidade: ${unidade.unidade} - R$ ${unidade.valorTotal.toLocaleString("pt-BR")}`);
+  }
+
+  console.log(`   Total: ${essenciaUnidades.length} unidades\n`);
+
   console.log("========================================");
   console.log("Seed concluido com sucesso!");
   console.log("========================================");
