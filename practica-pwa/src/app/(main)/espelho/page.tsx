@@ -1,295 +1,488 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, Lock, Zap, TrendingUp, Clock } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
+import { ChevronDown, FileText, X, Check, Calendar, Wallet, Home, User } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { stationParkUnidades, stationParkInfo, criarPlanoFromUnidade, UnidadeStationPark } from "@/data/station-park"
+import { PlanoPagamentoTable } from "@/components/reserva/plano-pagamento"
+import { ClienteForm } from "@/components/reserva/cliente-form"
+import { Cliente, PlanoPagamento, PreReserva } from "@/types/pagamento"
 
-// Dados mockados do espelho de vendas
-const empreendimentos = [
-  { id: "aura", nome: "Aura by Pratica", torres: 1, andares: 22, unidadesPorAndar: 4 },
-  { id: "colatinna", nome: "Colatinna 56", torres: 1, andares: 21, unidadesPorAndar: 8 },
-  { id: "giardino", nome: "Giardino Verticale", torres: 1, andares: 15, unidadesPorAndar: 4 },
-]
-
-// Gerar unidades mockadas com status aleatório
-const generateUnidades = (andares: number, porAndar: number) => {
-  const unidades: Record<string, { status: string; preco: number; area: number }> = {}
-  const statusOptions = ["disponivel", "disponivel", "disponivel", "reservado", "vendido", "bloqueado"]
-
-  for (let andar = andares; andar >= 1; andar--) {
-    for (let unidade = 1; unidade <= porAndar; unidade++) {
-      const id = `${andar.toString().padStart(2, "0")}${unidade.toString().padStart(2, "0")}`
-      const randomStatus = statusOptions[Math.floor(Math.random() * statusOptions.length)]
-      unidades[id] = {
-        status: randomStatus,
-        preco: 380000 + (andar * 5000) + (unidade * 2000),
-        area: 40 + (unidade * 2),
-      }
-    }
-  }
-  return unidades
-}
-
-const statusConfig = {
-  disponivel: { color: "bg-emerald-500", label: "Disponível", textColor: "text-emerald-700" },
-  reservado: { color: "bg-amber-400", label: "Reservado", textColor: "text-amber-700" },
-  vendido: { color: "bg-red-400", label: "Vendido", textColor: "text-red-700" },
-  bloqueado: { color: "bg-gray-400", label: "Bloqueado", textColor: "text-gray-600" },
-}
+type ModalStep = "detalhes" | "cliente" | "confirmacao"
 
 export default function EspelhoPage() {
-  const [selectedEmp, setSelectedEmp] = useState(empreendimentos[0])
-  const [showSelector, setShowSelector] = useState(false)
-  const [selectedUnidade, setSelectedUnidade] = useState<string | null>(null)
-  const [unidades] = useState(() => generateUnidades(selectedEmp.andares, selectedEmp.unidadesPorAndar))
+  const router = useRouter()
+  const { data: session } = useSession()
+  const [selectedUnidade, setSelectedUnidade] = useState<UnidadeStationPark | null>(null)
+  const [modalStep, setModalStep] = useState<ModalStep>("detalhes")
+  const [loading, setLoading] = useState(false)
+  const [preReserva, setPreReserva] = useState<PreReserva | null>(null)
+  const [cliente, setCliente] = useState<Cliente | null>(null)
 
-  const stats = {
-    disponivel: Object.values(unidades).filter(u => u.status === "disponivel").length,
-    reservado: Object.values(unidades).filter(u => u.status === "reservado").length,
-    vendido: Object.values(unidades).filter(u => u.status === "vendido").length,
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value)
   }
 
-  const selectedData = selectedUnidade ? unidades[selectedUnidade] : null
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr + "T12:00:00").toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    })
+  }
+
+  // Agrupar unidades por andar
+  const unidadesPorAndar: Record<number, UnidadeStationPark[]> = {}
+  stationParkUnidades.forEach(u => {
+    const andar = parseInt(u.unidade.slice(0, -2)) || parseInt(u.unidade.slice(0, -1))
+    if (!unidadesPorAndar[andar]) unidadesPorAndar[andar] = []
+    unidadesPorAndar[andar].push(u)
+  })
+
+  const andares = Object.keys(unidadesPorAndar).map(Number).sort((a, b) => b - a)
+
+  const stats = {
+    total: stationParkUnidades.length,
+    disponiveis: stationParkUnidades.filter(u => u.status === "disponivel").length,
+    vgv: stationParkUnidades.reduce((sum, u) => sum + u.valorTotal, 0)
+  }
+
+  const handleUnidadeClick = (unidade: UnidadeStationPark) => {
+    setSelectedUnidade(unidade)
+    setModalStep("detalhes")
+    setPreReserva(null)
+    setCliente(null)
+  }
+
+  const handleCloseModal = () => {
+    setSelectedUnidade(null)
+    setModalStep("detalhes")
+  }
+
+  const handleClienteSubmit = async (dadosCliente: Cliente) => {
+    if (!selectedUnidade || !session?.user) return
+
+    setLoading(true)
+    setCliente(dadosCliente)
+
+    const plano = criarPlanoFromUnidade(selectedUnidade)
+
+    try {
+      const response = await fetch("/api/pre-reservas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          corretorId: session.user.id,
+          corretorNome: session.user.name,
+          empreendimentoId: stationParkInfo.id,
+          empreendimentoNome: stationParkInfo.nome,
+          unidade: selectedUnidade.unidade,
+          tipologia: {
+            area_m2: selectedUnidade.area,
+            dormitorios: selectedUnidade.dormitorios,
+            descricao: selectedUnidade.tipologia
+          },
+          cliente: dadosCliente,
+          plano
+        })
+      })
+
+      if (!response.ok) throw new Error("Erro ao criar pré-reserva")
+
+      const data = await response.json()
+      setPreReserva(data.preReserva)
+      setModalStep("confirmacao")
+    } catch (error) {
+      console.error("Erro:", error)
+      alert("Erro ao criar pré-reserva. Tente novamente.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const planoAtual = selectedUnidade ? criarPlanoFromUnidade(selectedUnidade) : null
 
   return (
-    <div className="min-h-screen bg-[#FAF9F7]">
+    <div className="min-h-screen bg-[#f5f5f7]">
       {/* Header */}
-      <header className="sticky top-0 z-40 glass border-b border-[#E5E2DC]">
-        <div className="px-5 pt-6 pb-4">
+      <header className="sticky top-0 z-40 bg-[#f5f5f7]/80 backdrop-blur-xl border-b border-[#d2d2d7]/50">
+        <div className="px-5 pt-14 pb-4">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-[#C9A962] text-xs font-semibold tracking-[0.15em] uppercase mb-1">
-                Disponibilidade
-              </p>
-              <h1 className="font-display text-3xl font-semibold text-[#1B4332]">
+              <h1 className="text-[28px] font-semibold text-[#1d1d1f] tracking-tight">
                 Espelho de Vendas
               </h1>
+              <p className="text-[13px] text-[#86868b] mt-0.5">
+                {stationParkInfo.nome}
+              </p>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B4332]/10 rounded-full">
-              <Zap className="w-3.5 h-3.5 text-[#C9A962]" />
-              <span className="text-[10px] font-semibold text-[#1B4332] uppercase tracking-wider">
-                Em breve
+            <button
+              onClick={() => router.push("/pre-reservas")}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0071e3]/10 rounded-full hover:bg-[#0071e3]/20 transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5 text-[#0071e3]" />
+              <span className="text-[11px] font-semibold text-[#0071e3]">
+                Pré-Reservas
+              </span>
+            </button>
+          </div>
+
+          {/* Info Card */}
+          <div className="bg-white rounded-xl p-4 border border-[#e8e8ed]">
+            <p className="text-[11px] text-[#86868b] font-medium mb-1">{stationParkInfo.tabelaVigente}</p>
+            <p className="text-[15px] font-semibold text-[#1d1d1f]">{stationParkInfo.nome}</p>
+            <div className="flex items-center gap-4 mt-2">
+              <span className="text-[12px] text-[#86868b]">
+                <span className="text-[#34c759] font-semibold">{stats.disponiveis}</span> disponíveis
+              </span>
+              <span className="text-[12px] text-[#86868b]">
+                VGV: <span className="text-[#0071e3] font-semibold">{formatCurrency(stats.vgv)}</span>
               </span>
             </div>
           </div>
-
-          {/* Seletor de Empreendimento */}
-          <button
-            onClick={() => setShowSelector(!showSelector)}
-            className="w-full flex items-center justify-between p-4 bg-white rounded-xl border border-[#E5E2DC] transition-all hover:border-[#1B4332]/30"
-          >
-            <div className="text-left">
-              <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider mb-0.5">Empreendimento</p>
-              <p className="font-semibold text-[#1A1A1A]">{selectedEmp.nome}</p>
-            </div>
-            <ChevronDown className={cn("w-5 h-5 text-[#8A8A8A] transition-transform", showSelector && "rotate-180")} />
-          </button>
-
-          {showSelector && (
-            <div className="mt-2 bg-white rounded-xl border border-[#E5E2DC] overflow-hidden animate-fade-in">
-              {empreendimentos.map((emp) => (
-                <button
-                  key={emp.id}
-                  onClick={() => {
-                    setSelectedEmp(emp)
-                    setShowSelector(false)
-                  }}
-                  className={cn(
-                    "w-full p-4 text-left border-b border-[#F0EDE8] last:border-0 transition-colors",
-                    emp.id === selectedEmp.id ? "bg-[#1B4332]/5" : "hover:bg-[#FAF9F7]"
-                  )}
-                >
-                  <p className="font-medium text-[#1A1A1A]">{emp.nome}</p>
-                  <p className="text-xs text-[#8A8A8A] mt-0.5">
-                    {emp.torres} torre • {emp.andares} andares • {emp.unidadesPorAndar * emp.andares} unidades
-                  </p>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </header>
 
-      <main className="px-5 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-white rounded-xl p-4 border border-[#E5E2DC]">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-[10px] text-[#8A8A8A] uppercase tracking-wider">Disponível</span>
-            </div>
-            <p className="text-2xl font-display font-semibold text-[#1B4332]">{stats.disponivel}</p>
+      <main className="px-5 py-5 pb-28">
+        {/* Legenda */}
+        <div className="flex items-center justify-center gap-4 mb-5">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-[#34c759]" />
+            <span className="text-[11px] text-[#86868b]">Disponível</span>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-[#E5E2DC]">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-amber-400" />
-              <span className="text-[10px] text-[#8A8A8A] uppercase tracking-wider">Reservado</span>
-            </div>
-            <p className="text-2xl font-display font-semibold text-amber-600">{stats.reservado}</p>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-[#ff9500]" />
+            <span className="text-[11px] text-[#86868b]">Reservado</span>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-[#E5E2DC]">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-red-400" />
-              <span className="text-[10px] text-[#8A8A8A] uppercase tracking-wider">Vendido</span>
-            </div>
-            <p className="text-2xl font-display font-semibold text-red-500">{stats.vendido}</p>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-[#ff3b30]" />
+            <span className="text-[11px] text-[#86868b]">Vendido</span>
           </div>
         </div>
 
-        {/* Espelho Visual */}
-        <div className="bg-white rounded-2xl border border-[#E5E2DC] overflow-hidden">
-          {/* Header do Espelho */}
-          <div className="px-4 py-3 border-b border-[#F0EDE8] flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-[#1A1A1A]">Torre A</p>
-              <p className="text-[10px] text-[#8A8A8A]">{selectedEmp.andares} andares</p>
-            </div>
-            <div className="flex items-center gap-3">
-              {Object.entries(statusConfig).slice(0, 3).map(([key, config]) => (
-                <div key={key} className="flex items-center gap-1.5">
-                  <div className={cn("w-2.5 h-2.5 rounded-sm", config.color)} />
-                  <span className="text-[10px] text-[#8A8A8A]">{config.label}</span>
-                </div>
-              ))}
-            </div>
+        {/* Grid de Unidades */}
+        <div className="bg-white rounded-2xl border border-[#e8e8ed] overflow-hidden">
+          <div className="px-4 py-3 border-b border-[#f5f5f7]">
+            <p className="text-[13px] font-semibold text-[#1d1d1f]">Unidades Disponíveis</p>
+            <p className="text-[11px] text-[#86868b]">Clique para ver detalhes e pré-reservar</p>
           </div>
 
-          {/* Grid de Unidades */}
-          <div className="p-4 overflow-x-auto">
-            <div className="min-w-fit">
-              {/* Labels das colunas */}
-              <div className="flex gap-1.5 mb-2 pl-10">
-                {Array.from({ length: selectedEmp.unidadesPorAndar }, (_, i) => (
-                  <div key={i} className="w-12 text-center">
-                    <span className="text-[10px] text-[#8A8A8A] font-medium">
-                      {(i + 1).toString().padStart(2, "0")}
-                    </span>
-                  </div>
-                ))}
+          <div className="p-4 space-y-3">
+            {andares.map(andar => (
+              <div key={andar} className="flex items-center gap-2">
+                <div className="w-10 text-right">
+                  <span className="text-[11px] text-[#86868b] font-medium">{andar}º</span>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  {unidadesPorAndar[andar]
+                    .sort((a, b) => a.unidade.localeCompare(b.unidade))
+                    .map(unidade => {
+                      const statusColor = {
+                        disponivel: "bg-[#34c759] hover:bg-[#2db550]",
+                        reservado: "bg-[#ff9500]",
+                        vendido: "bg-[#ff3b30]"
+                      }[unidade.status]
+
+                      return (
+                        <button
+                          key={unidade.id}
+                          onClick={() => handleUnidadeClick(unidade)}
+                          disabled={unidade.status !== "disponivel"}
+                          className={cn(
+                            "min-w-[70px] h-12 rounded-xl text-white font-medium transition-all",
+                            statusColor,
+                            unidade.status === "disponivel" && "active:scale-95",
+                            unidade.status !== "disponivel" && "opacity-60 cursor-not-allowed"
+                          )}
+                        >
+                          <span className="text-[13px] font-semibold">{unidade.unidade}</span>
+                          <span className="text-[10px] block opacity-80">{unidade.dormitorios}D</span>
+                        </button>
+                      )
+                    })}
+                </div>
               </div>
+            ))}
+          </div>
+        </div>
 
-              {/* Andares */}
-              <div className="space-y-1.5">
-                {Array.from({ length: Math.min(selectedEmp.andares, 15) }, (_, i) => {
-                  const andar = selectedEmp.andares - i
-                  return (
-                    <div key={andar} className="flex items-center gap-1.5">
-                      <div className="w-8 text-right">
-                        <span className="text-xs text-[#8A8A8A] font-medium">{andar}º</span>
+        {/* Lista Detalhada */}
+        <div className="mt-5 space-y-3">
+          <p className="text-[13px] font-semibold text-[#1d1d1f] px-1">Lista de Unidades</p>
+          {stationParkUnidades
+            .filter(u => u.status === "disponivel")
+            .sort((a, b) => a.valorTotal - b.valorTotal)
+            .map(unidade => (
+              <button
+                key={unidade.id}
+                onClick={() => handleUnidadeClick(unidade)}
+                className="w-full bg-white rounded-xl border border-[#e8e8ed] p-4 text-left transition-all hover:border-[#0071e3]/30 hover:shadow-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[15px] font-semibold text-[#1d1d1f]">
+                      Unidade {unidade.unidade}
+                    </p>
+                    <p className="text-[12px] text-[#86868b]">
+                      {unidade.area}m² | {unidade.tipologia}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[17px] font-bold text-[#0071e3]">
+                      {formatCurrency(unidade.valorTotal)}
+                    </p>
+                    <p className="text-[11px] text-[#86868b]">
+                      ATO {formatCurrency(unidade.plano.ato.valor)}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            ))}
+        </div>
+      </main>
+
+      {/* Modal/Sheet Bottom */}
+      {selectedUnidade && (
+        <div className="fixed inset-0 z-50">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={handleCloseModal}
+          />
+
+          {/* Sheet */}
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl max-h-[90vh] overflow-y-auto animate-slide-up">
+            {/* Handle */}
+            <div className="sticky top-0 bg-white pt-3 pb-2 px-5 border-b border-[#f5f5f7] z-10">
+              <div className="w-10 h-1 bg-[#d2d2d7] rounded-full mx-auto mb-3" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-[20px] font-semibold text-[#1d1d1f]">
+                    {modalStep === "confirmacao" ? "Pré-Reserva Confirmada" : `Unidade ${selectedUnidade.unidade}`}
+                  </h2>
+                  <p className="text-[13px] text-[#86868b]">
+                    {modalStep === "detalhes" && `${selectedUnidade.area}m² | ${selectedUnidade.tipologia}`}
+                    {modalStep === "cliente" && "Dados do cliente"}
+                    {modalStep === "confirmacao" && `ID: ${preReserva?.id.slice(0, 8).toUpperCase()}`}
+                  </p>
+                </div>
+                <button
+                  onClick={handleCloseModal}
+                  className="w-8 h-8 rounded-full bg-[#f5f5f7] flex items-center justify-center"
+                >
+                  <X className="w-4 h-4 text-[#86868b]" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5 pb-10">
+              {/* Step: Detalhes */}
+              {modalStep === "detalhes" && planoAtual && (
+                <>
+                  {/* Valor Total */}
+                  <div className="bg-[#0071e3]/5 rounded-2xl p-5 mb-5">
+                    <p className="text-[11px] text-[#0071e3] font-medium mb-1">VALOR TOTAL</p>
+                    <p className="text-[32px] font-bold text-[#0071e3]">
+                      {formatCurrency(selectedUnidade.valorTotal)}
+                    </p>
+                  </div>
+
+                  {/* Info Grid */}
+                  <div className="grid grid-cols-2 gap-3 mb-5">
+                    <div className="bg-[#f5f5f7] rounded-xl p-4">
+                      <Home className="w-5 h-5 text-[#86868b] mb-2" />
+                      <p className="text-[11px] text-[#86868b] font-medium">Área</p>
+                      <p className="text-[17px] font-semibold text-[#1d1d1f]">{selectedUnidade.area}m²</p>
+                    </div>
+                    <div className="bg-[#f5f5f7] rounded-xl p-4">
+                      <Wallet className="w-5 h-5 text-[#86868b] mb-2" />
+                      <p className="text-[11px] text-[#86868b] font-medium">Tipologia</p>
+                      <p className="text-[17px] font-semibold text-[#1d1d1f]">{selectedUnidade.dormitorios} Dorm</p>
+                    </div>
+                  </div>
+
+                  {/* Plano de Pagamento */}
+                  <div className="mb-5">
+                    <p className="text-[13px] font-semibold text-[#1d1d1f] mb-3">Plano de Pagamento</p>
+                    <div className="space-y-2">
+                      {/* ATO */}
+                      <div className="bg-white border border-[#e8e8ed] rounded-xl p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-[13px] font-semibold text-[#1d1d1f]">ATO (1x)</p>
+                          <p className="text-[11px] text-[#86868b] flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {formatDate(selectedUnidade.plano.ato.vencimento)}
+                          </p>
+                        </div>
+                        <p className="text-[17px] font-bold text-[#1d1d1f]">
+                          {formatCurrency(selectedUnidade.plano.ato.valor)}
+                        </p>
                       </div>
-                      <div className="flex gap-1.5">
-                        {Array.from({ length: selectedEmp.unidadesPorAndar }, (_, j) => {
-                          const unidadeId = `${andar.toString().padStart(2, "0")}${(j + 1).toString().padStart(2, "0")}`
-                          const unidade = unidades[unidadeId]
-                          const status = unidade?.status || "disponivel"
-                          const isSelected = selectedUnidade === unidadeId
 
-                          return (
-                            <button
-                              key={unidadeId}
-                              onClick={() => setSelectedUnidade(isSelected ? null : unidadeId)}
-                              className={cn(
-                                "w-12 h-10 rounded-lg text-[10px] font-semibold transition-all duration-200",
-                                statusConfig[status as keyof typeof statusConfig].color,
-                                status === "disponivel" ? "text-white" : "text-white/90",
-                                isSelected && "ring-2 ring-[#1B4332] ring-offset-2 scale-105"
-                              )}
-                            >
-                              {unidadeId}
-                            </button>
-                          )
-                        })}
+                      {/* MENSAIS */}
+                      <div className="bg-white border border-[#e8e8ed] rounded-xl p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-[13px] font-semibold text-[#1d1d1f]">
+                            MENSAIS ({selectedUnidade.plano.mensais.quantidade}x)
+                          </p>
+                          <p className="text-[11px] text-[#86868b] flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            A partir de {formatDate(selectedUnidade.plano.mensais.primeiroVencimento)}
+                          </p>
+                        </div>
+                        <p className="text-[17px] font-bold text-[#1d1d1f]">
+                          {formatCurrency(selectedUnidade.plano.mensais.valor)}
+                        </p>
+                      </div>
+
+                      {/* FINANCIAMENTO */}
+                      <div className="bg-white border border-[#e8e8ed] rounded-xl p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-[13px] font-semibold text-[#1d1d1f]">FINANCIAMENTO (1x)</p>
+                          <p className="text-[11px] text-[#86868b] flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {formatDate(selectedUnidade.plano.financiamento.vencimento)}
+                          </p>
+                        </div>
+                        <p className="text-[17px] font-bold text-[#1d1d1f]">
+                          {formatCurrency(selectedUnidade.plano.financiamento.valor)}
+                        </p>
                       </div>
                     </div>
-                  )
-                })}
-              </div>
+                  </div>
 
-              {selectedEmp.andares > 15 && (
-                <p className="text-center text-[10px] text-[#8A8A8A] mt-3">
-                  +{selectedEmp.andares - 15} andares...
-                </p>
+                  {/* Botão Pré-Reservar */}
+                  <button
+                    onClick={() => setModalStep("cliente")}
+                    className="w-full h-14 bg-[#0071e3] hover:bg-[#0077ed] text-white text-[17px] font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                  >
+                    <FileText className="w-5 h-5" />
+                    Pré-Reservar Esta Unidade
+                  </button>
+                </>
+              )}
+
+              {/* Step: Cliente */}
+              {modalStep === "cliente" && planoAtual && (
+                <>
+                  {/* Resumo Compacto */}
+                  <div className="bg-[#f5f5f7] rounded-xl p-4 mb-5 flex items-center justify-between">
+                    <div>
+                      <p className="text-[15px] font-semibold text-[#1d1d1f]">
+                        Unidade {selectedUnidade.unidade}
+                      </p>
+                      <p className="text-[12px] text-[#86868b]">
+                        {selectedUnidade.area}m² | {selectedUnidade.tipologia}
+                      </p>
+                    </div>
+                    <p className="text-[17px] font-bold text-[#0071e3]">
+                      {formatCurrency(selectedUnidade.valorTotal)}
+                    </p>
+                  </div>
+
+                  {/* Plano Resumido */}
+                  <div className="bg-white border border-[#e8e8ed] rounded-xl p-4 mb-5">
+                    <p className="text-[11px] text-[#86868b] font-medium mb-2">PLANO DE PAGAMENTO</p>
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="text-[#1d1d1f]">ATO</span>
+                      <span className="font-semibold">{formatCurrency(selectedUnidade.plano.ato.valor)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[13px] mt-1">
+                      <span className="text-[#1d1d1f]">{selectedUnidade.plano.mensais.quantidade}x Mensais</span>
+                      <span className="font-semibold">{formatCurrency(selectedUnidade.plano.mensais.valor)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[13px] mt-1">
+                      <span className="text-[#1d1d1f]">Financiamento</span>
+                      <span className="font-semibold">{formatCurrency(selectedUnidade.plano.financiamento.valor)}</span>
+                    </div>
+                  </div>
+
+                  {/* Formulário */}
+                  <ClienteForm onSubmit={handleClienteSubmit} loading={loading} />
+
+                  {/* Voltar */}
+                  <button
+                    onClick={() => setModalStep("detalhes")}
+                    className="w-full h-12 bg-[#f5f5f7] text-[#1d1d1f] text-[15px] font-medium rounded-xl mt-3"
+                  >
+                    Voltar
+                  </button>
+                </>
+              )}
+
+              {/* Step: Confirmação */}
+              {modalStep === "confirmacao" && preReserva && planoAtual && (
+                <>
+                  {/* Success Banner */}
+                  <div className="bg-[#34c759]/10 rounded-2xl p-5 mb-5 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-full bg-[#34c759] flex items-center justify-center flex-shrink-0">
+                      <Check className="w-7 h-7 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-[17px] font-semibold text-[#1d1d1f]">Pré-Reserva Criada!</h3>
+                      <p className="text-[13px] text-[#86868b]">
+                        {stationParkInfo.nome} - Unidade {selectedUnidade.unidade}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Cliente Info */}
+                  <div className="bg-white border border-[#e8e8ed] rounded-xl p-4 mb-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <User className="w-4 h-4 text-[#0071e3]" />
+                      <p className="text-[13px] font-semibold text-[#1d1d1f]">Cliente</p>
+                    </div>
+                    <p className="text-[17px] font-semibold text-[#1d1d1f]">{cliente?.nome}</p>
+                    <p className="text-[13px] text-[#86868b] mt-1">
+                      CPF: {cliente?.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}
+                    </p>
+                    <p className="text-[13px] text-[#86868b]">
+                      WhatsApp: {cliente?.whatsapp.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")}
+                    </p>
+                  </div>
+
+                  {/* Plano */}
+                  <PlanoPagamentoTable plano={planoAtual} />
+
+                  {/* Actions */}
+                  <div className="mt-5 space-y-3">
+                    <button
+                      onClick={() => {
+                        const msg = `*PRÉ-RESERVA CONFIRMADA*\n\n*${stationParkInfo.nome}*\nUnidade: ${selectedUnidade.unidade}\n${selectedUnidade.area}m² | ${selectedUnidade.tipologia}\n\n*Cliente:* ${cliente?.nome}\n\n*PLANO DE PAGAMENTO:*\n- ATO: ${formatCurrency(selectedUnidade.plano.ato.valor)}\n- Mensais: ${selectedUnidade.plano.mensais.quantidade}x ${formatCurrency(selectedUnidade.plano.mensais.valor)}\n- Financiamento: ${formatCurrency(selectedUnidade.plano.financiamento.valor)}\n\n*Total: ${formatCurrency(selectedUnidade.valorTotal)}*\n\nCorretor: ${session?.user?.name}`
+                        window.open(`https://wa.me/55${cliente?.whatsapp}?text=${encodeURIComponent(msg)}`, "_blank")
+                      }}
+                      className="w-full h-12 bg-[#25D366] hover:bg-[#20BD5A] text-white text-[15px] font-medium rounded-xl flex items-center justify-center gap-2"
+                    >
+                      Enviar para Cliente via WhatsApp
+                    </button>
+
+                    <button
+                      onClick={() => router.push(`/pre-reservas/${preReserva.id}`)}
+                      className="w-full h-12 bg-[#0071e3] hover:bg-[#0077ed] text-white text-[15px] font-medium rounded-xl"
+                    >
+                      Ver Detalhes da Pré-Reserva
+                    </button>
+
+                    <button
+                      onClick={handleCloseModal}
+                      className="w-full h-12 bg-[#f5f5f7] text-[#1d1d1f] text-[15px] font-medium rounded-xl"
+                    >
+                      Voltar ao Espelho
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
         </div>
-
-        {/* Detalhes da Unidade Selecionada */}
-        {selectedData && (
-          <div className="mt-4 bg-white rounded-2xl border border-[#E5E2DC] p-5 animate-scale-in">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider mb-1">Unidade</p>
-                <p className="text-2xl font-display font-semibold text-[#1A1A1A]">{selectedUnidade}</p>
-              </div>
-              <div className={cn(
-                "px-3 py-1.5 rounded-full text-xs font-semibold",
-                statusConfig[selectedData.status as keyof typeof statusConfig].color,
-                "text-white"
-              )}>
-                {statusConfig[selectedData.status as keyof typeof statusConfig].label}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-5">
-              <div>
-                <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider mb-1">Area Privativa</p>
-                <p className="text-lg font-semibold text-[#1A1A1A]">{selectedData.area}m²</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider mb-1">Valor</p>
-                <p className="text-lg font-semibold text-[#1B4332]">
-                  R$ {selectedData.preco.toLocaleString("pt-BR")}
-                </p>
-              </div>
-            </div>
-
-            {/* Ações - Em Breve */}
-            <div className="space-y-3">
-              <button
-                disabled
-                className="w-full flex items-center justify-center gap-2 h-12 bg-[#F0EDE8] text-[#8A8A8A] rounded-xl font-medium"
-              >
-                <Lock className="w-4 h-4" />
-                Reservar Unidade
-                <span className="text-[10px] bg-[#1B4332]/10 text-[#1B4332] px-2 py-0.5 rounded-full ml-2">
-                  Em breve
-                </span>
-              </button>
-              <button
-                disabled
-                className="w-full flex items-center justify-center gap-2 h-12 bg-[#F0EDE8] text-[#8A8A8A] rounded-xl font-medium"
-              >
-                <TrendingUp className="w-4 h-4" />
-                Simular Financiamento
-                <span className="text-[10px] bg-[#1B4332]/10 text-[#1B4332] px-2 py-0.5 rounded-full ml-2">
-                  Em breve
-                </span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Card de Integração */}
-        <div className="mt-6 bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] rounded-2xl p-5 text-white">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
-              <Clock className="w-6 h-6 text-[#C9A962]" />
-            </div>
-            <div>
-              <h3 className="font-display text-xl font-semibold mb-1">Integracao CVCRM</h3>
-              <p className="text-white/70 text-sm mb-3">
-                Em breve, dados em tempo real do espelho de vendas, valores atualizados e reservas instantaneas.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="text-[10px] bg-white/10 px-3 py-1 rounded-full">Mapa de Disponibilidade</span>
-                <span className="text-[10px] bg-white/10 px-3 py-1 rounded-full">Tabela de Precos</span>
-                <span className="text-[10px] bg-white/10 px-3 py-1 rounded-full">Reservas Online</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+      )}
     </div>
   )
 }

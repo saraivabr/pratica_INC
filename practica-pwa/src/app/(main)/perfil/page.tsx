@@ -3,28 +3,26 @@
 import { useSession, signOut } from "next-auth/react"
 import {
   LogOut,
-  User,
   Phone,
   Bell,
   Shield,
   HelpCircle,
   ChevronRight,
-  Award,
-  Target,
-  TrendingUp,
 } from "lucide-react"
 
 function PerfilSkeleton() {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <div className="skeleton-luxury w-20 h-20 rounded-2xl" />
-        <div className="space-y-3">
-          <div className="skeleton-luxury h-6 w-40 rounded-lg" />
-          <div className="skeleton-luxury h-4 w-32 rounded-lg" />
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-[#e8e8ed] p-5">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] animate-pulse" />
+          <div className="space-y-2 flex-1">
+            <div className="h-5 bg-[#f5f5f7] rounded-lg w-32 animate-pulse" />
+            <div className="h-4 bg-[#f5f5f7] rounded-lg w-24 animate-pulse" />
+          </div>
         </div>
       </div>
-      <div className="skeleton-luxury h-32 w-full rounded-2xl" />
+      <div className="h-32 bg-[#f5f5f7] rounded-2xl animate-pulse" />
     </div>
   )
 }
@@ -46,84 +44,51 @@ export default function PerfilPage() {
     .toUpperCase() || "CO"
 
   return (
-    <div className="min-h-screen bg-[#FAF9F7]">
+    <div className="min-h-screen bg-[#f5f5f7]">
       {/* Header */}
-      <header className="sticky top-0 z-40 glass border-b border-[#E5E2DC]">
-        <div className="px-5 pt-6 pb-4">
-          <p className="text-[#C9A962] text-xs font-semibold tracking-[0.15em] uppercase mb-1">
-            Minha Conta
-          </p>
-          <h1 className="font-display text-3xl font-semibold text-[#1B4332]">
+      <header className="sticky top-0 z-40 bg-[#f5f5f7]/80 backdrop-blur-xl border-b border-[#d2d2d7]/50">
+        <div className="px-5 pt-14 pb-4">
+          <h1 className="text-[28px] font-semibold text-[#1d1d1f] tracking-tight">
             Perfil
           </h1>
+          <p className="text-[13px] text-[#86868b] mt-0.5">
+            Gerencie sua conta
+          </p>
         </div>
       </header>
 
-      <main className="px-5 py-6">
+      <main className="px-5 py-5 pb-28">
         {isLoading ? (
           <PerfilSkeleton />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Profile Card */}
-            <div className="bg-white rounded-2xl border border-[#E5E2DC] p-5">
+            <div className="bg-white rounded-2xl border border-[#e8e8ed] p-5 shadow-sm">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] flex items-center justify-center">
-                  <span className="text-white text-xl font-display font-semibold">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1d1d1f] to-[#424245] flex items-center justify-center shadow-lg">
+                  <span className="text-white text-xl font-semibold">
                     {initials}
                   </span>
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-semibold text-[#1A1A1A]">
+                  <h2 className="text-[17px] font-semibold text-[#1d1d1f]">
                     {session?.user?.name || "Corretor"}
                   </h2>
                   {session?.user?.whatsapp && (
-                    <div className="flex items-center gap-2 text-[#8A8A8A] mt-1">
+                    <div className="flex items-center gap-2 text-[#86868b] mt-1">
                       <Phone className="w-3.5 h-3.5" />
-                      <span className="text-sm">{session.user.whatsapp}</span>
+                      <span className="text-[13px]">{session.user.whatsapp}</span>
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Stats - Em Breve */}
-            <div className="bg-white rounded-2xl border border-[#E5E2DC] p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-[#1A1A1A]">Minhas Metricas</h3>
-                <span className="text-[10px] bg-[#1B4332]/10 text-[#1B4332] px-2.5 py-1 rounded-full font-semibold">
-                  Em breve
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-4 opacity-50">
-                <div className="text-center">
-                  <div className="w-10 h-10 rounded-xl bg-[#F0EDE8] flex items-center justify-center mx-auto mb-2">
-                    <Target className="w-5 h-5 text-[#8A8A8A]" />
-                  </div>
-                  <p className="text-lg font-display font-semibold text-[#1A1A1A]">--</p>
-                  <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider">Leads</p>
-                </div>
-                <div className="text-center">
-                  <div className="w-10 h-10 rounded-xl bg-[#F0EDE8] flex items-center justify-center mx-auto mb-2">
-                    <TrendingUp className="w-5 h-5 text-[#8A8A8A]" />
-                  </div>
-                  <p className="text-lg font-display font-semibold text-[#1A1A1A]">--</p>
-                  <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider">Vendas</p>
-                </div>
-                <div className="text-center">
-                  <div className="w-10 h-10 rounded-xl bg-[#F0EDE8] flex items-center justify-center mx-auto mb-2">
-                    <Award className="w-5 h-5 text-[#8A8A8A]" />
-                  </div>
-                  <p className="text-lg font-display font-semibold text-[#1A1A1A]">--</p>
-                  <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider">Ranking</p>
-                </div>
-              </div>
-            </div>
-
             {/* Menu Options */}
-            <div className="bg-white rounded-2xl border border-[#E5E2DC] overflow-hidden">
+            <div className="bg-white rounded-2xl border border-[#e8e8ed] overflow-hidden shadow-sm">
               <MenuItem
                 icon={Bell}
-                label="Notificacoes"
+                label="Notificações"
                 badge="Em breve"
               />
               <MenuItem
@@ -138,25 +103,25 @@ export default function PerfilPage() {
               />
             </div>
 
-            {/* Prática Info */}
-            <div className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] rounded-2xl p-5 text-white">
-              <div className="flex items-center gap-3 mb-4">
+            {/* Company Info */}
+            <div className="bg-[#1d1d1f] rounded-2xl p-5 text-white shadow-lg">
+              <div className="flex items-center gap-4 mb-4">
                 <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                  <span className="font-display text-xl font-semibold">P</span>
+                  <span className="text-xl font-semibold">P</span>
                 </div>
                 <div>
-                  <h3 className="font-semibold">Pratica Construtora</h3>
-                  <p className="text-white/60 text-sm">25+ anos de experiencia</p>
+                  <h3 className="font-semibold text-[15px]">Prática Construtora</h3>
+                  <p className="text-white/60 text-[13px]">25+ anos de experiência</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="bg-white/10 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-display font-semibold">3k+</p>
-                  <p className="text-[10px] text-white/60 uppercase tracking-wider">Clientes</p>
+                  <p className="text-[22px] font-semibold">3k+</p>
+                  <p className="text-[11px] text-white/60">Clientes</p>
                 </div>
                 <div className="bg-white/10 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-display font-semibold">6</p>
-                  <p className="text-[10px] text-white/60 uppercase tracking-wider">Empreendimentos</p>
+                  <p className="text-[22px] font-semibold">6</p>
+                  <p className="text-[11px] text-white/60">Empreendimentos</p>
                 </div>
               </div>
             </div>
@@ -164,15 +129,15 @@ export default function PerfilPage() {
             {/* Logout */}
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 h-14 bg-white border border-red-200 text-red-500 rounded-2xl font-medium hover:bg-red-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 h-[50px] bg-white border border-[#fecaca] text-[#dc2626] rounded-2xl text-[15px] font-medium hover:bg-[#fef2f2] transition-colors shadow-sm"
             >
               <LogOut className="w-5 h-5" />
               Sair da conta
             </button>
 
             {/* Version */}
-            <p className="text-center text-[11px] text-[#8A8A8A]">
-              Pratica Catalogo v1.0.0
+            <p className="text-center text-[11px] text-[#86868b] pt-2">
+              Prática Catálogo v1.0.0
             </p>
           </div>
         )}
@@ -193,21 +158,21 @@ function MenuItem({
   return (
     <button
       disabled={!!badge}
-      className="w-full flex items-center justify-between p-4 border-b border-[#F0EDE8] last:border-0 hover:bg-[#FAF9F7] transition-colors disabled:opacity-60"
+      className="w-full flex items-center justify-between p-4 border-b border-[#f5f5f7] last:border-0 hover:bg-[#f5f5f7] transition-colors disabled:opacity-60"
     >
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[#F0EDE8] flex items-center justify-center">
-          <Icon className="w-5 h-5 text-[#5C5C5C]" />
+        <div className="w-9 h-9 rounded-xl bg-[#f5f5f7] flex items-center justify-center">
+          <Icon className="w-[18px] h-[18px] text-[#86868b]" />
         </div>
-        <span className="font-medium text-[#1A1A1A]">{label}</span>
+        <span className="text-[15px] font-medium text-[#1d1d1f]">{label}</span>
       </div>
       <div className="flex items-center gap-2">
         {badge && (
-          <span className="text-[10px] bg-[#F0EDE8] text-[#8A8A8A] px-2 py-0.5 rounded-full">
+          <span className="text-[11px] bg-[#f5f5f7] text-[#86868b] px-2.5 py-1 rounded-full font-medium">
             {badge}
           </span>
         )}
-        <ChevronRight className="w-5 h-5 text-[#C9A962]" />
+        <ChevronRight className="w-5 h-5 text-[#d2d2d7]" />
       </div>
     </button>
   )

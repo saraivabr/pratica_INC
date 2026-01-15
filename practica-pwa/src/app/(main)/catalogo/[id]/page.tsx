@@ -1,27 +1,24 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
-import { Heart, MapPin, Train, Building2, Check, Dumbbell, CreditCard } from "lucide-react"
-import { Header } from "@/components/layout/header"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { useParams, useRouter } from "next/navigation"
+import { Heart, MapPin, Train, Building2, Check, Dumbbell, CreditCard, ChevronLeft } from "lucide-react"
 import { ShareSheet } from "@/components/catalogo/share-sheet"
 import { useFavorites } from "@/hooks/use-favorites"
 import { formatarPreco, cn } from "@/lib/utils"
 import { Empreendimento } from "@/types/empreendimento"
 
 const statusConfig = {
-  em_construcao: { label: "Em Construcao", variant: "construcao" as const },
-  lancamento: { label: "Lancamento", variant: "lancamento" as const },
-  entregue: { label: "Pronto", variant: "pronto" as const },
+  em_construcao: { label: "Em Construção", className: "bg-[#ff9500] text-white" },
+  lancamento: { label: "Lançamento", className: "bg-[#1d1d1f] text-white" },
+  entregue: { label: "Pronto", className: "bg-[#34c759] text-white" },
 }
 
-// Fallback placeholder se não houver imagem no banco de dados
 const defaultPlaceholder = "https://praticaincorporadora.com.br/assets/new-images/aura-guilhermina/praticaincorporadora-aura-guilhermina-hero.jpg"
 
 export default function EmpreendimentoDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const id = params.id as string
   const { toggle, isFavorite } = useFavorites()
   const [empreendimento, setEmpreendimento] = useState<Empreendimento | null>(null)
@@ -37,7 +34,7 @@ export default function EmpreendimentoDetailPage() {
         const res = await fetch(`/api/empreendimentos/${id}`)
 
         if (!res.ok) {
-          throw new Error("Empreendimento nao encontrado")
+          throw new Error("Empreendimento não encontrado")
         }
 
         const data = await res.json()
@@ -56,15 +53,12 @@ export default function EmpreendimentoDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAF9F7]">
-        <Header showBack title="Carregando..." />
-        <div>
-          <div className="h-72 skeleton-luxury" />
-          <div className="p-5 space-y-4">
-            <div className="h-8 skeleton-luxury rounded-lg w-3/4" />
-            <div className="h-4 skeleton-luxury rounded-lg w-1/2" />
-            <div className="h-24 skeleton-luxury rounded-2xl" />
-          </div>
+      <div className="min-h-screen bg-[#f5f5f7]">
+        <div className="h-72 bg-[#e8e8ed] animate-pulse" />
+        <div className="p-5 space-y-4">
+          <div className="h-7 bg-[#e8e8ed] rounded-lg w-3/4 animate-pulse" />
+          <div className="h-5 bg-[#e8e8ed] rounded-lg w-1/2 animate-pulse" />
+          <div className="h-24 bg-[#e8e8ed] rounded-2xl animate-pulse" />
         </div>
       </div>
     )
@@ -72,22 +66,28 @@ export default function EmpreendimentoDetailPage() {
 
   if (error || !empreendimento) {
     return (
-      <div className="min-h-screen bg-[#FAF9F7]">
-        <Header showBack title="Erro" />
-        <div className="flex flex-col items-center justify-center p-8 pt-24">
-          <div className="w-20 h-20 rounded-2xl bg-[#F0EDE8] flex items-center justify-center mb-6">
-            <Building2 className="w-10 h-10 text-[#C9A962]" />
+      <div className="min-h-screen bg-[#f5f5f7]">
+        <header className="sticky top-0 z-40 bg-[#f5f5f7]/80 backdrop-blur-xl border-b border-[#d2d2d7]/50">
+          <div className="flex items-center gap-3 px-5 h-14">
+            <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-[#e8e8ed] transition-colors">
+              <ChevronLeft className="w-5 h-5 text-[#1d1d1f]" />
+            </button>
+            <span className="text-[17px] font-semibold text-[#1d1d1f]">Erro</span>
           </div>
-          <p className="text-[#5C5C5C] text-center font-medium">
-            {error || "Empreendimento nao encontrado"}
+        </header>
+        <div className="flex flex-col items-center justify-center p-8 pt-24">
+          <div className="w-20 h-20 rounded-2xl bg-[#f5f5f7] flex items-center justify-center mb-6">
+            <Building2 className="w-10 h-10 text-[#86868b]" />
+          </div>
+          <p className="text-[15px] text-[#86868b] text-center font-medium">
+            {error || "Empreendimento não encontrado"}
           </p>
-          <Button
-            variant="outline"
-            className="mt-6"
-            onClick={() => window.history.back()}
+          <button
+            onClick={() => router.back()}
+            className="mt-6 px-6 py-3 bg-[#0071e3] text-white text-[15px] font-medium rounded-xl hover:bg-[#0077ed] transition-colors"
           >
             Voltar
-          </Button>
+          </button>
         </div>
       </div>
     )
@@ -98,84 +98,86 @@ export default function EmpreendimentoDetailPage() {
   const imageUrl = empreendimento.imagemCapa || defaultPlaceholder
 
   return (
-    <div className="min-h-screen bg-[#FAF9F7] pb-32">
+    <div className="min-h-screen bg-[#f5f5f7] pb-32">
       {/* Header */}
-      <Header
-        showBack
-        title={empreendimento.nome}
-        rightAction={
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#f5f5f7]/80 backdrop-blur-xl border-b border-[#d2d2d7]/50">
+        <div className="flex items-center justify-between px-5 h-14">
+          <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-[#e8e8ed] transition-colors">
+            <ChevronLeft className="w-5 h-5 text-[#1d1d1f]" />
+          </button>
+          <span className="text-[15px] font-semibold text-[#1d1d1f] truncate max-w-[200px]">
+            {empreendimento.nome}
+          </span>
           <button
             onClick={() => toggle(empreendimento.id)}
             className={cn(
-              "p-2 rounded-full transition-all",
+              "p-2 -mr-2 rounded-full transition-all",
               favorited
-                ? "bg-red-100 text-red-500"
-                : "hover:bg-[#F0EDE8] text-[#5C5C5C]"
+                ? "bg-[#ff3b30]/10 text-[#ff3b30]"
+                : "hover:bg-[#e8e8ed] text-[#86868b]"
             )}
           >
-            <Heart
-              className={cn("w-5 h-5", favorited && "fill-current")}
-            />
+            <Heart className={cn("w-5 h-5", favorited && "fill-current")} />
           </button>
-        }
-      />
+        </div>
+      </header>
 
-      {/* Image Gallery */}
-      <div className="relative h-72 bg-[#E5E2DC]">
+      {/* Image */}
+      <div className="relative h-72 bg-[#e8e8ed] mt-14">
         <img
           src={imageUrl}
           alt={empreendimento.nome}
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
-        <Badge
-          variant={status.variant}
-          className="absolute top-4 left-4 shadow-sm px-3 py-1.5"
-        >
+        <div className={cn(
+          "absolute top-4 left-4 px-3 py-1.5 rounded-lg text-[12px] font-semibold",
+          status.className
+        )}>
           {status.label}
-        </Badge>
+        </div>
       </div>
 
       {/* Content */}
-      <div className="px-5 py-6 space-y-6 max-w-lg mx-auto">
+      <div className="px-5 py-6 space-y-5 max-w-lg mx-auto">
         {/* Title and Location */}
         <section>
-          <h1 className="font-display text-2xl font-semibold text-[#1A1A1A]">
+          <h1 className="text-[24px] font-semibold text-[#1d1d1f] tracking-tight">
             {empreendimento.nome}
           </h1>
 
-          <div className="flex items-center gap-2 text-[#5C5C5C] mt-2">
-            <MapPin className="w-4 h-4 flex-shrink-0 text-[#C9A962]" />
-            <span className="text-sm">
+          <div className="flex items-center gap-1.5 text-[#86868b] mt-2">
+            <MapPin className="w-4 h-4 flex-shrink-0" />
+            <span className="text-[14px]">
               {empreendimento.localizacao.bairro}, {empreendimento.localizacao.zona}
             </span>
           </div>
 
           {empreendimento.localizacao.proximidade_metro && (
-            <div className="flex items-center gap-2 text-[#1B4332] mt-1.5">
+            <div className="flex items-center gap-1.5 text-[#0071e3] mt-1.5">
               <Train className="w-4 h-4 flex-shrink-0" />
-              <span className="text-sm font-medium">
+              <span className="text-[14px] font-medium">
                 {empreendimento.localizacao.proximidade_metro}
               </span>
             </div>
           )}
 
           {empreendimento.localizacao.endereco && (
-            <p className="text-sm text-[#8A8A8A] mt-1">
+            <p className="text-[13px] text-[#86868b] mt-1">
               {empreendimento.localizacao.endereco}
             </p>
           )}
         </section>
 
         {/* Price */}
-        <section className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] rounded-2xl p-5 text-white">
-          <p className="text-sm text-white/70">A partir de</p>
-          <p className="text-3xl font-display font-semibold">
+        <section className="bg-[#1d1d1f] rounded-2xl p-5 text-white shadow-lg">
+          <p className="text-[13px] text-white/60">A partir de</p>
+          <p className="text-[28px] font-semibold tracking-tight">
             R$ {formatarPreco(preco)}
           </p>
           {empreendimento.preco_m2 && (
-            <p className="text-sm text-white/60 mt-1">
+            <p className="text-[13px] text-white/50 mt-1">
               {empreendimento.preco_m2}
             </p>
           )}
@@ -184,31 +186,31 @@ export default function EmpreendimentoDetailPage() {
         {/* Tipologias */}
         {empreendimento.tipologias && empreendimento.tipologias.length > 0 && (
           <section>
-            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3">
+            <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-3">
               Tipologias
             </h2>
             <div className="grid grid-cols-2 gap-3">
               {empreendimento.tipologias.map((tip, i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-2xl p-4 border border-[#E5E2DC] shadow-sm hover:shadow-md transition-shadow"
+                  className="bg-white rounded-2xl p-4 border border-[#e8e8ed] shadow-sm"
                 >
-                  <p className="text-lg font-display font-semibold text-[#1A1A1A]">
+                  <p className="text-[17px] font-semibold text-[#1d1d1f]">
                     {tip.area_m2}m²
                   </p>
-                  <div className="space-y-1 mt-2 text-sm text-[#5C5C5C]">
+                  <div className="space-y-0.5 mt-2 text-[13px] text-[#86868b]">
                     {tip.dormitorios && (
-                      <p>{tip.dormitorios} dormitorio{Number(tip.dormitorios) > 1 ? "s" : ""}</p>
+                      <p>{tip.dormitorios} dormitório{Number(tip.dormitorios) > 1 ? "s" : ""}</p>
                     )}
                     {tip.suites && tip.suites > 0 && (
-                      <p>{tip.suites} suite{tip.suites > 1 ? "s" : ""}</p>
+                      <p>{tip.suites} suíte{tip.suites > 1 ? "s" : ""}</p>
                     )}
                     {tip.vagas && tip.vagas > 0 && (
                       <p>{tip.vagas} vaga{tip.vagas > 1 ? "s" : ""}</p>
                     )}
                   </div>
                   {tip.preco_base && (
-                    <p className="text-[#1B4332] font-semibold mt-2">
+                    <p className="text-[#0071e3] font-semibold mt-2 text-[14px]">
                       R$ {formatarPreco(tip.preco_base)}
                     </p>
                   )}
@@ -221,18 +223,15 @@ export default function EmpreendimentoDetailPage() {
         {/* Diferenciais */}
         {empreendimento.diferenciais && empreendimento.diferenciais.length > 0 && (
           <section>
-            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3">
+            <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-3">
               Diferenciais
             </h2>
-            <div className="bg-white rounded-2xl border border-[#E5E2DC] p-4">
-              <div className="space-y-2">
+            <div className="bg-white rounded-2xl border border-[#e8e8ed] p-4 shadow-sm">
+              <div className="space-y-2.5">
                 {empreendimento.diferenciais.map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 text-[#5C5C5C]"
-                  >
-                    <Check className="w-5 h-5 text-[#1B4332] flex-shrink-0 mt-0.5" />
-                    <span className="text-sm">{item}</span>
+                  <div key={i} className="flex items-start gap-3 text-[#1d1d1f]">
+                    <Check className="w-5 h-5 text-[#34c759] flex-shrink-0 mt-0.5" />
+                    <span className="text-[14px]">{item}</span>
                   </div>
                 ))}
               </div>
@@ -243,18 +242,15 @@ export default function EmpreendimentoDetailPage() {
         {/* Diferenciais Premium */}
         {empreendimento.diferenciais_premium && empreendimento.diferenciais_premium.length > 0 && (
           <section>
-            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3">
+            <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-3">
               Diferenciais Premium
             </h2>
-            <div className="bg-gradient-to-br from-[#C9A962]/10 to-[#C9A962]/20 rounded-2xl p-4 border border-[#C9A962]/30">
-              <div className="space-y-2">
+            <div className="bg-gradient-to-br from-[#0071e3]/5 to-[#0071e3]/10 rounded-2xl p-4 border border-[#0071e3]/20">
+              <div className="space-y-2.5">
                 {empreendimento.diferenciais_premium.map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 text-[#5C5C5C]"
-                  >
-                    <Check className="w-5 h-5 text-[#C9A962] flex-shrink-0 mt-0.5" />
-                    <span className="text-sm">{item}</span>
+                  <div key={i} className="flex items-start gap-3 text-[#1d1d1f]">
+                    <Check className="w-5 h-5 text-[#0071e3] flex-shrink-0 mt-0.5" />
+                    <span className="text-[14px]">{item}</span>
                   </div>
                 ))}
               </div>
@@ -265,19 +261,18 @@ export default function EmpreendimentoDetailPage() {
         {/* Lazer */}
         {empreendimento.lazer && empreendimento.lazer.length > 0 && (
           <section>
-            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3 flex items-center gap-2">
-              <Dumbbell className="w-5 h-5 text-[#1B4332]" />
+            <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-3 flex items-center gap-2">
+              <Dumbbell className="w-5 h-5 text-[#1d1d1f]" />
               Lazer
             </h2>
             <div className="flex flex-wrap gap-2">
               {empreendimento.lazer.map((item, i) => (
-                <Badge
+                <span
                   key={i}
-                  variant="secondary"
-                  className="px-3 py-1.5"
+                  className="px-3 py-1.5 bg-[#f5f5f7] text-[#1d1d1f] text-[13px] font-medium rounded-full"
                 >
                   {item}
-                </Badge>
+                </span>
               ))}
             </div>
           </section>
@@ -286,19 +281,16 @@ export default function EmpreendimentoDetailPage() {
         {/* Financiamento */}
         {empreendimento.financiamento && empreendimento.financiamento.length > 0 && (
           <section>
-            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3 flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-[#1B4332]" />
+            <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-3 flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-[#1d1d1f]" />
               Financiamento
             </h2>
-            <div className="bg-[#1B4332]/5 rounded-2xl p-4 border border-[#1B4332]/10">
-              <div className="space-y-2">
+            <div className="bg-[#f5f5f7] rounded-2xl p-4">
+              <div className="space-y-2.5">
                 {empreendimento.financiamento.map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 text-[#5C5C5C]"
-                  >
-                    <Check className="w-5 h-5 text-[#1B4332] flex-shrink-0 mt-0.5" />
-                    <span className="text-sm">{item}</span>
+                  <div key={i} className="flex items-start gap-3 text-[#1d1d1f]">
+                    <Check className="w-5 h-5 text-[#1d1d1f] flex-shrink-0 mt-0.5" />
+                    <span className="text-[14px]">{item}</span>
                   </div>
                 ))}
               </div>
@@ -309,60 +301,60 @@ export default function EmpreendimentoDetailPage() {
         {/* Conceito */}
         {empreendimento.conceito && (
           <section>
-            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3">
+            <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-3">
               Conceito
             </h2>
-            <div className="bg-[#F0EDE8] rounded-2xl p-4">
+            <div className="bg-[#f5f5f7] rounded-2xl p-4">
               {Array.isArray(empreendimento.conceito) ? (
                 <ul className="space-y-2">
                   {empreendimento.conceito.map((item, i) => (
-                    <li key={i} className="text-sm text-[#5C5C5C]">{item}</li>
+                    <li key={i} className="text-[14px] text-[#1d1d1f]">{item}</li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-[#5C5C5C]">{empreendimento.conceito}</p>
+                <p className="text-[14px] text-[#1d1d1f]">{empreendimento.conceito}</p>
               )}
             </div>
           </section>
         )}
 
-        {/* Configuracao */}
+        {/* Configuração */}
         {empreendimento.configuracao && (
           <section>
-            <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3">
-              Configuracao do Empreendimento
+            <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-3">
+              Configuração
             </h2>
             <div className="grid grid-cols-2 gap-3">
               {empreendimento.configuracao.torres && (
-                <div className="bg-white rounded-2xl p-4 border border-[#E5E2DC] text-center">
-                  <p className="text-2xl font-display font-semibold text-[#1B4332]">
+                <div className="bg-white rounded-2xl p-4 border border-[#e8e8ed] text-center shadow-sm">
+                  <p className="text-[24px] font-semibold text-[#0071e3]">
                     {empreendimento.configuracao.torres}
                   </p>
-                  <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider mt-1">Torre{empreendimento.configuracao.torres > 1 ? "s" : ""}</p>
+                  <p className="text-[11px] text-[#86868b] mt-1">Torre{empreendimento.configuracao.torres > 1 ? "s" : ""}</p>
                 </div>
               )}
               {empreendimento.configuracao.pavimentos && (
-                <div className="bg-white rounded-2xl p-4 border border-[#E5E2DC] text-center">
-                  <p className="text-2xl font-display font-semibold text-[#1B4332]">
+                <div className="bg-white rounded-2xl p-4 border border-[#e8e8ed] text-center shadow-sm">
+                  <p className="text-[24px] font-semibold text-[#0071e3]">
                     {empreendimento.configuracao.pavimentos}
                   </p>
-                  <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider mt-1">Pavimentos</p>
+                  <p className="text-[11px] text-[#86868b] mt-1">Pavimentos</p>
                 </div>
               )}
               {empreendimento.configuracao.unidades_totais && (
-                <div className="bg-white rounded-2xl p-4 border border-[#E5E2DC] text-center">
-                  <p className="text-2xl font-display font-semibold text-[#1B4332]">
+                <div className="bg-white rounded-2xl p-4 border border-[#e8e8ed] text-center shadow-sm">
+                  <p className="text-[24px] font-semibold text-[#0071e3]">
                     {empreendimento.configuracao.unidades_totais}
                   </p>
-                  <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider mt-1">Unidades</p>
+                  <p className="text-[11px] text-[#86868b] mt-1">Unidades</p>
                 </div>
               )}
               {empreendimento.configuracao.elevadores && (
-                <div className="bg-white rounded-2xl p-4 border border-[#E5E2DC] text-center">
-                  <p className="text-2xl font-display font-semibold text-[#1B4332]">
+                <div className="bg-white rounded-2xl p-4 border border-[#e8e8ed] text-center shadow-sm">
+                  <p className="text-[24px] font-semibold text-[#0071e3]">
                     {empreendimento.configuracao.elevadores}
                   </p>
-                  <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider mt-1">Elevador{empreendimento.configuracao.elevadores > 1 ? "es" : ""}</p>
+                  <p className="text-[11px] text-[#86868b] mt-1">Elevador{empreendimento.configuracao.elevadores > 1 ? "es" : ""}</p>
                 </div>
               )}
             </div>
@@ -370,45 +362,45 @@ export default function EmpreendimentoDetailPage() {
         )}
 
         {/* Datas */}
-        <section className="bg-white rounded-2xl p-4 border border-[#E5E2DC]">
+        <section className="bg-white rounded-2xl p-4 border border-[#e8e8ed] shadow-sm">
           <div className="space-y-3">
             {empreendimento.lançamento && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-[#8A8A8A]">Lancamento</span>
-                <span className="text-sm font-medium text-[#1A1A1A]">
+                <span className="text-[14px] text-[#86868b]">Lançamento</span>
+                <span className="text-[14px] font-medium text-[#1d1d1f]">
                   {empreendimento.lançamento}
                 </span>
               </div>
             )}
             {empreendimento.entrega_prevista && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-[#8A8A8A]">Previsao de Entrega</span>
-                <span className="text-sm font-medium text-[#1A1A1A]">
+                <span className="text-[14px] text-[#86868b]">Previsão de Entrega</span>
+                <span className="text-[14px] font-medium text-[#1d1d1f]">
                   {empreendimento.entrega_prevista}
                 </span>
               </div>
             )}
             {empreendimento.entrega && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-[#8A8A8A]">Entrega</span>
-                <span className="text-sm font-medium text-[#1A1A1A]">
+                <span className="text-[14px] text-[#86868b]">Entrega</span>
+                <span className="text-[14px] font-medium text-[#1d1d1f]">
                   {empreendimento.entrega}
                 </span>
               </div>
             )}
             {empreendimento.padrao && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-[#8A8A8A]">Padrao</span>
-                <Badge variant="accent">
+                <span className="text-[14px] text-[#86868b]">Padrão</span>
+                <span className="px-3 py-1 bg-[#0071e3]/10 text-[#0071e3] text-[12px] font-semibold rounded-full">
                   {empreendimento.padrao}
-                </Badge>
+                </span>
               </div>
             )}
           </div>
         </section>
       </div>
 
-      {/* ShareSheet - Fixed bottom right */}
+      {/* ShareSheet */}
       <ShareSheet empreendimento={empreendimento} />
     </div>
   )
