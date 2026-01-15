@@ -87,3 +87,14 @@ model PreReserva {
 
   @@map("pre_reservas")
 }
+
+model AuthCode {
+  id        String   @id @default(uuid())
+  whatsapp  String
+  code      String
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("auth_codes")
+}

@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { ChevronDown, FileText, X, Check, Calendar, Wallet, Home, User, Share2, Copy, ArrowRight, CircleDollarSign, Loader2 } from "lucide-react"
+import { ChevronDown, FileText, X, Check, Calendar, Wallet, Home, User, Share2, Copy, ArrowRight, CircleDollarSign, Loader2, Building2, Sparkles, Calculator } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { PlanoPagamentoTable } from "@/components/reserva/plano-pagamento"
 import { ClienteForm } from "@/components/reserva/cliente-form"
+import { CaixaSimulator } from "@/components/ai/caixa-simulator"
 import { Cliente, PlanoPagamento, PreReserva } from "@/types/pagamento"
 
 // Interface para unidade vinda do banco
@@ -42,6 +43,7 @@ export default function EspelhoPage() {
   const [submitting, setSubmitting] = useState(false)
   const [preReserva, setPreReserva] = useState<PreReserva | null>(null)
   const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [showSimulator, setShowSimulator] = useState(false)
 
   // Fetch unidades from API
   useEffect(() => {
@@ -102,11 +104,13 @@ export default function EspelhoPage() {
     setModalStep("detalhes")
     setPreReserva(null)
     setCliente(null)
+    setShowSimulator(false)
   }
 
   const handleCloseModal = () => {
     setSelectedUnidade(null)
     setModalStep("detalhes")
+    setShowSimulator(false)
   }
 
   // Criar plano de pagamento a partir da unidade
@@ -464,6 +468,17 @@ export default function EspelhoPage() {
                     </div>
                   </div>
 
+                  {/* Simulador Caixa Button */}
+                  <div className="mb-4">
+                    <button
+                      onClick={() => setShowSimulator(true)}
+                      className="w-full h-12 bg-white border border-[#0071e3] text-[#0071e3] hover:bg-[#0071e3]/5 text-[15px] font-medium rounded-xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <Calculator className="w-5 h-5" />
+                      Simular Financiamento Caixa
+                    </button>
+                  </div>
+
                   {/* Botões de Ação */}
                   <div className="space-y-3">
                     <button
@@ -652,54 +667,6 @@ export default function EspelhoPage() {
                 </>
               )}
 
-              {/* Step: Cliente */}
-              {modalStep === "cliente" && planoAtual && selectedUnidade.plano && (
-                <>
-                  {/* Resumo Compacto */}
-                  <div className="bg-[#f5f5f7] rounded-xl p-4 mb-5 flex items-center justify-between">
-                    <div>
-                      <p className="text-[15px] font-semibold text-[#1d1d1f]">
-                        Unidade {selectedUnidade.numero}
-                      </p>
-                      <p className="text-[12px] text-[#86868b]">
-                        {selectedUnidade.area}m² | {selectedUnidade.tipologia}
-                      </p>
-                    </div>
-                    <p className="text-[17px] font-bold text-[#0071e3]">
-                      {formatCurrency(selectedUnidade.valorTotal)}
-                    </p>
-                  </div>
-
-                  {/* Plano Resumido */}
-                  <div className="bg-white border border-[#e8e8ed] rounded-xl p-4 mb-5">
-                    <p className="text-[11px] text-[#86868b] font-medium mb-2">PLANO DE PAGAMENTO</p>
-                    <div className="flex items-center justify-between text-[13px]">
-                      <span className="text-[#1d1d1f]">ATO</span>
-                      <span className="font-semibold">{formatCurrency(selectedUnidade.plano.ato.valor)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[13px] mt-1">
-                      <span className="text-[#1d1d1f]">{selectedUnidade.plano.mensais.quantidade}x Mensais</span>
-                      <span className="font-semibold">{formatCurrency(selectedUnidade.plano.mensais.valor)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[13px] mt-1">
-                      <span className="text-[#1d1d1f]">Financiamento</span>
-                      <span className="font-semibold">{formatCurrency(selectedUnidade.plano.financiamento.valor)}</span>
-                    </div>
-                  </div>
-
-                  {/* Formulário */}
-                  <ClienteForm onSubmit={handleClienteSubmit} loading={submitting} />
-
-                  {/* Voltar */}
-                  <button
-                    onClick={() => setModalStep("detalhes")}
-                    className="w-full h-12 bg-[#f5f5f7] text-[#1d1d1f] text-[15px] font-medium rounded-xl mt-3"
-                  >
-                    Voltar
-                  </button>
-                </>
-              )}
-
               {/* Step: Confirmação */}
               {modalStep === "confirmacao" && preReserva && planoAtual && selectedUnidade.plano && (
                 <>
@@ -761,6 +728,17 @@ export default function EspelhoPage() {
                     </button>
                   </div>
                 </>
+              )}
+
+              {/* Caixa Simulator */}
+              {selectedUnidade && (
+                <CaixaSimulator
+                  isOpen={showSimulator}
+                  onClose={() => setShowSimulator(false)}
+                  valorImovel={selectedUnidade.valorTotal}
+                  empreendimento={empreendimentoNome}
+                  unidade={selectedUnidade.numero}
+                />
               )}
             </div>
           </div>

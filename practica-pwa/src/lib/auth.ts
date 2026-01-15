@@ -1,6 +1,6 @@
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import corretoresData from "@/data/corretores.json"
+import { prisma } from "@/lib/prisma"
 
 declare module "next-auth" {
   interface User {
@@ -24,27 +24,49 @@ declare module "next-auth/jwt" {
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: "Codigo Corretor",
+      name: "WhatsApp OTP",
       credentials: {
         whatsapp: { label: "WhatsApp", type: "tel" },
-        codigo: { label: "Codigo", type: "text" },
+        codigo: { label: "Código", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.whatsapp || !credentials?.codigo) {
           return null
         }
 
-        // Normaliza o numero (remove espacos, tracos, parenteses)
         const whatsappNormalizado = credentials.whatsapp.replace(/\D/g, "")
 
-        const corretor = corretoresData.corretores.find(
-          (c) =>
-            c.whatsapp === whatsappNormalizado &&
-            c.codigo.toUpperCase() === credentials.codigo.toUpperCase() &&
-            c.ativo
-        )
+        // Busca o código mais recente e não usado para este WhatsApp
+        const authCode = await prisma.authCode.findFirst({
+          where: {
+            whatsapp: whatsappNormalizado,
+            code: credentials.codigo,
+            used: false,
+            expiresAt: {
+              gt: new Date()
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        })
 
-        if (corretor) {
+        if (!authCode) {
+          return null
+        }
+
+        // Marca o código como usado
+        await prisma.authCode.update({
+          where: { id: authCode.id },
+          data: { used: true }
+        })
+
+        // Busca o corretor
+        const corretor = await prisma.corretor.findUnique({
+          where: { whatsapp: whatsappNormalizado }
+        })
+
+        if (corretor && corretor.ativo) {
           return {
             id: corretor.id,
             name: corretor.nome,

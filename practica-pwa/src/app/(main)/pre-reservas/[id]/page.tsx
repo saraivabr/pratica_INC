@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Building2, User, Phone, Mail, Share2, Check, MoreHorizontal } from "lucide-react"
-import { PreReserva, Parcela } from "@/types/pagamento"
+import { ArrowLeft, Building2, User, Phone, Mail, Share2, MoreHorizontal, Sparkles, Edit3, MessageCircle } from "lucide-react"
+import { PreReserva, Parcela, PlanoPagamento } from "@/types/pagamento"
 import { PlanoPagamentoTable } from "@/components/reserva/plano-pagamento"
-import { StatusPreReserva, StatusPagamento } from "@/components/reserva/status-pagamento"
+import { StatusPreReserva } from "@/components/reserva/status-pagamento"
+import { ChatPanel } from "@/components/ai/chat-panel"
+import { FlowEditor } from "@/components/ai/flow-editor"
 
 export default function PreReservaDetalhePage() {
   const params = useParams()
@@ -13,6 +15,8 @@ export default function PreReservaDetalhePage() {
   const [preReserva, setPreReserva] = useState<PreReserva | null>(null)
   const [loading, setLoading] = useState(true)
   const [showActions, setShowActions] = useState(false)
+  const [showChat, setShowChat] = useState(false)
+  const [showFlowEditor, setShowFlowEditor] = useState(false)
 
   useEffect(() => {
     fetchPreReserva()
@@ -87,6 +91,55 @@ export default function PreReservaDetalhePage() {
     }
   }
 
+  const handleFlowSave = async (novoPlano: {
+    valorTotal: number
+    ato: { percentual: number; valor: number; vencimento: string }
+    mensais: { quantidade: number; percentual: number; valorTotal: number; valorParcela: number; primeiroVencimento: string }
+    financiamento: { percentual: number; valor: number; vencimento: string }
+  }) => {
+    if (!preReserva) return
+
+    // Convert to the expected PlanoPagamento format
+    const planoAtualizado = {
+      valorTotal: novoPlano.valorTotal,
+      ato: {
+        valor: novoPlano.ato.valor,
+        vencimento: novoPlano.ato.vencimento,
+        status: preReserva.plano.ato.status
+      },
+      mensais: Array.from({ length: novoPlano.mensais.quantidade }, (_, i) => {
+        const existing = preReserva.plano.mensais[i]
+        const dataVenc = new Date(novoPlano.mensais.primeiroVencimento)
+        dataVenc.setMonth(dataVenc.getMonth() + i)
+        return {
+          valor: novoPlano.mensais.valorParcela,
+          vencimento: dataVenc.toISOString().split('T')[0],
+          status: existing?.status || "pendente" as const
+        }
+      }),
+      financiamento: {
+        valor: novoPlano.financiamento.valor,
+        vencimento: novoPlano.financiamento.vencimento,
+        status: preReserva.plano.financiamento.status
+      }
+    }
+
+    try {
+      const response = await fetch(`/api/pre-reservas/${preReserva.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plano: planoAtualizado })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPreReserva(data.preReserva)
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar plano:", error)
+    }
+  }
+
   const handleShare = () => {
     if (!preReserva) return
 
@@ -118,6 +171,35 @@ ${preReserva.plano.mensais.map((m, i) => `- Mensal ${i + 1}: ${formatCurrency(m.
     }).format(value)
   }
 
+  // Convert plano to FlowEditor format
+  const getFlowEditorPlano = () => {
+    if (!preReserva) return null
+
+    const plano = preReserva.plano
+    const valorMensaisTotal = plano.mensais.reduce((acc, m) => acc + m.valor, 0)
+
+    return {
+      valorTotal: plano.valorTotal,
+      ato: {
+        percentual: Math.round((plano.ato.valor / plano.valorTotal) * 100),
+        valor: plano.ato.valor,
+        vencimento: plano.ato.vencimento
+      },
+      mensais: {
+        quantidade: plano.mensais.length,
+        percentual: Math.round((valorMensaisTotal / plano.valorTotal) * 100),
+        valorTotal: valorMensaisTotal,
+        valorParcela: plano.mensais[0]?.valor || 0,
+        primeiroVencimento: plano.mensais[0]?.vencimento || ""
+      },
+      financiamento: {
+        percentual: Math.round((plano.financiamento.valor / plano.valorTotal) * 100),
+        valor: plano.financiamento.valor,
+        vencimento: plano.financiamento.vencimento
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center">
@@ -141,6 +223,18 @@ ${preReserva.plano.mensais.map((m, i) => `- Mensal ${i + 1}: ${formatCurrency(m.
   ].filter(p => p.status === "pago").length
 
   const totalParcelas = 2 + preReserva.plano.mensais.length
+
+  const chatContext = {
+    preReserva: {
+      cliente: preReserva.cliente.nome,
+      empreendimento: preReserva.empreendimentoNome,
+      unidade: preReserva.unidade,
+      valorTotal: preReserva.plano.valorTotal,
+      status: preReserva.status
+    }
+  }
+
+  const flowEditorPlano = getFlowEditorPlano()
 
   return (
     <div className="min-h-screen bg-[#f5f5f7]">
@@ -207,7 +301,7 @@ ${preReserva.plano.mensais.map((m, i) => `- Mensal ${i + 1}: ${formatCurrency(m.
         </div>
       </header>
 
-      <main className="px-5 py-5 pb-28">
+      <main className="px-5 py-5 pb-36">
         {/* Empreendimento */}
         <div className="bg-white rounded-2xl border border-[#e8e8ed] p-4 mb-5">
           <div className="flex items-start gap-3">
@@ -271,23 +365,70 @@ ${preReserva.plano.mensais.map((m, i) => `- Mensal ${i + 1}: ${formatCurrency(m.
         </div>
 
         {/* Plano de Pagamento */}
-        <PlanoPagamentoTable
-          plano={preReserva.plano}
-          interactive
-          onParcelaClick={handleParcelaClick}
-        />
+        <div className="relative">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[15px] font-semibold text-[#1d1d1f]">Plano de Pagamento</h3>
+            <button
+              onClick={() => setShowFlowEditor(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white text-[12px] font-medium shadow-lg shadow-purple-500/20 hover:shadow-xl hover:scale-105 transition-all"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              Editar Fluxo
+            </button>
+          </div>
+          <PlanoPagamentoTable
+            plano={preReserva.plano}
+            interactive
+            onParcelaClick={handleParcelaClick}
+          />
+        </div>
 
         {/* Actions */}
-        <div className="mt-5">
+        <div className="mt-5 space-y-3">
           <button
             onClick={handleShare}
-            className="w-full h-12 bg-[#25D366] hover:bg-[#20BD5A] text-white text-[15px] font-medium rounded-xl flex items-center justify-center gap-2"
+            className="w-full h-12 bg-[#25D366] hover:bg-[#20BD5A] text-white text-[15px] font-medium rounded-xl flex items-center justify-center gap-2 transition-colors"
           >
             <Share2 className="w-5 h-5" />
             Enviar Atualização para Cliente
           </button>
         </div>
       </main>
+
+      {/* Floating AI Button */}
+      <button
+        onClick={() => setShowChat(true)}
+        className="fixed bottom-24 right-5 w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/40 flex items-center justify-center hover:scale-110 transition-transform z-30 animate-[pulse_2s_ease-in-out_infinite]"
+      >
+        <Sparkles className="w-6 h-6" />
+      </button>
+
+      {/* Chat Panel */}
+      <ChatPanel
+        isOpen={showChat}
+        onClose={() => setShowChat(false)}
+        context={chatContext}
+        title="Assistente Prática"
+      />
+
+      {/* Flow Editor */}
+      {flowEditorPlano && (
+        <FlowEditor
+          isOpen={showFlowEditor}
+          onClose={() => setShowFlowEditor(false)}
+          plano={flowEditorPlano}
+          onSave={handleFlowSave}
+          unidade={preReserva.unidade}
+          empreendimento={preReserva.empreendimentoNome}
+        />
+      )}
+
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); }
+          50% { box-shadow: 0 0 0 12px rgba(168, 85, 247, 0); }
+        }
+      `}</style>
     </div>
   )
 }
