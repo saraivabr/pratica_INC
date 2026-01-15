@@ -14,13 +14,15 @@
   --primary: 155 42% 18%;
   --primary-foreground: 0 0% 98%;
 
-  --secondary: 40 17% 93%; /* #F0EDE8 */
+  --secondary: 40 17% 93%;
+  /* #F0EDE8 */
   --secondary-foreground: 240 5.9% 10%;
 
   --muted: 240 4.8% 95.9%;
   --muted-foreground: 240 3.8% 46.1%;
 
-  --accent: 42 48% 59%; /* #C9A962 */
+  --accent: 42 48% 59%;
+  /* #C9A962 */
   --accent-foreground: 0 0% 98%;
 
   --destructive: 0 84.2% 60.2%;
@@ -36,20 +38,23 @@
   --font-system: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   --font-serif: var(--font-playfair), 'Playfair Display', Georgia, serif;
 }
- 
+
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
     -webkit-tap-highlight-color: transparent;
   }
+
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
     font-family: var(--font-system);
   }
 }
 
 @layer components {
+
   /* Skeleton Animation */
   .skeleton {
     background: linear-gradient(90deg, #1A1F2E 25%, #252D3D 50%, #1A1F2E 75%);
@@ -68,6 +73,7 @@
 }
 
 @layer utilities {
+
   /* Hide scrollbar but keep functionality */
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -81,8 +87,13 @@
 
 /* Animations */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes fadeIn {
@@ -90,6 +101,7 @@
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -101,6 +113,7 @@
     opacity: 0;
     transform: translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -112,6 +125,7 @@
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -135,6 +149,7 @@
   from {
     transform: translateY(100%);
   }
+
   to {
     transform: translateY(0);
   }
@@ -157,6 +172,7 @@ input[type="search"]::-webkit-search-decoration {
 
 /* Prevent zoom on input focus (iOS) */
 @media screen and (-webkit-min-device-pixel-ratio: 0) {
+
   select,
   textarea,
   input[type="text"],
@@ -172,6 +188,7 @@ input[type="search"]::-webkit-search-decoration {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -183,6 +200,7 @@ input[type="search"]::-webkit-search-decoration {
     opacity: 0;
     transform: translateY(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -193,6 +211,7 @@ input[type="search"]::-webkit-search-decoration {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -203,6 +222,7 @@ input[type="search"]::-webkit-search-decoration {
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -210,18 +230,24 @@ input[type="search"]::-webkit-search-decoration {
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
 }
 
 @keyframes bounce {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-10px);
   }
@@ -253,9 +279,12 @@ input[type="search"]::-webkit-search-decoration {
 
 /* Special Effects Animations */
 @keyframes glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 5px rgba(255, 107, 107, 0.2);
   }
+
   50% {
     box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
   }
@@ -265,30 +294,52 @@ input[type="search"]::-webkit-search-decoration {
   from {
     transform: rotateY(0deg);
   }
+
   to {
     transform: rotateY(180deg);
   }
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-  20%, 40%, 60%, 80% { transform: translateX(5px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-5px);
+  }
+
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(5px);
+  }
 }
 
 @keyframes rotate360 {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
 }
 
 @keyframes float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-10px);
   }
@@ -299,6 +350,7 @@ input[type="search"]::-webkit-search-decoration {
     opacity: 0;
     transform: translateX(-30px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -310,6 +362,7 @@ input[type="search"]::-webkit-search-decoration {
     opacity: 0;
     transform: translateX(30px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -317,12 +370,16 @@ input[type="search"]::-webkit-search-decoration {
 }
 
 @keyframes heartbeat {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
   }
+
   25% {
     transform: scale(1.1);
   }
+
   50% {
     transform: scale(1);
   }
@@ -332,6 +389,7 @@ input[type="search"]::-webkit-search-decoration {
   0% {
     background-position: -1000px 0;
   }
+
   100% {
     background-position: 1000px 0;
   }
