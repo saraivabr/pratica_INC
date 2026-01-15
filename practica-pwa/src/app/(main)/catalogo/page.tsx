@@ -149,7 +149,7 @@ export default function CatalogoPage() {
               className="flex-shrink-0 px-4 py-2 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all"
               style={{
                 backgroundColor: showFilters || activeFiltersCount > 0 ? colors.primary : colors.surface,
-                color: colors.text
+                color: showFilters || activeFiltersCount > 0 ? colors.white : colors.text
               }}
             >
               Filtros {activeFiltersCount > 0 && `(${activeFiltersCount})`}
@@ -171,7 +171,7 @@ export default function CatalogoPage() {
                     className="flex-shrink-0 px-3 py-2 rounded-full text-[12px] font-medium transition-all"
                     style={{
                       backgroundColor: filters.bairro.includes(bairro) ? colors.primary : colors.surface,
-                      color: colors.text
+                      color: filters.bairro.includes(bairro) ? colors.white : colors.text
                     }}
                   >
                     {bairro}
@@ -238,7 +238,7 @@ export default function CatalogoPage() {
                         {/* Status Badge - Top Left */}
                         <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-[11px] font-semibold backdrop-blur-md uppercase tracking-wider" style={{
                           backgroundColor: `${colors.primary}cc`,
-                          color: colors.text
+                          color: colors.white
                         }}>
                           {getStatusLabel(emp.status)}
                         </div>
@@ -252,7 +252,7 @@ export default function CatalogoPage() {
                           }}
                           className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-all backdrop-blur-md"
                           style={{
-                            backgroundColor: favorited ? colors.text : "rgba(255,255,255,0.2)"
+                            backgroundColor: favorited ? colors.white : "rgba(255,255,255,0.2)"
                           }}
                         >
                           <Heart

@@ -16,7 +16,7 @@ export function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#fbfbfd]/90 backdrop-blur-xl border-t border-[#d2d2d7]/50 pb-safe">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-ios-bg/90 backdrop-blur-xl border-t border-[hsl(var(--border))]/50 pb-safe">
       <div className="flex justify-around items-center h-[60px] max-w-lg mx-auto px-2">
         {tabs.map(({ href, icon: Icon, label }) => {
           const isActive = pathname?.startsWith(href)
@@ -27,7 +27,7 @@ export function BottomNav() {
               className={cn(
                 "flex flex-col items-center justify-center flex-1 py-2",
                 "transition-all duration-200",
-                isActive ? "text-[#0071e3]" : "text-[#86868b]"
+                isActive ? "text-ios-blue" : "text-ios-gray"
               )}
             >
               <div className="relative">

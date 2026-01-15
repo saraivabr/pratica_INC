@@ -1,18 +1,19 @@
 export const colors = {
-  bg: '#0F1419',
-  bgDark: '#0A0E13',
-  bgElevated: '#1A1F2E',
-  surface: '#151A28',
+  bg: '#FFFFFF',
+  bgDark: '#F5F5F7',
+  bgElevated: '#FFFFFF',
+  surface: '#F5F5F5',
 
-  text: '#FFFFFF',
-  textSecondary: '#B0B8C1',
-  textTertiary: '#7A8290',
+  text: '#1D1D1F',
+  textSecondary: '#86868B',
+  textTertiary: '#6E6E73',
 
-  primary: '#FF6B6B',
-  secondary: '#4ECDC4',
-  success: '#95E77D',
-  warning: '#FFD93D',
-  accent: '#A29BFE',
+  white: '#FFFFFF',
+  primary: '#1B4332',   /* Forest Green */
+  secondary: '#F5F5F7',
+  success: '#34C759',
+  warning: '#FFCC00',
+  accent: '#C9A962',    /* Gold */
 };
 
 export const modes = {

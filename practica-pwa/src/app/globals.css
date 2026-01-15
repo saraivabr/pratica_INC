@@ -2,96 +2,50 @@
 @import "tailwindcss";
 
 :root {
-  /* Organic Fluid Dark Palette */
-  --color-bg: #0F1419;
-  --color-bg-dark: #0A0E13;
-  --color-bg-elevated: #1A1F2E;
-  --color-surface: #151A28;
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
 
-  --color-text: #FFFFFF;
-  --color-text-secondary: #B0B8C1;
-  --color-text-tertiary: #7A8290;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
 
-  /* Vibrant Accents */
-  --color-primary: #FF6B6B;      /* Coral */
-  --color-secondary: #4ECDC4;    /* Turquoise */
-  --color-success: #95E77D;       /* Mint Green */
-  --color-warning: #FFD93D;       /* Warm Yellow */
-  --color-accent: #A29BFE;        /* Soft Purple */
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
 
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #FF6B6B 0%, #A29BFE 100%);
-  --gradient-success: linear-gradient(135deg, #95E77D 0%, #4ECDC4 100%);
-  --gradient-bg: linear-gradient(135deg, #0F1419 0%, #1A1F2E 100%);
+  --primary: 155 42% 18%;
+  --primary-foreground: 0 0% 98%;
+
+  --secondary: 40 17% 93%; /* #F0EDE8 */
+  --secondary-foreground: 240 5.9% 10%;
+
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 3.8% 46.1%;
+
+  --accent: 42 48% 59%; /* #C9A962 */
+  --accent-foreground: 0 0% 98%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 155 42% 18%;
+
+  --radius: 0.75rem;
 
   /* Typography */
   --font-system: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   --font-serif: var(--font-playfair), 'Playfair Display', Georgia, serif;
 }
-
+ 
 @layer base {
   * {
+    @apply border-border;
     -webkit-tap-highlight-color: transparent;
   }
-
-  html {
-    scroll-behavior: smooth;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    background: #0F1419;
-  }
-
   body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
     font-family: var(--font-system);
-    background: var(--gradient-bg);
-    color: var(--color-text);
-    line-height: 1.5;
-    letter-spacing: -0.01em;
-    font-feature-settings: 'kern' 1;
-    min-height: 100vh;
-    overflow-x: hidden;
-    padding: 0;
-    margin: 0;
-    position: fixed;
-    width: 100%;
-    height: 100%;
-  }
-
-  main {
-    overflow-y: auto;
-    height: 100vh;
-  }
-
-  /* Selection */
-  ::selection {
-    background-color: rgba(255, 107, 107, 0.3);
-    color: inherit;
-  }
-
-  /* Focus Outline */
-  :focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-  }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--color-text-tertiary);
-    border-radius: 3px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-text-secondary);
   }
 }
 

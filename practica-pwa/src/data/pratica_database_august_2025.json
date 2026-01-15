@@ -1,0 +1,319 @@
+{
+  "ultima_atualizacao": "2025-08-15",
+  "empreendimentos_detalhes": {
+    "aura_guilhermina": {
+      "nome": "Aura Guilhermina",
+      "endereco": "Rua Astorga nº 1005 - Guilhermina Esperança - São Paulo - SP",
+      "entrega": "10/2026",
+      "unidades": [
+        {
+          "unidade": "405",
+          "categoria": "HIS",
+          "vagas": 0,
+          "descricao": "2 Dormitórios",
+          "area_m2": 33,
+          "valor_total": 286865,
+          "ato": 28686,
+          "valor_financiado": 229492
+        },
+        {
+          "unidade": "702",
+          "categoria": "HIS",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte",
+          "area_m2": 44,
+          "valor_total": 368825,
+          "ato": 36883,
+          "valor_financiado": 295060
+        },
+        {
+          "unidade": "1001",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG - DEP)",
+          "area_m2": 44,
+          "valor_total": 358849,
+          "ato": 35885,
+          "valor_financiado": 287079
+        },
+        {
+          "unidade": "1103",
+          "categoria": "HIS-2",
+          "vagas": 0,
+          "descricao": "2 Dormitórios",
+          "area_m2": 33,
+          "valor_total": 276987,
+          "ato": 27699,
+          "valor_financiado": 221589
+        },
+        {
+          "unidade": "1107",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte",
+          "area_m2": 44,
+          "valor_total": 358849,
+          "ato": 35885,
+          "valor_financiado": 287079
+        },
+        {
+          "unidade": "1304",
+          "categoria": "HIS-2",
+          "vagas": 0,
+          "descricao": "2 Dormitórios",
+          "area_m2": 33,
+          "valor_total": 286865,
+          "ato": 28686,
+          "valor_financiado": 229492
+        },
+        {
+          "unidade": "1405",
+          "categoria": "HIS-2",
+          "vagas": 0,
+          "descricao": "2 Dormitórios",
+          "area_m2": 33,
+          "valor_total": 286865,
+          "ato": 28686,
+          "valor_financiado": 229492
+        },
+        {
+          "unidade": "1606",
+          "categoria": "HIS-2",
+          "vagas": 0,
+          "descricao": "2 Dormitórios",
+          "area_m2": 33,
+          "valor_total": 276987,
+          "ato": 27699,
+          "valor_financiado": 221589
+        },
+        {
+          "unidade": "1801",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte",
+          "area_m2": 44,
+          "valor_total": 459429,
+          "ato": 45943,
+          "valor_financiado": 367544
+        },
+        {
+          "unidade": "1805",
+          "categoria": "HIS-2",
+          "vagas": 0,
+          "descricao": "2 Dormitórios",
+          "area_m2": 33,
+          "valor_total": 358599,
+          "ato": 35860,
+          "valor_financiado": 286879
+        },
+        {
+          "unidade": "2001",
+          "categoria": "R2V",
+          "vagas": 2,
+          "descricao": "3 Dormitórios, sendo 1 suíte",
+          "area_m2": 88,
+          "valor_total": 986834,
+          "ato": 98683,
+          "valor_financiado": 789467
+        },
+        {
+          "unidade": "2002",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte",
+          "area_m2": 66,
+          "valor_total": 740126,
+          "ato": 74013,
+          "valor_financiado": 592101
+        },
+        {
+          "unidade": "2003",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte",
+          "area_m2": 66,
+          "valor_total": 740126,
+          "ato": 74013,
+          "valor_financiado": 592101
+        },
+        {
+          "unidade": "2004",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte",
+          "area_m2": 88,
+          "valor_total": 986834,
+          "ato": 98683,
+          "valor_financiado": 789467
+        }
+      ]
+    },
+    "colatinna": {
+      "nome": "Colatinna - Pratica Construtora",
+      "endereco": "Rua Colatina nº 66 - Patriarca - São Paulo - SP",
+      "entrega": "10/2027",
+      "unidades": [
+        {
+          "unidade": "604",
+          "categoria": "HMP",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG)",
+          "area_m2": 49,
+          "valor_total": 667937,
+          "ato": 66794,
+          "valor_financiado": 467556
+        },
+        {
+          "unidade": "803",
+          "categoria": "HMP",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG)",
+          "area_m2": 51,
+          "valor_total": 704835,
+          "ato": 70484,
+          "valor_financiado": 493385
+        },
+        {
+          "unidade": "902",
+          "categoria": "HMP",
+          "vagas": 0,
+          "descricao": "2 Dormitórios (MOTO)",
+          "area_m2": 43,
+          "valor_total": 538843,
+          "ato": 53884,
+          "valor_financiado": 377190
+        },
+        {
+          "unidade": "903",
+          "categoria": "HMP",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG)",
+          "area_m2": 51,
+          "valor_total": 725756,
+          "ato": 72576,
+          "valor_financiado": 508030
+        },
+        {
+          "unidade": "904",
+          "categoria": "HMP",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG - DEP)",
+          "area_m2": 50,
+          "valor_total": 697344,
+          "ato": 69734,
+          "valor_financiado": 488141
+        },
+        {
+          "unidade": "1001",
+          "categoria": "HMP",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG - DEP)",
+          "area_m2": 46,
+          "valor_total": 674064,
+          "ato": 67406,
+          "valor_financiado": 471844
+        },
+        {
+          "unidade": "1002",
+          "categoria": "HMP",
+          "vagas": 0,
+          "descricao": "2 Dormitórios (MOTO - DEP)",
+          "area_m2": 43,
+          "valor_total": 561166,
+          "ato": 56117,
+          "valor_financiado": 392816
+        },
+        {
+          "unidade": "1003",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG - DEP)",
+          "area_m2": 51,
+          "valor_total": 730446,
+          "ato": 73045,
+          "valor_financiado": 511312
+        },
+        {
+          "unidade": "1004",
+          "categoria": "HMP",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG - DEP)",
+          "area_m2": 49,
+          "valor_total": 701846,
+          "ato": 70185,
+          "valor_financiado": 491292
+        },
+        {
+          "unidade": "1102",
+          "categoria": "HMP",
+          "vagas": 0,
+          "descricao": "2 Dormitórios (MOTO - DEP)",
+          "area_m2": 43,
+          "valor_total": 568994,
+          "ato": 56899,
+          "valor_financiado": 398296
+        },
+        {
+          "unidade": "1202",
+          "categoria": "HMP",
+          "vagas": 1,
+          "descricao": "2 Dormitórios (VG - DEP)",
+          "area_m2": 43,
+          "valor_total": 636974,
+          "ato": 63697,
+          "valor_financiado": 445882
+        },
+        {
+          "unidade": "1203",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG - DEP)",
+          "area_m2": 51,
+          "valor_total": 768067,
+          "ato": 76807,
+          "valor_financiado": 537647
+        },
+        {
+          "unidade": "1204",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG - DEP)",
+          "area_m2": 49,
+          "valor_total": 710938,
+          "ato": 71094,
+          "valor_financiado": 497657
+        },
+        {
+          "unidade": "1302",
+          "categoria": "HMP",
+          "vagas": 1,
+          "descricao": "2 Dormitórios (VG - DEP)",
+          "area_m2": 43,
+          "valor_total": 594387,
+          "ato": 59439,
+          "valor_financiado": 416071
+        },
+        {
+          "unidade": "1303",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG - DEP)",
+          "area_m2": 51,
+          "valor_total": 765257,
+          "ato": 76526,
+          "valor_financiado": 535680
+        },
+        {
+          "unidade": "1304",
+          "categoria": "R2V",
+          "vagas": 1,
+          "descricao": "2 Dormitórios, sendo 1 suíte (VG - DEP)",
+          "area_m2": 49,
+          "valor_total": 743866,
+          "ato": 74387,
+          "valor_financiado": 520706
+        }
+      ]
+    }
+  }
+}
