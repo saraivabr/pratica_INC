@@ -167,6 +167,77 @@ async function main() {
   console.log(`   Total: ${todosEmpreendimentos.length} empreendimentos\n`);
 
   // ============================================
+  // 2B. CRIAR EMPREENDIMENTOS ADICIONAIS (AGOSTO 2025)
+  // ============================================
+  console.log("2B. Criando empreendimentos adicionais (Agosto 2025)...");
+
+  const empreendimentosAdicionais = [
+    {
+      id: "station-garden",
+      nome: "Station Garden Patriarca",
+      status: "em_construcao",
+      bairro: "Patriarca",
+      zona: "Leste",
+      entregaPrevista: new Date("2025-12-15"),
+      imagemCapa: "https://praticaincorporadora.com.br/assets/new-images/station-garden/fachada/praticaincorporadora-stationgarden-Fachada-(6).jpg",
+    },
+    {
+      id: "mirante-vila",
+      nome: "Mirante da Vila",
+      status: "em_construcao",
+      bairro: "Vila Mariana",
+      zona: "Sul",
+      entregaPrevista: new Date("2025-12-15"),
+      imagemCapa: null,
+    },
+    {
+      id: "moment-metro",
+      nome: "Moment Metrô Conceição",
+      status: "em_construcao",
+      bairro: "Conceição",
+      zona: "Centro",
+      entregaPrevista: new Date("2025-12-15"),
+      imagemCapa: null,
+    },
+    {
+      id: "essencia-vila",
+      nome: "Essência da Vila",
+      status: "em_construcao",
+      bairro: "Vila Mariana",
+      zona: "Sul",
+      entregaPrevista: new Date("2026-04-15"),
+      imagemCapa: null,
+    },
+  ];
+
+  for (const emp of empreendimentosAdicionais) {
+    await prisma.empreendimento.upsert({
+      where: { id: emp.id },
+      update: {
+        nome: emp.nome,
+        status: emp.status,
+        bairro: emp.bairro,
+        zona: emp.zona,
+        entregaPrevista: emp.entregaPrevista,
+        imagemCapa: emp.imagemCapa,
+      },
+      create: {
+        id: emp.id,
+        nome: emp.nome,
+        status: emp.status,
+        bairro: emp.bairro,
+        zona: emp.zona,
+        entregaPrevista: emp.entregaPrevista,
+        imagemCapa: emp.imagemCapa,
+        dadosJson: {},
+      },
+    });
+    console.log(`   - Empreendimento adicional criado: ${emp.nome}`);
+  }
+
+  console.log(`   Total: ${empreendimentosAdicionais.length} empreendimentos adicionais\n`);
+
+  // ============================================
   // 3. INSERIR UNIDADES DO STATION PARK
   // ============================================
   console.log("3. Inserindo unidades do Station Park...");
