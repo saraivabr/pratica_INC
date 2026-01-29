@@ -37,7 +37,7 @@ function AnimatedCounter({ value, duration = 2 }: { value: number; duration?: nu
     }
 
     animationFrame = requestAnimationFrame(animate)
-    return () => cancelFrameRequest(animationFrame)
+    return () => cancelAnimationFrame(animationFrame)
   }, [isInView, value, duration])
 
   return <span ref={ref}>{count}</span>
