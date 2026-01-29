@@ -83,7 +83,7 @@ const adminGroups = {
     title: "Inteligência",
     defaultOpen: true,
     items: [
-      { href: "/recupera-leads", icon: Search, label: "CataVendas" },
+      { href: "/catavendas", icon: Search, label: "CataVendas" },
       { href: "/admin/score", icon: ShieldCheck, label: "Consulta Score" },
     ],
   },
@@ -132,25 +132,25 @@ const adminItems = Object.values(adminGroups).flatMap(g => g.items)
 
 // Corretor navigation (ROTAS UNIFICADAS)
 const corretorNavItems = [
-  { href: "/corretor", icon: LayoutDashboard, label: "Command Center" },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Home" },
   { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
-  { href: "/corretor/salva-leads", icon: Search, label: "CataVendas" },
+  { href: "/catavendas", icon: Search, label: "CataVendas" },
 ]
 
 // Mobile bottom nav for corretor (3 main items)
 const corretorMobileNavItems = [
-  { href: "/corretor", icon: LayoutDashboard, label: "Central" },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Home" },
   { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
-  { href: "/corretor/salva-leads", icon: Search, label: "CataVendas" },
+  { href: "/catavendas", icon: Search, label: "CataVendas" },
 ]
 
 // Mobile bottom nav for admin (5 main items)
 const adminMobileNavItems = [
-  { href: "/admin", icon: LayoutDashboard, label: "Home" },
-  { href: "/admin/pipeline", icon: Workflow, label: "Pipeline" },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Home" },
+  { href: "/pipeline", icon: Workflow, label: "Pipeline" },
   { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
-  { href: "/admin/chat", icon: MessageSquare, label: "Chat" },
-  { href: "/admin/leads", icon: UserCircle, label: "Leads" },
+  { href: "/chat", icon: MessageSquare, label: "Chat" },
+  { href: "/leads", icon: UserCircle, label: "Leads" },
 ]
 
 // Role Switch Component

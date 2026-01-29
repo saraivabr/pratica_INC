@@ -221,8 +221,24 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Validar comprimento mínimo
+        if (nome.trim().length < 2) {
+            return NextResponse.json(
+                { error: 'Nome deve ter pelo menos 2 caracteres' },
+                { status: 400 }
+            );
+        }
+
         // Limpar telefone (remover caracteres especiais)
         const telefoneClean = telefone.replace(/\D/g, '');
+
+        // Validar telefone
+        if (telefoneClean.length < 10 || telefoneClean.length > 13) {
+            return NextResponse.json(
+                { error: 'Telefone inválido' },
+                { status: 400 }
+            );
+        }
 
         // Verificar se já existe lead com esse telefone
         const existingLead = await pool.query(

@@ -716,7 +716,7 @@ export default function WhatsAppOnboardingPage() {
 
   // ── Go to dashboard ──
   const handleContinue = () => {
-    router.push("/corretor")
+    router.push("/dashboard")
   }
 
   // ── Reset to step 1 ──
@@ -775,7 +775,7 @@ export default function WhatsAppOnboardingPage() {
           </div>
           <Button
             variant="ghost"
-            onClick={() => router.push("/corretor")}
+            onClick={() => router.push("/dashboard")}
             className="text-gray-500 hover:text-gray-700"
           >
             Pular

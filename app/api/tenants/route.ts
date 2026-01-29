@@ -44,6 +44,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validar formato do slug (apenas letras minúsculas, números e hífens)
+    if (!/^[a-z0-9-]+$/.test(body.slug)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Slug deve conter apenas letras minúsculas, números e hífens'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validar comprimento
+    if (body.slug.length < 3 || body.slug.length > 50) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Slug deve ter entre 3 e 50 caracteres'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (body.name.trim().length < 2) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Nome deve ter pelo menos 2 caracteres'
+        },
+        { status: 400 }
+      );
+    }
+
     const tenant = await createTenant({
       slug: body.slug,
       name: body.name,

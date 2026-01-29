@@ -101,6 +101,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validar data não é passado
+    const dataAgendamento = new Date(data_hora);
+    const agora = new Date();
+    
+    if (isNaN(dataAgendamento.getTime())) {
+      return NextResponse.json(
+        { error: 'Data e hora inválidos' },
+        { status: 400 }
+      );
+    }
+
+    if (dataAgendamento < agora) {
+      return NextResponse.json(
+        { error: 'Não é possível agendar no passado' },
+        { status: 400 }
+      );
+    }
+
+    // Validar tipo
+    const tiposValidos = ['visita', 'ligacao', 'proposta', 'vistoria', 'outro'];
+    if (tipo && !tiposValidos.includes(tipo)) {
+      return NextResponse.json(
+        { error: 'Tipo de agendamento inválido' },
+        { status: 400 }
+      );
+    }
+
     const insertQuery = `
       INSERT INTO agendamentos (
         workspace_id, lead_id, lead_nome, corretor_id, corretor_nome,

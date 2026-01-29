@@ -28,11 +28,11 @@ export default function HomePage() {
   // Redirect authenticated users based on role
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
-      // Corretores vão para /corretor, admin/gerentes vão para /admin
+      // Admin/gerentes vão para /admin, corretores vão para /dashboard
       if (user.role === "admin" || user.role === "gerente") {
         router.push("/admin")
       } else {
-        router.push("/corretor")
+        router.push("/dashboard")
       }
     }
   }, [isAuthenticated, isLoading, user, router])

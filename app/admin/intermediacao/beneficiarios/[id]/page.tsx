@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import { Breadcrumb } from "@/components/breadcrumb"
 
 interface Beneficiario {
   id: string
@@ -313,6 +314,16 @@ export default function BeneficiarioDetailPage({
   return (
     <AppShell title={beneficiario.nome}>
       <div className="container px-4 py-6 animate-page-in space-y-6">
+        {/* Breadcrumb */}
+        <Breadcrumb
+          items={[
+            { label: "Admin", href: "/admin" },
+            { label: "Intermediação", href: "/admin/intermediacao" },
+            { label: "Beneficiários", href: "/admin/intermediacao/beneficiarios" },
+            { label: beneficiario.nome },
+          ]}
+        />
+        
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">

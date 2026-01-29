@@ -640,16 +640,14 @@ async function handleNewMessage(workspaceId: number, data: any) {
             { phone_number: phoneNumber },
             {
               last_message_at: timestamp.toISOString(),
-              last_interaction_at: timestamp.toISOString(),
               total_messages_received: existingContacts[0].total_messages_received + 1,
             }
           );
         } else {
           await query.insert('whatsapp_contacts', {
             phone_number: phoneNumber,
-            name: phoneNumber,
+            contact_name: phoneNumber,
             last_message_at: timestamp.toISOString(),
-            last_interaction_at: timestamp.toISOString(),
             total_messages_received: 1,
             total_messages_sent: 0,
           });

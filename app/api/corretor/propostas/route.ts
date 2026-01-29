@@ -52,6 +52,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validar valores não negativos
+    if (valor_proposta <= 0) {
+      return NextResponse.json(
+        { error: 'Valor da proposta deve ser maior que zero' },
+        { status: 400 }
+      );
+    }
+
+    if (valor_entrada && valor_entrada < 0) {
+      return NextResponse.json(
+        { error: 'Valor de entrada não pode ser negativo' },
+        { status: 400 }
+      );
+    }
+
+    if (valor_entrada && valor_entrada > valor_proposta) {
+      return NextResponse.json(
+        { error: 'Valor de entrada não pode ser maior que valor da proposta' },
+        { status: 400 }
+      );
+    }
+
+    // Validar prazo
+    if (prazo_meses && (prazo_meses < 1 || prazo_meses > 360)) {
+      return NextResponse.json(
+        { error: 'Prazo deve estar entre 1 e 360 meses' },
+        { status: 400 }
+      );
+    }
+
     const query = `
       INSERT INTO cvcrm_propostas (
         lead_id, empreendimento_id, unidade_id,
