@@ -73,29 +73,29 @@ function FeatureCard({
         scale: 1.05,
         transition: { duration: 0.2 }
       }}
-      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-8 backdrop-blur-xl transition-all duration-300 hover:border-purple-500/50 hover:shadow-2xl hover:shadow-purple-500/20"
+      className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-gradient-to-br from-white/5 to-white/0 p-8 backdrop-blur-xl transition-all duration-300 hover:border-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/20"
       style={{ willChange: 'transform' }}
     >
       {/* Glow effect on hover */}
       <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-pink-500/10 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-green-500/10 to-transparent" />
       </div>
 
       {/* Content */}
       <div className="relative z-10">
         <motion.div 
-          className="mb-6 inline-flex rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 p-4"
+          className="mb-6 inline-flex rounded-xl bg-gradient-to-br from-emerald-500/20 to-green-500/20 p-4"
           whileHover={{ rotate: [0, -10, 10, -10, 0] }}
           transition={{ duration: 0.5 }}
         >
-          <Icon className="h-8 w-8 text-purple-400" />
+          <Icon className="h-8 w-8 text-emerald-400" />
         </motion.div>
         
-        <h3 className="mb-3 text-2xl font-bold text-white">
+        <h3 className="mb-3 text-2xl font-bold text-gray-900">
           {title}
         </h3>
         
-        <p className="text-gray-300 leading-relaxed">
+        <p className="text-gray-600 leading-relaxed">
           {description}
         </p>
       </div>
@@ -148,11 +148,11 @@ function StatCard({
       }}
       className="text-center"
     >
-      <div className="mb-2 text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+      <div className="mb-2 text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-400">
         <AnimatedCounter value={value} />
         {suffix}
       </div>
-      <div className="text-gray-400 text-sm uppercase tracking-wider">
+      <div className="text-gray-500 text-sm uppercase tracking-wider">
         {label}
       </div>
     </motion.div>
@@ -211,11 +211,11 @@ export default function Home() {
   ]
 
   return (
-    <main ref={containerRef} className="relative min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 overflow-x-hidden">
+    <main ref={containerRef} className="relative min-h-screen bg-gradient-to-br from-emerald-50 via-white to-green-50 overflow-x-hidden">
       {/* Animated background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/30 rounded-full blur-3xl"
+          className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/30 rounded-full blur-3xl"
           animate={{
             scale: [1, 1.2, 1],
             opacity: [0.3, 0.5, 0.3],
@@ -227,7 +227,7 @@ export default function Home() {
           }}
         />
         <motion.div
-          className="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-500/30 rounded-full blur-3xl"
+          className="absolute bottom-0 right-1/4 w-96 h-96 bg-green-500/30 rounded-full blur-3xl"
           animate={{
             scale: [1.2, 1, 1.2],
             opacity: [0.3, 0.5, 0.3],
@@ -251,10 +251,10 @@ export default function Home() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-2 mb-8 backdrop-blur-sm"
+            className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 mb-8 backdrop-blur-sm"
           >
-            <Sparkles className="h-4 w-4 text-purple-400" />
-            <span className="text-sm text-purple-300 font-medium">
+            <Sparkles className="h-4 w-4 text-emerald-400" />
+            <span className="text-sm text-emerald-300 font-medium">
               Plataforma de Vendas com IA
             </span>
           </motion.div>
@@ -264,10 +264,10 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 text-white leading-tight"
+            className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 text-gray-900 leading-tight"
           >
             Transforme Leads em{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-300% animate-gradient">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-400 bg-300% animate-gradient">
               Clientes Reais
             </span>
           </motion.h1>
@@ -277,7 +277,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="text-xl sm:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed"
+            className="text-xl sm:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed"
           >
             Automação inteligente de vendas com IA que trabalha 24/7.
             Atendimento, qualificação e conversão em uma única plataforma.
@@ -294,7 +294,7 @@ export default function Home() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="group relative px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold text-lg shadow-lg shadow-purple-500/50 hover:shadow-xl hover:shadow-purple-500/60 transition-all duration-300"
+                className="group relative px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-gray-900 font-semibold text-lg shadow-lg shadow-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/60 transition-all duration-300"
               >
                 <span className="flex items-center gap-2">
                   Entrar
@@ -307,7 +307,7 @@ export default function Home() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 rounded-xl border-2 border-white/20 text-white font-semibold text-lg backdrop-blur-sm hover:bg-white/10 transition-all duration-300"
+                className="px-8 py-4 rounded-xl border-2 border-gray-200 text-gray-900 font-semibold text-lg backdrop-blur-sm hover:bg-white/10 transition-all duration-300"
               >
                 Ver Empreendimentos
             </motion.button>
@@ -360,10 +360,10 @@ export default function Home() {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4">
+            <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
               Tudo que Você Precisa
             </h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-500 max-w-2xl mx-auto">
               Ferramentas poderosas trabalhando juntas para maximizar suas vendas
             </p>
           </motion.div>
@@ -392,11 +392,11 @@ export default function Home() {
           transition={{ duration: 0.8 }}
           className="max-w-4xl mx-auto text-center"
         >
-          <div className="relative rounded-3xl border border-white/10 bg-gradient-to-br from-purple-900/40 to-pink-900/40 p-12 backdrop-blur-xl overflow-hidden">
+          <div className="relative rounded-3xl border border-gray-100 bg-gradient-to-br from-emerald-900/40 to-green-900/40 p-12 backdrop-blur-xl overflow-hidden">
             {/* Animated background */}
             <div className="absolute inset-0 opacity-30">
               <motion.div
-                className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-emerald-500 to-green-500"
                 animate={{
                   backgroundPosition: ['0% 0%', '100% 100%'],
                 }}
@@ -412,16 +412,16 @@ export default function Home() {
             </div>
 
             <div className="relative z-10">
-              <h2 className="text-4xl font-bold text-white mb-4">
+              <h2 className="text-4xl font-bold text-gray-900 mb-4">
                 Pronto para Revolucionar suas Vendas?
               </h2>
-              <p className="text-xl text-gray-300 mb-8">
+              <p className="text-xl text-gray-600 mb-8">
                 Junte-se a centenas de empresas que já automatizaram suas vendas
               </p>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-10 py-5 rounded-xl bg-white text-purple-600 font-bold text-lg shadow-2xl hover:shadow-white/20 transition-all duration-300"
+                className="px-10 py-5 rounded-xl bg-white text-emerald-600 font-bold text-lg shadow-2xl hover:shadow-white/20 transition-all duration-300"
               >
                 Começar Gratuitamente
               </motion.button>
@@ -431,8 +431,8 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="relative py-12 px-4 sm:px-6 lg:px-8 border-t border-white/10">
-        <div className="max-w-7xl mx-auto text-center text-gray-400">
+      <footer className="relative py-12 px-4 sm:px-6 lg:px-8 border-t border-gray-100">
+        <div className="max-w-7xl mx-auto text-center text-gray-500">
           <p>© 2024 Prática. Transformando vendas com inteligência artificial.</p>
         </div>
       </footer>
