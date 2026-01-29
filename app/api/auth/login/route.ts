@@ -110,7 +110,6 @@ export async function POST(request: Request) {
         email: user.email,
         telefone: user.telefone,
         role: user.role,
-        workspace_id: user.workspace_id,
         imobiliaria_id: user.imobiliaria_id,
         is_active: user.is_active,
       },

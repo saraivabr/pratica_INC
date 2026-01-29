@@ -71,20 +71,11 @@ export async function POST(request: Request) {
     // Hash password with bcrypt (salt rounds: 10)
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Get default tenant (all users start with tenant 1)
-    const { rows: tenantRows } = await dbQuery(
-      `SELECT id FROM tenants ORDER BY id LIMIT 1`
-    );
-    const tenantId = tenantRows[0]?.id || 1;
-
-    // Get default workspace for tenant
-    const { rows: workspaceRows } = await dbQuery(
-      `SELECT id FROM workspaces WHERE tenant_id = $1 ORDER BY id LIMIT 1`,
-      [tenantId]
-    );
-    const workspaceId = workspaceRows[0]?.id;
+    // Generate placeholder phone if not provided (telefone is NOT NULL in DB)
+    const userPhone = telefone || `email-${Date.now()}`;
 
     // Create user with password_hash
+    // Note: workspace_id and tenant_id columns don't exist in current schema
     const { rows: userRows } = await dbQuery(
       `INSERT INTO users (
         nome, 
@@ -92,21 +83,17 @@ export async function POST(request: Request) {
         telefone, 
         password_hash, 
         role, 
-        tenant_id,
-        workspace_id,
         onboarding_status, 
         is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', true)
-      RETURNING id, nome, email, telefone, role, workspace_id`,
+      VALUES ($1, $2, $3, $4, $5, 'completed', true)
+      RETURNING id, nome, email, telefone, role`,
       [
         nome,
         normalizedEmail,
-        telefone || null,
+        userPhone,
         passwordHash,
         role,
-        tenantId,
-        workspaceId,
       ]
     );
 
@@ -148,7 +135,6 @@ export async function POST(request: Request) {
         email: user.email,
         telefone: user.telefone,
         role: user.role,
-        workspace_id: user.workspace_id,
       },
     });
   } catch (error) {
