@@ -228,8 +228,8 @@ END $$;
 -- 4. COMMIT (descomente após validar resultado)
 -- ============================================================================
 
--- COMMIT;
-ROLLBACK; -- REMOVER após validar resultado com ROLLBACK primeiro!
+COMMIT; -- Aplicando alterações permanentemente
+-- ROLLBACK; -- REMOVIDO - alterações serão commitadas
 
 -- ============================================================================
 -- INSTRUÇÕES DE USO

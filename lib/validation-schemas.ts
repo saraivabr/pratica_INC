@@ -95,6 +95,44 @@ export const VerifyOTPSchema = z.object({
 export type VerifyOTPRequest = z.infer<typeof VerifyOTPSchema>;
 
 /**
+ * POST /api/auth/login
+ */
+export const LoginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
+});
+
+export type LoginRequest = z.infer<typeof LoginSchema>;
+
+/**
+ * POST /api/auth/register
+ */
+export const RegisterSchema = z.object({
+  nome: nameSchema,
+  email: emailSchema,
+  password: z
+    .string()
+    .min(6, 'Senha deve ter no mínimo 6 caracteres')
+    .max(100, 'Senha muito longa'),
+  telefone: phoneSchema.optional(),
+  role: z.enum(['corretor', 'gerente', 'admin']).default('corretor'),
+});
+
+export type RegisterRequest = z.infer<typeof RegisterSchema>;
+
+/**
+ * POST /api/auth/set-password
+ */
+export const SetPasswordSchema = z.object({
+  password: z
+    .string()
+    .min(6, 'Senha deve ter no mínimo 6 caracteres')
+    .max(100, 'Senha muito longa'),
+});
+
+export type SetPasswordRequest = z.infer<typeof SetPasswordSchema>;
+
+/**
  * POST /api/whatsapp/send
  */
 export const SendWhatsAppMessageSchema = z.object({

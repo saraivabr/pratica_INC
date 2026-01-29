@@ -50,6 +50,7 @@ import {
   gerarSofiaEventoPrompt,
 } from '@/lib/eventos';
 import { emitNewMessage, emitConnectionUpdate } from '@/lib/message-events';
+import { isAudioMessage, extractAudioMessage, transcribeWhatsAppAudio } from '@/lib/whisper';
 
 /**
  * Valida autenticação do webhook.
@@ -333,12 +334,26 @@ async function handleNewMessage(workspaceId: number, data: any) {
       phoneNumber = remoteJid.split('@')[0];
     }
     
-    const messageText = message.message?.conversation ||
-                       message.message?.extendedTextMessage?.text ||
-                       '';
+    let messageText = message.message?.conversation ||
+                      message.message?.extendedTextMessage?.text ||
+                      '';
 
     const messageType = Object.keys(message.message || {})[0];
     const timestamp = new Date(message.messageTimestamp * 1000);
+
+    // ✅ NOVA FEATURE: Transcrição de Áudio com Whisper
+    if (isAudioMessage(message)) {
+      try {
+        console.log('[Webhook] Audio message detected, transcribing...');
+        const audioMessage = extractAudioMessage(message);
+        const transcription = await transcribeWhatsAppAudio(data.instance, audioMessage);
+        messageText = `[Áudio transcrito]: ${transcription.text}`;
+        console.log('[Webhook] Audio transcribed:', messageText.substring(0, 100));
+      } catch (error: any) {
+        console.error('[Webhook] Audio transcription failed:', error);
+        messageText = '[Áudio recebido - erro na transcrição]';
+      }
+    }
 
     console.log('[New Message]', {
       from: phoneNumber,
