@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { motion, useScroll, useTransform, useInView, useSpring } from 'framer-motion'
 import { useRef, useEffect, useState } from 'react'
 import { 
@@ -289,24 +290,28 @@ export default function Home() {
             transition={{ duration: 0.8, delay: 0.6 }}
             className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="group relative px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold text-lg shadow-lg shadow-purple-500/50 hover:shadow-xl hover:shadow-purple-500/60 transition-all duration-300"
-            >
-              <span className="flex items-center gap-2">
-                Começar Agora
+            <Link href="/login">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="group relative px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold text-lg shadow-lg shadow-purple-500/50 hover:shadow-xl hover:shadow-purple-500/60 transition-all duration-300"
+              >
+                <span className="flex items-center gap-2">
+                  Entrar
                 <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </span>
-            </motion.button>
+                </span>
+              </motion.button>
+            </Link>
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-8 py-4 rounded-xl border-2 border-white/20 text-white font-semibold text-lg backdrop-blur-sm hover:bg-white/10 transition-all duration-300"
-            >
-              Ver Demo
+            <Link href="/empreendimentos">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-8 py-4 rounded-xl border-2 border-white/20 text-white font-semibold text-lg backdrop-blur-sm hover:bg-white/10 transition-all duration-300"
+              >
+                Ver Empreendimentos
             </motion.button>
+            </Link>
           </motion.div>
 
           {/* Stats */}
