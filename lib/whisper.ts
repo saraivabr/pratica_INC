@@ -6,7 +6,6 @@
 
 import OpenAI from 'openai';
 import FormData from 'form-data';
-import fetch from 'node-fetch';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,

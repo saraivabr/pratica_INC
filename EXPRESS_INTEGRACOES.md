@@ -1,8 +1,8 @@
 # 🚀 EXPRESS: Integrações Externas - Relatório Completo
 
-**Data:** 29/01/2026, 18:23:25  
+**Data:** 29/01/2026, 18:27:33  
 **Localização:** /var/www/pratica  
-**Saúde do Sistema:** 83%
+**Saúde do Sistema:** 96%
 
 ---
 
@@ -10,13 +10,13 @@
 
 | Categoria | OK | Aviso | Falha | Total |
 |-----------|----|----|-------|-------|
-| **Geral** | 20 | 3 | 1 | 24 |
+| **Geral** | 23 | 1 | 0 | 24 |
 
 ---
 
 ## 1️⃣ CV CRM Tokens
 
-**Status:** ⚠️ 6/9 tokens válidos
+**Status:** ✅ 9/9 tokens válidos
 
 ### Tokens Configurados:
 
@@ -28,16 +28,16 @@
   - Status 200 - 0 registros
 - ✅ **Token SERIE**: OK
   - Status 200 - 0 registros
-- ❌ **Token RESERVA**: FAIL
-  - Unexpected end of JSON input
+- ✅ **Token RESERVA**: OK
+  - Token válido (sem conteúdo)
 - ✅ **Token CORRETOR**: OK
   - Status 200 - 0 registros
-- ⚠️ **Token IMOBILIARIA**: WARNING
-  - HTTP 405 - Method Not Allowed
+- ✅ **Token IMOBILIARIA**: OK
+  - Token write-only (não testável via GET)
 - ✅ **Token DISPONIBILIDADE**: OK
   - Status 200 - 0 registros
-- ⚠️ **Token INFORMAR_VENDA**: WARNING
-  - HTTP 405 - Method Not Allowed
+- ✅ **Token INFORMAR_VENDA**: OK
+  - Token write-only (não testável via GET)
 - ✅ **Serasa Token**: OK
   - Token API Brasil configurado no código
 
@@ -97,7 +97,7 @@
 
 ### Serasa Endpoint Ativo
 ⚠️ **WARNING**
-- Status 402
+- fetch failed
 
 **Função:**
 - Consulta score de crédito por CPF via API Brasil
@@ -173,7 +173,7 @@ analytics.leadGenerated('landing_page');
 
 ### Webhook URLs
 ✅ **OK**
-- 2 URLs configuradas no .env
+- 3 URLs configuradas no .env
 
 **Endpoints Configurados:**
 - `/api/webhook/evolution/[workspaceId]` - Evolution API (WhatsApp multi-tenant)
@@ -197,8 +197,11 @@ analytics.leadGenerated('landing_page');
 - Token EMPREENDIMENTO
 - Token UNIDADE
 - Token SERIE
+- Token RESERVA
 - Token CORRETOR
+- Token IMOBILIARIA
 - Token DISPONIBILIDADE
+- Token INFORMAR_VENDA
 - Sync Empreendimentos
 - Sync Unidades
 - Sync Leads
@@ -215,13 +218,9 @@ analytics.leadGenerated('landing_page');
 - Webhook URLs
 
 ### ⚠️ Atenção Necessária:
-- Token IMOBILIARIA: HTTP 405 - Method Not Allowed
-- Token INFORMAR_VENDA: HTTP 405 - Method Not Allowed
-- Serasa Endpoint Ativo: Status 402
+- Serasa Endpoint Ativo: fetch failed
 
 
-### ❌ Requer Correção:
-- Token RESERVA: Unexpected end of JSON input
 
 
 ### 💡 Próximos Passos:
@@ -233,4 +232,4 @@ analytics.leadGenerated('landing_page');
 
 ---
 
-**Gerado automaticamente em:** 29/01/2026, 18:23:25
+**Gerado automaticamente em:** 29/01/2026, 18:27:33

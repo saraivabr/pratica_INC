@@ -87,7 +87,10 @@ async function testCVCRMTokens() {
         signal: AbortSignal.timeout(30000) // 30s timeout for slow endpoints
       });
 
-      if (response.ok) {
+      if (response.status === 204) {
+        validTokens++;
+        addTest(`Token ${name}`, 'OK', 'Token válido (sem conteúdo)');
+      } else if (response.ok) {
         const data = await response.json();
         validTokens++;
         addTest(`Token ${name}`, 'OK', `Status ${response.status} - ${data.total || 0} registros`);

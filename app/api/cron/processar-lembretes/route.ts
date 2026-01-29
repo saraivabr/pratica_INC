@@ -5,7 +5,7 @@
  * Cria notificações para os usuários
  * 
  * Executar a cada 5 minutos via cron:
- * */5 * * * * curl http://localhost:3000/api/cron/processar-lembretes
+ * (star-slash)5 * * * * curl http://localhost:3000/api/cron/processar-lembretes
  */
 
 import { NextRequest, NextResponse } from 'next/server';
