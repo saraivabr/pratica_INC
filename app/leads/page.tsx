@@ -441,6 +441,12 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [actionStatus, setActionStatus] = useState<Record<string, string>>({})
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState({
+    search: "",
+    situacao: "all",
+    origem: "all",
+  })
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -452,9 +458,23 @@ export default function LeadsPage() {
     const fetchLeads = async () => {
       setLoading(true)
       try {
-        const res = await fetch("/api/leads?limit=200")
+        const params = new URLSearchParams({
+          limit: "200",
+          ...(filters.search && { search: filters.search }),
+          ...(filters.situacao !== "all" && { situacao: filters.situacao }),
+        })
+        const res = await fetch(`/api/leads?${params}`)
         const data = await res.json()
-        setLeads(data.data || [])
+        let fetchedLeads = data.data || []
+
+        // Filtro de origem no frontend (se API não suportar)
+        if (filters.origem !== "all") {
+          fetchedLeads = fetchedLeads.filter((lead: Lead) => 
+            (lead.origem || "").toLowerCase().includes(filters.origem.toLowerCase())
+          )
+        }
+
+        setLeads(fetchedLeads)
       } catch (error) {
         console.error("Erro ao buscar leads:", error)
       } finally {
@@ -462,7 +482,7 @@ export default function LeadsPage() {
       }
     }
     fetchLeads()
-  }, [])
+  }, [filters])
 
   const leadsWithStatus = useMemo(() => {
     const now = Date.now()
@@ -590,9 +610,23 @@ export default function LeadsPage() {
   const handleRefresh = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/leads?limit=200")
+      const params = new URLSearchParams({
+        limit: "200",
+        ...(filters.search && { search: filters.search }),
+        ...(filters.situacao !== "all" && { situacao: filters.situacao }),
+      })
+      const res = await fetch(`/api/leads?${params}`)
       const data = await res.json()
-      setLeads(data.data || [])
+      let fetchedLeads = data.data || []
+
+      // Filtro de origem no frontend
+      if (filters.origem !== "all") {
+        fetchedLeads = fetchedLeads.filter((lead: Lead) => 
+          (lead.origem || "").toLowerCase().includes(filters.origem.toLowerCase())
+        )
+      }
+
+      setLeads(fetchedLeads)
     } catch (error) {
       console.error("Erro ao buscar leads:", error)
     } finally {
@@ -674,25 +708,81 @@ export default function LeadsPage() {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex flex-wrap gap-3 animate-fadeInUp" style={{ animationDelay: "500ms" }}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 bg-white/50 dark:bg-zinc-800/50 hover:bg-white dark:hover:bg-zinc-800 border-gray-200 dark:border-zinc-700"
-                  >
-                    <Filter className="h-4 w-4" />
-                    Filtrar (em breve)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 bg-white/50 dark:bg-zinc-800/50 hover:bg-white dark:hover:bg-zinc-800 border-gray-200 dark:border-zinc-700"
-                    onClick={handleRefresh}
-                    disabled={loading}
-                  >
-                    <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
-                    Atualizar dados
-                  </Button>
+                <div className="space-y-3 animate-fadeInUp" style={{ animationDelay: "500ms" }}>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 bg-white/50 dark:bg-zinc-800/50 hover:bg-white dark:hover:bg-zinc-800 border-gray-200 dark:border-zinc-700"
+                      onClick={() => setShowFilters(!showFilters)}
+                    >
+                      <Filter className="h-4 w-4" />
+                      {showFilters ? "Ocultar Filtros" : "Filtrar"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 bg-white/50 dark:bg-zinc-800/50 hover:bg-white dark:hover:bg-zinc-800 border-gray-200 dark:border-zinc-700"
+                      onClick={handleRefresh}
+                      disabled={loading}
+                    >
+                      <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
+                      Atualizar dados
+                    </Button>
+                  </div>
+
+                  {/* Filters Panel */}
+                  {showFilters && (
+                    <div className="grid md:grid-cols-3 gap-3 p-4 bg-white/50 dark:bg-zinc-800/50 rounded-xl border border-gray-200 dark:border-zinc-700">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Buscar
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Nome, email ou telefone"
+                          value={filters.search}
+                          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Situação
+                        </label>
+                        <select
+                          value={filters.situacao}
+                          onChange={(e) => setFilters({ ...filters, situacao: e.target.value })}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-white"
+                        >
+                          <option value="all">Todas</option>
+                          <option value="1">Novo Lead</option>
+                          <option value="2">Contato Realizado</option>
+                          <option value="3">Em Negociação</option>
+                          <option value="4">Proposta Enviada</option>
+                          <option value="5">Ganho</option>
+                          <option value="6">Perdido</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Origem
+                        </label>
+                        <select
+                          value={filters.origem}
+                          onChange={(e) => setFilters({ ...filters, origem: e.target.value })}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-white"
+                        >
+                          <option value="all">Todas</option>
+                          <option value="whatsapp">WhatsApp</option>
+                          <option value="facebook">Facebook</option>
+                          <option value="instagram">Instagram</option>
+                          <option value="site">Site</option>
+                          <option value="manual">Manual</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
