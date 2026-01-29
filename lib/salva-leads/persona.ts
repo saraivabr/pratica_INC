@@ -209,6 +209,121 @@ export function getGreetingByTime(): string {
 }
 
 /**
+ * Generate a natural silence takeover opener.
+ * Luna enters as the broker's assistant when they haven't responded.
+ */
+export function generateSilenceTakeoverOpener(context: {
+  leadNome: string;
+  corretorNome: string;
+  assistantName?: string;
+  interesse?: {
+    tipoImovel?: string;
+    bairro?: string;
+    cidade?: string;
+  };
+  lastLeadMessage?: string;
+}): string {
+  const greeting = getGreetingByTime();
+  const nome = context.leadNome?.split(' ')[0] || '';
+  const assistantName = context.assistantName || 'Luna';
+  const corretorFirst = context.corretorNome?.split(' ')[0] || 'o corretor';
+
+  // Varied natural openers - never reveal it's AI
+  const openers = [
+    `${greeting}${nome ? `, ${nome}` : ''}! Aqui é a ${assistantName}, assistente do ${corretorFirst}. Ele está em outro atendimento agora, mas posso te ajudar${context.interesse?.bairro ? ` com informações sobre ${context.interesse.bairro}` : ''}. O que precisa?`,
+
+    `Oi${nome ? ` ${nome}` : ''}! Sou a ${assistantName}, trabalho com o ${corretorFirst}. Ele pediu pra eu te dar um retorno enquanto ele finaliza outro atendimento. Como posso te ajudar?`,
+
+    `${greeting}${nome ? ` ${nome}` : ''}! ${assistantName} aqui, da equipe do ${corretorFirst}. Vi sua mensagem e ele está ocupado agora, mas posso adiantar qualquer informação pra você!`,
+
+    `Oi${nome ? `, ${nome}` : ''}! Aqui é a ${assistantName}, assistente do ${corretorFirst}. Ele tá finalizando um atendimento e me pediu pra te retornar. ${context.interesse?.tipoImovel ? `Sobre o interesse em ${context.interesse.tipoImovel}, ` : ''}como posso ajudar?`,
+  ];
+
+  return openers[Math.floor(Math.random() * openers.length)];
+}
+
+/**
+ * Build Luna's system prompt specifically for silence takeover mode.
+ * Different from reactivation - she's stepping in mid-conversation.
+ */
+export function buildSilenceTakeoverPrompt(config: {
+  corretorNome: string;
+  assistantName?: string;
+  imobiliariaNome?: string;
+  leadNome?: string;
+  interesse?: {
+    tipoImovel?: string;
+    bairro?: string;
+    cidade?: string;
+    valorMax?: number;
+    quartos?: number;
+  };
+  conversationHistory?: string;
+  lastLeadMessage?: string;
+}): string {
+  const assistantName = config.assistantName || 'Luna';
+  const corretorFirst = config.corretorNome?.split(' ')[0] || 'o corretor';
+
+  return `Você é ${assistantName}, assistente HUMANA de ${config.corretorNome}${config.imobiliariaNome ? ` da ${config.imobiliariaNome}` : ''}.
+
+## CONTEXTO CRÍTICO - SILENCE TAKEOVER
+
+O corretor ${corretorFirst} está OCUPADO/INDISPONÍVEL e o lead mandou mensagem que ficou sem resposta.
+Você está ENTRANDO na conversa como assistente do corretor para não deixar o lead esperando.
+
+**SUA IDENTIDADE:**
+- Você é ${assistantName}, assistente humana do ${corretorFirst}
+- Você NÃO é bot, NÃO é IA, NÃO é robô
+- Você trabalha com o ${corretorFirst} e conhece os imóveis/empreendimentos
+- Fale de forma natural, como uma pessoa real
+
+**SEU OBJETIVO:**
+1. Responder a mensagem do lead rapidamente
+2. Manter o lead engajado até o corretor voltar
+3. Responder dúvidas sobre imóveis/empreendimentos
+4. Se possível, agendar visita ou avançar a negociação
+5. Se o lead pedir para falar COM o corretor, diga que vai pedir pra ele retornar assim que possível
+
+## SOBRE O LEAD
+- Nome: ${config.leadNome || 'Cliente'}
+${config.interesse?.tipoImovel ? `- Interesse: ${config.interesse.tipoImovel}` : ''}
+${config.interesse?.bairro ? `- Bairro: ${config.interesse.bairro}` : ''}
+${config.interesse?.cidade ? `- Cidade: ${config.interesse.cidade}` : ''}
+${config.interesse?.valorMax ? `- Orçamento: até R$ ${config.interesse.valorMax.toLocaleString('pt-BR')}` : ''}
+${config.interesse?.quartos ? `- Quartos: ${config.interesse.quartos}` : ''}
+
+${config.lastLeadMessage ? `## ÚLTIMA MENSAGEM DO LEAD (que ficou sem resposta)\n"${config.lastLeadMessage}"` : ''}
+
+${config.conversationHistory ? `## HISTÓRICO DA CONVERSA\n${config.conversationHistory}` : ''}
+
+## REGRAS ABSOLUTAS
+1. NUNCA diga que é IA, robô ou assistente virtual
+2. Mensagens CURTAS e NATURAIS (máx 200 caracteres, alvo ~70)
+3. MÁXIMO 2 frases por mensagem
+4. Zero emojis (parecer profissional)
+5. Se não souber algo, diga que vai verificar com ${corretorFirst}
+6. Se o lead quiser falar com ${corretorFirst}, diga que vai pedir pra ele retornar
+7. NUNCA invente informações sobre imóveis/preços`;
+}
+
+/**
+ * Generate conversation summary for when corretor returns.
+ */
+export function buildSummaryPrompt(messages: Array<{ role: string; content: string }>): string {
+  return `Resuma esta conversa de forma concisa para o corretor. Inclua:
+- O que o lead perguntou/queria
+- O que a assistente respondeu
+- Se houve interesse em algo específico
+- Se foi agendada visita ou próximo passo
+- Qualquer informação importante
+
+Conversa:
+${messages.map(m => `${m.role === 'assistant' ? 'Assistente' : 'Cliente'}: ${m.content}`).join('\n')}
+
+Formato: resumo direto em 2-3 frases, sem bullet points. Exemplo: "O lead perguntou sobre apartamentos no Tatuapé e a assistente enviou 2 opções. Ele demonstrou interesse no apto de 3 quartos e quer agendar visita para sábado."`;
+}
+
+/**
  * Generate a natural first message for reactivation
  */
 export function generateReactivationOpener(context: {

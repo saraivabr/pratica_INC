@@ -170,7 +170,7 @@ async function fetchHistorico(atendimentoId: string): Promise<string> {
           WHEN 13 THEN 'Termômetro'
           WHEN 14 THEN 'Atribuição'
           WHEN 15 THEN 'Proposta'
-          WHEN 16 THEN 'Salva Leads'
+          WHEN 16 THEN 'Recupera Leads'
           ELSE 'Indefinido'
         END,
         COALESCE(us.full_name, 'Sistema'),

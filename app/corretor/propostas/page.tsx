@@ -1,121 +1,227 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
+import { useEffect, useState } from "react"
 import { AppShell } from "@/components/app-shell"
-import { useAuth, usePageTracking } from "@/lib/auth-context"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { AnimatedBackground } from "@/components/animated-background"
-import {
+import { 
+  Loader2, 
   FileText,
-  Calculator,
-  Sparkles,
-  Bell,
-  CheckCircle2,
-  Clock,
+  Plus,
   Send,
-  ChevronRight,
-  Rocket,
+  CheckCircle,
+  XCircle,
+  Clock
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
-export default function CorretorPropostasPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
-  const router = useRouter()
-  usePageTracking("corretor-propostas")
+interface Proposta {
+  id: string
+  lead_nome: string
+  empreendimento_nome: string
+  valor_proposta: number
+  valor_entrada: number
+  prazo_meses: number
+  status: string
+  created_at: string
+  enviada_em?: string
+  respondida_em?: string
+}
 
-  // Redirect non-authenticated users
+export default function PropostasPage() {
+  const [loading, setLoading] = useState(true)
+  const [propostas, setPropostas] = useState<Proposta[]>([])
+
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push("/login")
+    async function fetchPropostas() {
+      try {
+        const res = await fetch("/api/corretor/propostas")
+        const data = await res.json()
+        
+        if (data.success) {
+          setPropostas(data.propostas)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar propostas:", error)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [authLoading, isAuthenticated, router])
 
-  if (authLoading) {
+    fetchPropostas()
+  }, [])
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-green-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950">
-        <AnimatedBackground />
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full blur-xl opacity-30 animate-pulse" />
-          <div className="relative h-14 w-14 rounded-full border-4 border-emerald-100 border-t-emerald-500 animate-spin" />
+      <AppShell>
+        <div className="flex items-center justify-center h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </div>
+      </AppShell>
     )
   }
 
+  const rascunhos = propostas.filter(p => p.status === 'rascunho')
+  const enviadas = propostas.filter(p => p.status === 'enviada')
+  const aceitas = propostas.filter(p => p.status === 'aceita')
+  const recusadas = propostas.filter(p => p.status === 'recusada')
+
   return (
-    <AppShell title="Propostas">
-      <div className="relative min-h-full">
-        <AnimatedBackground />
-
-        <div className="relative z-10 flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
-          {/* Icon with glow effect */}
-          <div className="relative mb-8 animate-fadeInUp">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-3xl blur-2xl opacity-40 animate-pulse" />
-            <div className="relative h-32 w-32 rounded-3xl bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 flex items-center justify-center shadow-2xl">
-              <FileText className="h-16 w-16 text-white" />
-            </div>
-            <div className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
-              <Rocket className="h-4 w-4 text-white" />
-            </div>
+    <AppShell>
+      <div className="p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Propostas</h1>
+            <p className="text-slate-500">Gerencie suas propostas comerciais</p>
           </div>
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nova Proposta
+          </Button>
+        </div>
 
-          {/* Title */}
-          <h1 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 dark:from-emerald-400 dark:via-green-400 dark:to-teal-400 bg-clip-text text-transparent animate-fadeInUp" style={{ animationDelay: "100ms" }}>
-            Propostas Digitais
-          </h1>
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <StatCard
+            icon={<Clock className="h-5 w-5" />}
+            label="Rascunhos"
+            value={rascunhos.length}
+            color="slate"
+          />
+          <StatCard
+            icon={<Send className="h-5 w-5" />}
+            label="Enviadas"
+            value={enviadas.length}
+            color="blue"
+          />
+          <StatCard
+            icon={<CheckCircle className="h-5 w-5" />}
+            label="Aceitas"
+            value={aceitas.length}
+            color="emerald"
+          />
+          <StatCard
+            icon={<XCircle className="h-5 w-5" />}
+            label="Recusadas"
+            value={recusadas.length}
+            color="red"
+          />
+        </div>
 
-          <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md animate-fadeInUp" style={{ animationDelay: "200ms" }}>
-            Em breve você poderá criar e enviar propostas profissionais diretamente para seus clientes.
-          </p>
-
-          {/* Features preview */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mb-10 animate-fadeInUp" style={{ animationDelay: "300ms" }}>
-            <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl rounded-2xl p-5 border border-white/60 dark:border-zinc-800/60 shadow-lg">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center mx-auto mb-3">
-                <Calculator className="h-5 w-5 text-white" />
-              </div>
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Simulador Integrado</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Gere propostas com cálculos automáticos</p>
-            </div>
-
-            <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl rounded-2xl p-5 border border-white/60 dark:border-zinc-800/60 shadow-lg">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center mx-auto mb-3">
-                <Send className="h-5 w-5 text-white" />
-              </div>
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Envio pelo WhatsApp</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Envie propostas em PDF diretamente</p>
-            </div>
-
-            <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl rounded-2xl p-5 border border-white/60 dark:border-zinc-800/60 shadow-lg">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mx-auto mb-3">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Acompanhamento</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Saiba quando o cliente visualizar</p>
-            </div>
-          </div>
-
-          {/* CTA */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 animate-fadeInUp" style={{ animationDelay: "400ms" }}>
-            <Link href="/calculadora">
-              <Button size="lg" className="gap-2 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 shadow-lg shadow-emerald-500/25">
-                <Calculator className="h-5 w-5" />
-                Usar Calculadora
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-
-          {/* Status badge */}
-          <div className="mt-10 flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/30 rounded-full animate-fadeInUp" style={{ animationDelay: "500ms" }}>
-            <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
-              Em desenvolvimento
-            </span>
-          </div>
+        {/* Lista de propostas */}
+        <div className="space-y-4">
+          {propostas.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <FileText className="h-12 w-12 text-slate-300 mb-4" />
+                <p className="text-slate-500 text-center">
+                  Nenhuma proposta criada ainda
+                </p>
+                <Button className="mt-4 gap-2">
+                  <Plus className="h-4 w-4" />
+                  Criar Primeira Proposta
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            propostas.map((proposta) => (
+              <PropostaCard key={proposta.id} proposta={proposta} />
+            ))
+          )}
         </div>
       </div>
     </AppShell>
+  )
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  color
+}: {
+  icon: React.ReactNode
+  label: string
+  value: number
+  color: string
+}) {
+  const colors = {
+    slate: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+    blue: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+    emerald: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+    red: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className={cn("p-2 rounded-lg", colors[color as keyof typeof colors])}>
+            {icon}
+          </div>
+        </div>
+        <p className="text-sm text-slate-500 mb-1">{label}</p>
+        <p className="text-2xl font-bold">{value}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function PropostaCard({ proposta }: { proposta: Proposta }) {
+  const statusConfig = {
+    rascunho: { label: "Rascunho", color: "bg-slate-100 text-slate-700" },
+    enviada: { label: "Enviada", color: "bg-blue-100 text-blue-700" },
+    aceita: { label: "Aceita", color: "bg-emerald-100 text-emerald-700" },
+    recusada: { label: "Recusada", color: "bg-red-100 text-red-700" }
+  }
+
+  const config = statusConfig[proposta.status as keyof typeof statusConfig] || statusConfig.rascunho
+
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <h3 className="font-bold text-lg">{proposta.lead_nome}</h3>
+              <span className={cn("px-2 py-1 rounded text-xs font-medium", config.color)}>
+                {config.label}
+              </span>
+            </div>
+            <p className="text-sm text-slate-500 mb-3">{proposta.empreendimento_nome}</p>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-slate-500">Valor Total</p>
+                <p className="font-bold text-emerald-600">
+                  R$ {proposta.valor_proposta?.toLocaleString('pt-BR') || '0'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Entrada</p>
+                <p className="font-medium">
+                  R$ {proposta.valor_entrada?.toLocaleString('pt-BR') || '0'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Prazo</p>
+                <p className="font-medium">{proposta.prazo_meses || 0} meses</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">Editar</Button>
+            {proposta.status === 'rascunho' && (
+              <Button size="sm" className="gap-2">
+                <Send className="h-4 w-4" />
+                Enviar
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

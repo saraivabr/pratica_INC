@@ -78,13 +78,23 @@ export async function GET(request: NextRequest) {
       instance_name: instanceName,
     });
 
+    // Filtrar APENAS mensagens de contatos reais (não LIDs, não status broadcast)
+    const realMessages = allMessages.filter((msg: any) => {
+      const remoteJid = msg.raw_data?.key?.remoteJid || '';
+      // Aceitar: @s.whatsapp.net (contatos reais) ou mensagens sem raw_data com phone real
+      if (remoteJid.includes('@s.whatsapp.net')) return true;
+      if (!remoteJid && msg.phone_number && /^\d{10,13}$/.test(msg.phone_number)) return true;
+      return false;
+    });
+
     // Agrupar por telefone e pegar a última mensagem de cada
     const conversationsMap = new Map<string, any>();
     const unreadCountMap = new Map<string, number>();
 
     // Primeiro passo: agrupar mensagens e contar não lidas
-    allMessages.forEach((msg: any) => {
+    realMessages.forEach((msg: any) => {
       const phone = msg.phone_number;
+      if (!phone) return;
 
       // Atualizar última mensagem
       const existing = conversationsMap.get(phone);
@@ -112,10 +122,27 @@ export async function GET(request: NextRequest) {
 
         const contact = contacts[0];
 
+        // Buscar nome do synced_contacts também (tem push_name real)
+        let syncedContact = null;
+        try {
+          const { rows } = await (await import('@/lib/db')).dbQuery(
+            `SELECT push_name, profile_picture_url FROM whatsapp_synced_contacts WHERE phone_number = $1 LIMIT 1`,
+            [msg.phone_number]
+          );
+          syncedContact = rows[0];
+        } catch {}
+
+        // Resolver nome: synced_contacts.push_name > contact.name > msg.contact_name (excluindo "Você")
+        const resolvedName = syncedContact?.push_name 
+          || contact?.contact_name 
+          || contact?.name
+          || (msg.contact_name && msg.contact_name !== 'Você' ? msg.contact_name : null)
+          || msg.phone_number;
+
         return {
           phone_number: msg.phone_number,
-          contact_name: contact?.name || msg.contact_name || msg.phone_number,
-          profile_picture_url: contact?.profile_picture_url || null,
+          contact_name: resolvedName,
+          profile_picture_url: syncedContact?.profile_picture_url || contact?.profile_picture_url || null,
           last_message: msg.message_text,
           last_message_type: msg.message_type,
           last_message_time: msg.timestamp,

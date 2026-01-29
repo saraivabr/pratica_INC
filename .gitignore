@@ -76,3 +76,8 @@ dados_sistema_orulo/
 
 # backups
 /backups/
+/_backups_ignore/
+
+# logs
+logs/
+tunnel.log

@@ -43,6 +43,16 @@ export interface Tenant {
  * Get tenant by ID
  */
 export async function getWorkspace(workspaceId: number): Promise<Tenant | null> {
+  // Tentar primeiro na tabela workspaces (nova arquitetura)
+  const wsResult = await pool.query(
+    'SELECT * FROM workspaces WHERE id = $1',
+    [workspaceId]
+  );
+  if (wsResult.rows[0]) {
+    return wsResult.rows[0];
+  }
+
+  // Fallback: buscar em tenants (compatibilidade)
   const result = await pool.query(
     'SELECT * FROM tenants WHERE id = $1',
     [workspaceId]
@@ -153,15 +163,26 @@ export async function updateWorkspace(
 
   values.push(workspaceId);
 
-  const result = await pool.query(
-    `UPDATE tenants SET ${updates.join(', ')}, updated_at = NOW()
+  // Tentar atualizar em workspaces primeiro (nova arquitetura)
+  let result = await pool.query(
+    `UPDATE workspaces SET ${updates.join(', ')}, updated_at = NOW()
      WHERE id = $${paramCount}
      RETURNING *`,
     values
   );
 
+  // Fallback: tentar em tenants
   if (result.rows.length === 0) {
-    throw new Error(`Tenant ${workspaceId} not found`);
+    result = await pool.query(
+      `UPDATE tenants SET ${updates.join(', ')}, updated_at = NOW()
+       WHERE id = $${paramCount}
+       RETURNING *`,
+      values
+    );
+  }
+
+  if (result.rows.length === 0) {
+    throw new Error(`Workspace ${workspaceId} not found`);
   }
 
   return result.rows[0];

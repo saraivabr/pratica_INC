@@ -23,6 +23,8 @@ const protectedRoutes = [
 const protectedPrefixes = [
   '/empreendimentos/',
   '/admin/',
+  '/gerente/',
+  '/corretor/',
 ]
 
 // Routes that are always public (no auth required)

@@ -2,6 +2,7 @@ export interface Empreendimento {
   id: string
   nome: string
   cidade?: string
+  uf?: string
   bairro?: string
   tipo?: string
   construtora?: string
@@ -14,12 +15,28 @@ export interface Empreendimento {
   precoMaximo?: number
   unidades?: Unidade[]
   condicoes?: CondicaoPagamento[]
-  // Campos extras para exibicao
   unidadesDisponiveis?: number
   areaMin?: number
   areaMax?: number
   quartosMin?: number
   quartosMax?: number
+  // New Órulo fields
+  estoque?: number
+  fase?: string
+  preco_m2?: number
+  suites_min?: number
+  suites_max?: number
+  vagas_min?: number
+  vagas_max?: number
+  andares?: number
+  torres?: number
+  finalidade?: string
+  url_orulo?: string
+  url_site?: string
+  url_compartilhar?: string
+  endereco?: any
+  endereco_completo?: string
+  total_unidades?: number
 }
 
 export interface Unidade {

@@ -59,6 +59,19 @@ interface SalvaLeadsConversation {
   bot_paused: boolean
   created_at: string
   updated_at: string
+  silence_takeover?: boolean
+  silence_takeover_at?: string | null
+  corretor_resumed_at?: string | null
+  luna_summary?: string | null
+  trigger_type?: string
+}
+
+interface SilenceConfig {
+  autoAssistantEnabled: boolean
+  silenceTimeoutMinutes: number
+  businessHoursStart: number
+  businessHoursEnd: number
+  assistantName: string
 }
 
 interface SalvaLeadsStats {
@@ -340,12 +353,33 @@ function ConversationCard({
           </div>
         )}
 
+        {/* Luna summary (for silence takeover conversations) */}
+        {conversation.luna_summary && (
+          <div className="mb-3 p-3 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="h-3 w-3 text-purple-500" />
+              <span className="text-[10px] uppercase tracking-wider text-purple-500">
+                Resumo da assistente
+              </span>
+            </div>
+            <p className="text-sm text-purple-700 dark:text-purple-300 line-clamp-3">
+              {conversation.luna_summary}
+            </p>
+          </div>
+        )}
+
         {/* Meta info */}
         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-4">
           <span className="flex items-center gap-1">
             <MessageSquare className="h-3 w-3" />
             {messageCount} mensagens
           </span>
+          {conversation.silence_takeover && (
+            <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
+              <Zap className="h-3 w-3" />
+              Intervenção automática
+            </span>
+          )}
           {conversation.classification && (
             <span
               className={cn(
@@ -433,6 +467,33 @@ function ConversationDetailModal({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Silence takeover info */}
+        {conversation.silence_takeover && (
+          <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 mb-2">
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="h-4 w-4 text-purple-500" />
+              <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                Intervenção automática
+              </span>
+            </div>
+            {conversation.silence_takeover_at && (
+              <p className="text-xs text-purple-600 dark:text-purple-400">
+                Assistente entrou em {new Date(conversation.silence_takeover_at).toLocaleString("pt-BR")}
+              </p>
+            )}
+            {conversation.corretor_resumed_at && (
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                Você reassumiu em {new Date(conversation.corretor_resumed_at).toLocaleString("pt-BR")}
+              </p>
+            )}
+            {conversation.luna_summary && (
+              <p className="text-sm text-purple-700 dark:text-purple-300 mt-2">
+                <strong>Resumo:</strong> {conversation.luna_summary}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto py-4 space-y-4">
           {conversation.messages?.map((msg, index) => (
             <div
@@ -455,7 +516,7 @@ function ConversationDetailModal({
                     <>
                       <Bot className="h-3 w-3 text-purple-500" />
                       <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        Salva-Leads IA
+                        CataVendas IA
                       </span>
                     </>
                   ) : (
@@ -720,6 +781,8 @@ export default function SalvaLeadsPage() {
   const [selectedConversation, setSelectedConversation] =
     useState<SalvaLeadsConversation | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [silenceConfig, setSilenceConfig] = useState<SilenceConfig | null>(null)
+  const [configSaving, setConfigSaving] = useState(false)
 
   // Opportunities state
   const [opportunities, setOpportunities] = useState<WhatsAppOpportunity[]>([])
@@ -745,9 +808,10 @@ export default function SalvaLeadsPage() {
 
       setLoading(true)
       try {
-        const [convRes, statsRes] = await Promise.all([
+        const [convRes, statsRes, configRes] = await Promise.all([
           fetch(`/api/salva-leads/conversations?limit=50`),
           fetch(`/api/salva-leads/stats`),
+          fetch(`/api/salva-leads/config`),
         ])
 
         if (convRes.ok) {
@@ -758,6 +822,11 @@ export default function SalvaLeadsPage() {
         if (statsRes.ok) {
           const statsData = await statsRes.json()
           setStats(statsData)
+        }
+
+        if (configRes.ok) {
+          const configData = await configRes.json()
+          setSilenceConfig(configData.data)
         }
       } catch (error) {
         console.error("Erro ao buscar dados:", error)
@@ -771,14 +840,33 @@ export default function SalvaLeadsPage() {
     }
   }, [isAuthenticated, user])
 
+  const handleUpdateConfig = async (updates: Partial<SilenceConfig>) => {
+    setConfigSaving(true)
+    try {
+      const res = await fetch('/api/salva-leads/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSilenceConfig(data.data)
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar config:', error)
+    } finally {
+      setConfigSaving(false)
+    }
+  }
+
   const handleRefresh = async () => {
     if (!user?.workspace_id) return
 
     setLoading(true)
     try {
       const [convRes, statsRes] = await Promise.all([
-        fetch(`/api/salva-leads/conversations?tenantId=${user.workspace_id}&limit=50`),
-        fetch(`/api/salva-leads/stats?tenantId=${user.workspace_id}`),
+        fetch(`/api/salva-leads/conversations?workspaceId=${user.workspace_id}&limit=50`),
+        fetch(`/api/salva-leads/stats?workspaceId=${user.workspace_id}`),
       ])
 
       if (convRes.ok) {
@@ -828,7 +916,7 @@ export default function SalvaLeadsPage() {
     setOpportunitiesLoading(true)
     setSyncError(null)
     try {
-      const res = await fetch(`/api/whatsapp/sync/opportunities?tenantId=${user.workspace_id}`)
+      const res = await fetch(`/api/whatsapp/sync/opportunities?workspaceId=${user.workspace_id}`)
       if (res.ok) {
         const data = await res.json()
         const normalized = (data.data || []).map((opp: any) => {
@@ -879,7 +967,7 @@ export default function SalvaLeadsPage() {
     if (!user?.workspace_id) return null
 
     try {
-      const res = await fetch(`/api/whatsapp/sync?tenantId=${user.workspace_id}`)
+      const res = await fetch(`/api/whatsapp/sync?workspaceId=${user.workspace_id}`)
       if (!res.ok) {
         const errorData = await res.json()
         setSyncError(errorData.error || "Erro ao buscar status do WhatsApp")
@@ -922,7 +1010,7 @@ export default function SalvaLeadsPage() {
       const res = await fetch(`/api/whatsapp/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantId: user.workspace_id }),
+        body: JSON.stringify({ workspaceId: user.workspace_id }),
       })
 
       if (res.ok) {
@@ -988,6 +1076,10 @@ export default function SalvaLeadsPage() {
     () => conversations.filter((c) => c.status === "active" || c.status === "pending"),
     [conversations]
   )
+  const silenceTakeoverConversations = useMemo(
+    () => conversations.filter((c) => c.silence_takeover === true),
+    [conversations]
+  )
   const myConversations = useMemo(
     () => conversations.filter((c) => c.status === "paused_by_corretor"),
     [conversations]
@@ -1010,7 +1102,7 @@ export default function SalvaLeadsPage() {
   }
 
   return (
-    <AppShell title="Salva-Leads">
+    <AppShell title="CataVendas">
       <div className="min-h-screen relative">
         <AnimatedBackground />
 
@@ -1027,7 +1119,7 @@ export default function SalvaLeadsPage() {
                     <span>Recuperacao Inteligente de Leads</span>
                   </div>
                   <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
-                    Salva-Leads
+                    CataVendas
                   </h1>
                   <p className="text-gray-500 dark:text-gray-400 max-w-lg">
                     Sistema de IA que recupera leads abandonados automaticamente.
@@ -1080,16 +1172,23 @@ export default function SalvaLeadsPage() {
                   />
                   <FlowStep
                     number={2}
+                    icon={Zap}
+                    title="Assistente automática"
+                    description="Se um lead te mandar mensagem e você não responder em alguns minutos, a assistente entra como sua ajudante — segura a conversa até você voltar."
+                    color="bg-gradient-to-br from-purple-400 to-pink-500"
+                  />
+                  <FlowStep
+                    number={3}
                     icon={MessageCircle}
                     title="Cliente responde"
                     description="Quando o cliente responde, a IA assume a conversa. Ela pode buscar imoveis, responder duvidas e agendar visitas."
                     color="bg-gradient-to-br from-emerald-400 to-green-500"
                   />
                   <FlowStep
-                    number={3}
+                    number={4}
                     icon={UserCheck}
                     title="Voce assume quando quiser"
-                    description="A qualquer momento voce pode assumir a conversa. Basta enviar uma mensagem pelo WhatsApp que a IA para automaticamente."
+                    description="Basta enviar uma mensagem pelo WhatsApp que a IA para automaticamente. Você vê o resumo do que ela conversou."
                     color="bg-gradient-to-br from-blue-400 to-cyan-500"
                     isLast
                   />
@@ -1139,6 +1238,149 @@ export default function SalvaLeadsPage() {
               </div>
             </GlowCard>
           </section>
+
+          {/* Silence Monitor Config */}
+          {silenceConfig && (
+            <section>
+              <GlowCard glowColor="blue" className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg">
+                      <Bot className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Assistente Automática
+                      </h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {silenceConfig.assistantName} entra quando você não responde
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={silenceConfig.autoAssistantEnabled}
+                        onChange={(e) => handleUpdateConfig({ autoAssistantEnabled: e.target.checked })}
+                        disabled={configSaving}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                      <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {silenceConfig.autoAssistantEnabled ? 'Ativo' : 'Desativado'}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {silenceConfig.autoAssistantEnabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                      <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">
+                        Tempo de espera (minutos)
+                      </label>
+                      <select
+                        className="w-full rounded-lg border border-blue-200 dark:border-blue-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
+                        value={silenceConfig.silenceTimeoutMinutes}
+                        onChange={(e) => handleUpdateConfig({ silenceTimeoutMinutes: parseInt(e.target.value) })}
+                        disabled={configSaving}
+                      >
+                        {[5, 10, 15, 20, 30, 45, 60].map((v) => (
+                          <option key={v} value={v}>{v} minutos</option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-1">
+                        Tempo antes da {silenceConfig.assistantName} entrar
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                      <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">
+                        Horário de funcionamento
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex-1 rounded-lg border border-blue-200 dark:border-blue-700 bg-white dark:bg-zinc-800 px-2 py-2 text-sm"
+                          value={silenceConfig.businessHoursStart}
+                          onChange={(e) => handleUpdateConfig({ businessHoursStart: parseInt(e.target.value) })}
+                          disabled={configSaving}
+                        >
+                          {Array.from({ length: 24 }, (_, i) => (
+                            <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
+                          ))}
+                        </select>
+                        <span className="text-sm text-gray-500">até</span>
+                        <select
+                          className="flex-1 rounded-lg border border-blue-200 dark:border-blue-700 bg-white dark:bg-zinc-800 px-2 py-2 text-sm"
+                          value={silenceConfig.businessHoursEnd}
+                          onChange={(e) => handleUpdateConfig({ businessHoursEnd: parseInt(e.target.value) })}
+                          disabled={configSaving}
+                        >
+                          {Array.from({ length: 24 }, (_, i) => (
+                            <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                      <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">
+                        Nome da assistente
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full rounded-lg border border-blue-200 dark:border-blue-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
+                        value={silenceConfig.assistantName}
+                        onChange={(e) => {
+                          setSilenceConfig({ ...silenceConfig, assistantName: e.target.value })
+                        }}
+                        onBlur={(e) => {
+                          if (e.target.value.trim()) {
+                            handleUpdateConfig({ assistantName: e.target.value.trim() })
+                          }
+                        }}
+                        disabled={configSaving}
+                      />
+                    </div>
+                  </div>
+                )}
+              </GlowCard>
+            </section>
+          )}
+
+          {/* Luna Interventions Section */}
+          {silenceTakeoverConversations.length > 0 && (
+            <section>
+              <GlowCard glowColor="purple" className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center shadow-lg">
+                    <Sparkles className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Intervenções da {silenceConfig?.assistantName || 'Luna'} ({silenceTakeoverConversations.length})
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Conversas onde a assistente segurou o lead enquanto você estava ocupado
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {silenceTakeoverConversations.map((conv, index) => (
+                    <ConversationCard
+                      key={conv.id}
+                      conversation={conv}
+                      onViewDetails={handleViewDetails}
+                      onTogglePause={handleTogglePause}
+                      delay={index * 50}
+                    />
+                  ))}
+                </div>
+              </GlowCard>
+            </section>
+          )}
 
           {/* Opportunities Section */}
           <section>
@@ -1412,7 +1654,7 @@ export default function SalvaLeadsPage() {
                   Nenhuma conversa ainda
                 </h3>
                 <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                  O Salva-Leads envia mensagens automaticamente todo dia as 8h para leads
+                  O CataVendas envia mensagens automaticamente todo dia as 8h para leads
                   que estao sem resposta. As conversas aparecerao aqui.
                 </p>
               </GlowCard>

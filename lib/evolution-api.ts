@@ -273,19 +273,11 @@ export async function getQRCode(instanceName: string): Promise<QRCodeData> {
  * Docs: https://github.com/EvolutionAPI/evolution-api/issues/2197
  */
 export async function getPairingCode(instanceName: string, phoneNumber: string): Promise<{ code: string; pairingCode: string }> {
-  // Format phone number - remove non-digits and ensure country code (E.164 format)
-  const formattedNumber = phoneNumber.replace(/\D/g, '');
-  const numberWithCountry = formattedNumber.startsWith('55') ? formattedNumber : `55${formattedNumber}`;
-
-  // Evolution API v2: send number in body with pairing: true
+  // Evolution API v2.3.7: GET /instance/connect returns both QR and pairingCode
   return evolutionFetch<{ code: string; pairingCode: string }>(
     `/instance/connect/${instanceName}`,
     {
-      method: 'POST',
-      body: JSON.stringify({
-        number: numberWithCountry,
-        pairing: true,
-      }),
+      method: 'GET',
     }
   );
 }

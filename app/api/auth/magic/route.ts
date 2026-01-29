@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.escreve.ai';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://corretorparceria.com.br';
 
 export async function GET(request: Request) {
   try {

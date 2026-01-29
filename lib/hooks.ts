@@ -29,7 +29,9 @@ export const queryKeys = {
 // ============================================
 
 async function fetchEmpreendimentos() {
-  const response = await fetch('/api/empreendimentos');
+  const response = await fetch(`/api/empreendimentos?t=${Date.now()}`, {
+    cache: 'no-store',
+  });
 
   if (!response.ok) {
     throw new Error('Falha ao buscar dados');

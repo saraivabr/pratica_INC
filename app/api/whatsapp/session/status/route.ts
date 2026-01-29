@@ -55,9 +55,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Buscar instância do workspace
+    // Buscar instância — prioridade: evolution_instances do tenant, fallback: users.evolution_instance_name
     const userId = (user as any).id;
-    const instanceName = (workspace as any).evolution_instance_name;
+    const instances = (workspace as any).evolution_instances || [];
+    let instanceName = instances[0]?.instance_name || null;
+
+    // Fallback: buscar do registro do usuário
+    if (!instanceName) {
+      const userRow = await dbQuery(
+        `SELECT evolution_instance_name FROM users WHERE id = $1`,
+        [userId]
+      );
+      instanceName = userRow.rows[0]?.evolution_instance_name || null;
+    }
 
     if (!instanceName) {
       return NextResponse.json({
@@ -122,6 +132,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           status: "ready",
           instanceName,
+          userId,
           pairedPhone: formattedPhone,
           profileName,
           profilePicUrl,
@@ -139,7 +150,7 @@ export async function GET(request: NextRequest) {
         try {
           const qrData = await getQRCode(instanceName);
           qrCode = qrData?.code || qrData?.base64 || null;
-          if (qrData?.pairingCode && qrData.pairingCode.length === 8 && /^\d+$/.test(qrData.pairingCode)) {
+          if (qrData?.pairingCode && qrData.pairingCode.length === 8 && /^[A-Z0-9]+$/i.test(qrData.pairingCode)) {
             pairingCode = qrData.pairingCode;
           }
         } catch {
@@ -149,6 +160,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           status: "connecting",
           instanceName,
+          userId,
           pairedPhone: null,
           profileName: null,
           profilePicUrl: null,
@@ -179,6 +191,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         status: "disconnected",
         instanceName,
+        userId,
         pairedPhone: null,
         profileName: null,
         profilePicUrl: null,
@@ -200,6 +213,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         status: "disconnected",
         instanceName,
+        userId,
         pairedPhone: null,
         profileName: null,
         profilePicUrl: null,

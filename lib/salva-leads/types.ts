@@ -110,6 +110,16 @@ export interface SalvaLeadsConversation {
   created_at: string;
   /** Data de atualizacao (ISO string) */
   updated_at: string;
+  /** Whether this conversation was triggered by silence takeover */
+  silence_takeover?: boolean;
+  /** When Luna entered via silence takeover */
+  silence_takeover_at?: string | null;
+  /** When corretor resumed the conversation */
+  corretor_resumed_at?: string | null;
+  /** Luna's summary of the conversation */
+  luna_summary?: string | null;
+  /** What triggered this conversation */
+  trigger_type?: 'reactivation' | 'silence_takeover' | 'manual';
 }
 
 // =============================================================================

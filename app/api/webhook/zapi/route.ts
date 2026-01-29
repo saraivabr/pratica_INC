@@ -515,7 +515,7 @@ async function tryHandleCvcrmInsight(phone: string) {
   if (shouldPersist) {
     slug = await saveLeadInsight(phone, insight.summary, insight.detail);
   }
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratica.escreve.ai";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://corretorparceria.com.br";
   let text = `${insight.summary}\n${insight.detail}`;
   if (slug) {
     text += `\n\nDetalhes completos: ${baseUrl}/insights/${slug}`;
@@ -547,7 +547,18 @@ async function handleTextMessage(
     return;
   }
 
-  // Processar mensagem via Sofia
+  // === Nova Sofia: IA conversacional natural ===
+  if (user.role === 'corretor' || user.role === 'admin' || user.role === 'gerente') {
+    try {
+      const { processNovaSofia } = await import('@/lib/sofia/nova-sofia');
+      await processNovaSofia(senderPhone, messageText, user as any);
+      return;
+    } catch (err) {
+      console.error('[Nova Sofia] Error, falling back to old Sofia:', err);
+    }
+  }
+
+  // Fallback: Sofia antiga (para roles sem Nova Sofia)
   await processMessage(user, messageText);
 }
 
@@ -561,6 +572,20 @@ export async function POST(request: Request) {
 
     if (process.env.NODE_ENV === 'development') {
       console.log('Z-API Webhook received:', JSON.stringify(body, null, 2));
+    }
+
+    // 🔍 LOGGING TEMPORÁRIO: Captura grupos pra configuração
+    const rawPhone = body.message?.phone || body.phone;
+    if (rawPhone && rawPhone.endsWith('@g.us')) {
+      const participantPhone = body.message?.participantPhone;
+      const messageText = extractMessageText(body);
+      console.log('📱 GRUPO DETECTADO:', {
+        groupId: rawPhone,
+        participantPhone,
+        messageText,
+        contactName: body.message?.contactName || body.message?.pushName,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     if (!isInboundUserMessage(body)) {

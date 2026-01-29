@@ -252,17 +252,15 @@ function LoginContent() {
       fetch('/api/auth/imobiliarias')
         .then(res => res.json())
         .then(data => {
-          // Add "Autônomo" as first option
-          const autonomo = { id: 0, nome: 'Autônomo' };
-          setImobiliarias([autonomo, ...data]);
-          setFilteredImobiliarias([autonomo, ...data]);
+          if (Array.isArray(data)) {
+            setImobiliarias(data);
+            setFilteredImobiliarias(data);
+          }
         })
         .catch(error => {
           console.error('Error loading imobiliarias:', error);
-          // Fallback to just "Autônomo"
-          const autonomo = { id: 0, nome: 'Autônomo' };
-          setImobiliarias([autonomo]);
-          setFilteredImobiliarias([autonomo]);
+          setImobiliarias([]);
+          setFilteredImobiliarias([]);
         });
     }
   }, [step]);
@@ -301,6 +299,11 @@ function LoginContent() {
       }
 
       if (!data.exists) {
+        // Pre-fill from CVCRM corretor data if available
+        if (data.corretor) {
+          setRegNome(data.corretor.nome || "");
+          setRegImobiliaria(data.corretor.imobiliaria || "");
+        }
         setStep("not_registered");
         return;
       }
@@ -423,18 +426,24 @@ function LoginContent() {
     if (value.trim() === '') {
       setFilteredImobiliarias(imobiliarias);
     } else {
+      const search = value.toLowerCase().trim();
       const filtered = imobiliarias.filter(imob => 
-        imob.nome.toLowerCase().includes(value.toLowerCase())
+        imob.nome.toLowerCase().includes(search)
       );
       setFilteredImobiliarias(filtered);
     }
     setShowImobDropdown(true);
   };
 
-  // Handle imobiliaria selection
+  // Handle imobiliaria selection (onMouseDown with preventDefault to beat onBlur)
   const handleImobiliariaSelect = (imob: {id: number, nome: string}) => {
     setRegImobiliaria(imob.nome);
     setShowImobDropdown(false);
+  };
+
+  // Close dropdown on blur (small delay for touch events)
+  const handleImobBlur = () => {
+    setTimeout(() => setShowImobDropdown(false), 200);
   };
 
   if (authLoading) {
@@ -478,9 +487,9 @@ function LoginContent() {
             {/* Card glow effect */}
             <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-[2rem] blur-xl opacity-20" />
 
-            <div className="relative bg-white/70 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-emerald-900/10 border border-white/60 overflow-hidden">
+            <div className="relative bg-white/70 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-emerald-900/10 border border-white/60">
               {/* Animated top border */}
-              <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-500 to-teal-400 animate-gradient" />
+              <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-500 to-teal-400 animate-gradient rounded-t-3xl" />
 
               <div className="p-8">
                 {/* Step: Phone */}
@@ -747,42 +756,50 @@ function LoginContent() {
                             </div>
                           </div>
 
-                          {/* Imobiliária */}
-                          <div className="relative group">
-                            <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-green-400 rounded-xl opacity-0 group-focus-within:opacity-50 blur transition-opacity duration-300" />
-                            <div className="relative">
-                              <Input
-                                type="text"
-                                placeholder="Imobiliária (digite para buscar)"
-                                value={regImobiliaria}
-                                onChange={(e) => handleImobiliariaChange(e.target.value)}
-                                onFocus={() => setShowImobDropdown(true)}
-                                onBlur={() => setTimeout(() => setShowImobDropdown(false), 150)}
-                                className="h-14 text-base bg-white/80 border-gray-200 rounded-xl focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all"
-                                autoComplete="off"
-                              />
-                              
-                              {/* Dropdown with suggestions */}
-                              {showImobDropdown && filteredImobiliarias.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto z-50">
-                                  {filteredImobiliarias.slice(0, 10).map((imob, index) => (
-                                    <button
-                                      key={imob.id}
-                                      type="button"
-                                      onClick={() => handleImobiliariaSelect(imob)}
-                                      className={cn(
-                                        "w-full text-left px-4 py-3 hover:bg-emerald-50 transition-colors",
-                                        index === 0 && "rounded-t-xl",
-                                        index === filteredImobiliarias.length - 1 && "rounded-b-xl",
-                                        imob.id === 0 && "font-semibold text-emerald-600 border-b border-emerald-100"
-                                      )}
-                                    >
-                                      {imob.nome}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
+                          {/* Imobiliária - Campo dinâmico com busca */}
+                          <div className="relative">
+                            <div className="relative group">
+                              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-green-400 rounded-xl opacity-0 group-focus-within:opacity-50 blur transition-opacity duration-300" />
+                              <div className="relative">
+                                <Input
+                                  type="text"
+                                  placeholder="Digite sua imobiliária"
+                                  value={regImobiliaria}
+                                  onChange={(e) => handleImobiliariaChange(e.target.value)}
+                                  onFocus={() => { setShowImobDropdown(true); setFilteredImobiliarias(imobiliarias); }}
+                                  onBlur={handleImobBlur}
+                                  className="h-14 text-base bg-white/80 border-gray-200 rounded-xl focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all"
+                                  autoComplete="off"
+                                />
+                              </div>
                             </div>
+                            
+                            {/* Dropdown com resultados */}
+                            {showImobDropdown && filteredImobiliarias.length > 0 && (
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-52 overflow-y-auto z-[9999]">
+                                {/* Autônomo sempre no topo */}
+                                <button
+                                  type="button"
+                                  onMouseDown={(e) => { e.preventDefault(); handleImobiliariaSelect({ id: 0, nome: 'Autônomo' }); }}
+                                  className="w-full text-left px-4 py-3 font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors border-b border-emerald-100 rounded-t-xl"
+                                >
+                                  🏠 Autônomo
+                                </button>
+                                {filteredImobiliarias.slice(0, 15).map((imob) => (
+                                  <button
+                                    key={imob.id}
+                                    type="button"
+                                    onMouseDown={(e) => { e.preventDefault(); handleImobiliariaSelect(imob); }}
+                                    className="w-full text-left px-4 py-3 hover:bg-emerald-50 transition-colors border-b border-gray-50 last:border-0 last:rounded-b-xl"
+                                  >
+                                    <span>{imob.nome}</span>
+                                    {(imob as any).corretores > 0 && (
+                                      <span className="ml-2 text-xs text-gray-400">({(imob as any).corretores})</span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
                           {/* Gerente */}

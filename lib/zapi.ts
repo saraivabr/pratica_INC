@@ -434,7 +434,7 @@ export async function sendButtonActions(
  */
 export async function sendMagicLink(phone: string, magicToken: string, userName?: string): Promise<ZAPIResponse> {
   const greeting = userName ? `Olá, ${userName}!` : 'Olá!';
-  const baseUrl = 'https://pratica.escreve.ai';
+  const baseUrl = 'https://corretorparceria.com.br';
   const loginUrl = `${baseUrl}/api/auth/magic?token=${magicToken}`;
 
   const message = `${greeting}

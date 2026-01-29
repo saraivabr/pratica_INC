@@ -171,6 +171,7 @@ export default function CorretorRelatoriosPage() {
   usePageTracking("corretor-relatorios")
 
   const [leads, setLeads] = useState<Lead[]>([])
+  const [reportsData, setReportsData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState("mes")
 
@@ -181,14 +182,22 @@ export default function CorretorRelatoriosPage() {
     }
   }, [authLoading, isAuthenticated, router])
 
-  // Fetch leads for metrics
+  // Fetch leads and reports data
   useEffect(() => {
-    const fetchLeads = async () => {
+    const fetchData = async () => {
       setLoading(true)
       try {
-        const res = await fetch("/api/leads?limit=200")
-        const data = await res.json()
-        setLeads(data.data || [])
+        // Buscar leads para métricas gerais
+        const leadsRes = await fetch("/api/leads?limit=200")
+        const leadsData = await leadsRes.json()
+        setLeads(leadsData.data || [])
+
+        // Buscar dados específicos do relatório (dados semanais e comissões)
+        const reportsRes = await fetch("/api/corretor/relatorios")
+        const reportsData = await reportsRes.json()
+        if (reportsData.success) {
+          setReportsData(reportsData.data)
+        }
       } catch (error) {
         console.error("Erro ao buscar dados:", error)
       } finally {
@@ -196,7 +205,7 @@ export default function CorretorRelatoriosPage() {
       }
     }
     if (isAuthenticated) {
-      fetchLeads()
+      fetchData()
     }
   }, [isAuthenticated])
 
@@ -223,9 +232,11 @@ export default function CorretorRelatoriosPage() {
     const taxaConversao = leads.length > 0 ? Math.round((convertidos / leads.length) * 100) : 0
     const score = Math.min(100, Math.max(0, 70 + (ativos * 2) - (perdidos * 3) + (convertidos * 5)))
 
-    // Mock weekly data
-    const weeklyLeads = [3, 5, 2, 7, 4, 1, 2]
-    const weeklyInteractions = [12, 18, 8, 22, 15, 5, 8]
+    // Use real data from API or fallback to sample data
+    const weeklyLeads = reportsData?.weeklyLeads || [0, 0, 0, 0, 0, 0, 0]
+    const weeklyInteractions = reportsData?.weeklyInteractions || [0, 0, 0, 0, 0, 0, 0]
+    const comissaoMes = reportsData?.comissaoMes || 0
+    const comissaoAno = reportsData?.comissaoAno || 0
 
     return {
       total: leads.length,
@@ -238,11 +249,10 @@ export default function CorretorRelatoriosPage() {
       score,
       weeklyLeads,
       weeklyInteractions,
-      // Mock commission data
-      comissaoMes: 12500,
-      comissaoAno: 145000,
+      comissaoMes,
+      comissaoAno,
     }
-  }, [leads])
+  }, [leads, reportsData])
 
   if (authLoading) {
     return (

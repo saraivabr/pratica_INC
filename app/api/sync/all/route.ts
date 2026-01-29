@@ -15,6 +15,15 @@ export const maxDuration = 300; // 5 minutes
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  // ❌ CV CRM SYNC ALL DESABILITADO - Erro 405 constantemente
+  return NextResponse.json({
+    success: false,
+    message: "CV CRM sync completo desabilitado por Fellipe - erro 405 constante",
+    timestamp: new Date().toISOString(),
+    note: "Para reativar, descomentar código em app/api/sync/all/route.ts"
+  }, { status: 503 });
+
+  /* CÓDIGO ORIGINAL COMENTADO
   const startTime = Date.now();
 
   try {
@@ -153,4 +162,5 @@ export async function GET() {
       { status: 500 }
     );
   }
+  */ // FIM DO CÓDIGO COMENTADO
 }

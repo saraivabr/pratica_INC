@@ -11,6 +11,7 @@ import {
   Mail,
   MessageSquare,
   Phone,
+  Plus,
   RefreshCcw,
   Search,
   Sparkles,
@@ -27,6 +28,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { AnimatedBackground } from "@/components/animated-background"
 import { LeadDetailModal } from "@/components/lead/LeadDetailModal"
+import { NovoClienteJourney } from "@/components/lead/NovoClienteJourney"
 import {
   cleanPhone,
   formatPhone,
@@ -460,6 +462,7 @@ export default function CorretorClientesPage() {
   const [sortBy, setSortBy] = useState<SortOption>("prioridade")
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isNewClientOpen, setIsNewClientOpen] = useState(false)
 
   // Redirect non-authenticated users
   useEffect(() => {
@@ -688,16 +691,26 @@ export default function CorretorClientesPage() {
                 Gerencie seus leads e acompanhe o funil de vendas
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={handleRefresh}
-              disabled={loading}
-            >
-              <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
-              Atualizar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
+                Atualizar
+              </Button>
+              <Button
+                size="sm"
+                className="gap-2 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 shadow-lg"
+                onClick={() => setIsNewClientOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Novo Cliente
+              </Button>
+            </div>
           </div>
 
           {/* Stats Grid */}
@@ -895,6 +908,11 @@ export default function CorretorClientesPage() {
         open={isModalOpen}
         onOpenChange={handleModalChange}
         onUpdate={handleRefresh}
+      />
+      <NovoClienteJourney
+        open={isNewClientOpen}
+        onClose={() => setIsNewClientOpen(false)}
+        onSuccess={handleRefresh}
       />
     </AppShell>
   )

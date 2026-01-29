@@ -12,6 +12,14 @@ import { saveSnapshot } from "./save";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  // ❌ CV CRM SYNC DESABILITADO - Erro 405 constantemente
+  return NextResponse.json({
+    success: false,
+    message: "CV CRM sync desabilitado por Fellipe - erro 405 constante",
+    timestamp: new Date().toISOString()
+  }, { status: 503 });
+
+  /* CÓDIGO ORIGINAL COMENTADO
   const { searchParams } = new URL(request.url);
   const leadsLimit = Number(searchParams.get("leadsLimit") || 200);
 
@@ -62,4 +70,5 @@ export async function GET(request: Request) {
   await saveSnapshot(result);
 
   return NextResponse.json(result);
+  */ // FIM DO CÓDIGO COMENTADO
 }

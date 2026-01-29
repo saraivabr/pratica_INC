@@ -289,7 +289,7 @@ const getDashboardSummary: VoiceAgentToolDefinition = {
 
 const getWhatsAppStats: VoiceAgentToolDefinition = {
   name: 'get_whatsapp_stats',
-  description: 'Obtém métricas de WhatsApp do módulo Salva-Leads. Retorna contagem de mensagens, conversas ativas e tempos de resposta.',
+  description: 'Obtém métricas de WhatsApp do módulo Recupera Leads. Retorna contagem de mensagens, conversas ativas e tempos de resposta.',
   parameters: {
     type: 'object',
     properties: {

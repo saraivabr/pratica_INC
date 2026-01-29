@@ -61,13 +61,13 @@ export function EmpreendimentoContent({
         }, 100)
     }
 
-    // Stats Logic
+    // Stats Logic - prefer Órulo fields over calculated values
     const unidadesComMetragem = unidades.filter(u => u.metragem && !isNaN(u.metragem) && u.metragem > 0)
     const stats = {
-        total: unidades.length,
-        disponiveis: unidades.filter(u => u.status === 'disponivel').length,
+        total: empreendimento.total_unidades || unidades.length,
+        disponiveis: empreendimento.unidadesDisponiveis || empreendimento.estoque || unidades.filter(u => u.status === 'disponivel').length,
         priceMin: precoMinimo,
-        areaMin: unidadesComMetragem.length > 0 ? Math.min(...unidadesComMetragem.map(u => u.metragem)) : 0,
+        areaMin: empreendimento.areaMin || (unidadesComMetragem.length > 0 ? Math.min(...unidadesComMetragem.map(u => u.metragem)) : 0),
     }
 
     const navItems = [

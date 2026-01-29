@@ -1,147 +1,169 @@
-import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
-import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { NextRequest, NextResponse } from 'next/server';
+import pool from '@/lib/db';
 
-export async function GET(req: NextRequest) {
+export const dynamic = 'force-dynamic';
+
+// GET - List activities
+export async function GET(request: NextRequest) {
   try {
-    // Autenticação e contexto do tenant
-    const ctx = await requireWorkspaceContext(req);
-    if (ctx.error) return ctx.error;
-
-    const { workspaceId } = ctx;
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
-
-    let query = `
-      SELECT
-        a.*,
-        l.name as lead_name,
-        l.phone as lead_phone
-      FROM activities a
-      LEFT JOIN leads l ON a.lead_id = l.id AND l.workspace_id = $1
-      WHERE a.workspace_id = $1
+    // Get activities from leads with follow-up dates
+    const query = `
+      SELECT 
+        l.id,
+        l.nome as title,
+        'follow_up' as activity_type,
+        l.proximo_contato as scheduled_at,
+        'Contato agendado com ' || l.nome as description,
+        l.status,
+        CASE 
+          WHEN l.proximo_contato < NOW() THEN 'high'
+          WHEN l.proximo_contato < NOW() + INTERVAL '1 day' THEN 'urgent'
+          ELSE 'medium'
+        END as priority,
+        e.nome as empreendimento,
+        l.telefone
+      FROM cvcrm_leads l
+      LEFT JOIN cvcrm_empreendimentos e ON e.id = l.empreendimento_id
+      WHERE l.proximo_contato IS NOT NULL
+        AND l.proximo_contato >= NOW() - INTERVAL '7 days'
+      ORDER BY l.proximo_contato ASC
+      LIMIT 100
     `;
-    const params: any[] = [workspaceId];
 
-    if (userId) {
-      params.push(userId);
-      query += ` AND a.user_id = $${params.length}`;
+    const result = await pool.query(query);
+
+    const activities = result.rows.map((row: any) => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      activity_type: row.activity_type,
+      scheduled_at: row.scheduled_at,
+      priority: row.priority,
+      status: row.status === 'ganho' || row.status === 'perdido' ? 'completed' : 'pending',
+      lead: {
+        nome: row.title,
+        telefone: row.telefone,
+        empreendimento: row.empreendimento
+      }
+    }));
+
+    return NextResponse.json(activities);
+
+  } catch (error: any) {
+    console.error('[Activities API] Erro:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// POST - Create activity  
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { title, description, activity_type, priority, scheduled_at, lead_id } = body;
+
+    if (!title || !scheduled_at) {
+      return NextResponse.json(
+        { error: 'title e scheduled_at são obrigatórios' },
+        { status: 400 }
+      );
     }
 
-    query += ` ORDER BY a.scheduled_at ASC`;
+    // If there's a lead_id, update the lead's proximo_contato
+    if (lead_id) {
+      await pool.query(
+        'UPDATE cvcrm_leads SET proximo_contato = $1 WHERE id = $2',
+        [scheduled_at, lead_id]
+      );
 
-    const res = await dbQuery(query, params);
-    return NextResponse.json(res.rows);
-  } catch (error) {
-    console.error("Activities API Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+      const activity = {
+        id: lead_id,
+        title,
+        description,
+        activity_type,
+        priority,
+        scheduled_at,
+        status: 'pending'
+      };
+
+      return NextResponse.json(activity);
+    }
+
+    // Create in agendamentos table
+    const query = `
+      INSERT INTO cvcrm_agendamentos (data_hora, tipo, observacoes, status)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [
+      scheduled_at,
+      activity_type || 'follow_up',
+      description || title,
+      'pendente'
+    ]);
+
+    const activity = {
+      id: result.rows[0].id,
+      title,
+      description,
+      activity_type,
+      priority,
+      scheduled_at,
+      status: 'pending'
+    };
+
+    return NextResponse.json(activity);
+
+  } catch (error: any) {
+    console.error('[Activities API] Erro ao criar:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-export async function POST(req: NextRequest) {
+// PATCH - Update activity
+export async function PATCH(request: NextRequest) {
   try {
-    // Autenticação e contexto do tenant
-    const ctx = await requireWorkspaceContext(req);
-    if (ctx.error) return ctx.error;
-
-    const { workspaceId } = ctx;
-    const body = await req.json();
-    const { lead_id, user_id, title, description, activity_type, scheduled_at, priority } = body;
-
-    const res = await dbQuery(
-      `INSERT INTO activities (workspace_id, lead_id, user_id, title, description, activity_type, scheduled_at, priority)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
-      [workspaceId, lead_id, user_id, title, description, activity_type, scheduled_at, priority || 'medium']
-    );
-
-    return NextResponse.json(res.rows[0]);
-  } catch (error) {
-    console.error("Activities Create Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-  }
-}
-
-export async function PATCH(req: NextRequest) {
-  try {
-    // Autenticação e contexto do tenant
-    const ctx = await requireWorkspaceContext(req);
-    if (ctx.error) return ctx.error;
-
-    const { workspaceId } = ctx;
-    const body = await req.json();
-    const { id, status, completed_at, outcome, notes } = body;
+    const body = await request.json();
+    const { id, status, outcome, completed_at } = body;
 
     if (!id) {
-      return NextResponse.json({ error: "Activity ID is required" }, { status: 400 });
+      return NextResponse.json({ error: 'id é obrigatório' }, { status: 400 });
     }
 
-    const updates: string[] = [];
-    const params: any[] = [workspaceId];
-    let paramIndex = 2;
-
-    if (status !== undefined) {
-      params.push(status);
-      updates.push(`status = $${paramIndex++}`);
-    }
-    if (completed_at !== undefined) {
-      params.push(completed_at);
-      updates.push(`completed_at = $${paramIndex++}`);
-    }
-    if (outcome !== undefined) {
-      params.push(outcome);
-      updates.push(`outcome = $${paramIndex++}`);
-    }
-    if (notes !== undefined) {
-      params.push(notes);
-      updates.push(`notes = $${paramIndex++}`);
-    }
-
-    updates.push(`updated_at = NOW()`);
-    params.push(id);
-
-    const res = await dbQuery(
-      `UPDATE activities SET ${updates.join(", ")} WHERE workspace_id = $1 AND id = $${paramIndex} RETURNING *`,
-      params
+    // Try updating lead status
+    await pool.query(
+      `UPDATE cvcrm_leads 
+       SET status = CASE WHEN $1 = 'completed' THEN 'ganho' ELSE status END,
+           proximo_contato = NULL
+       WHERE id = $2`,
+      [status, id]
     );
 
-    if (res.rows.length === 0) {
-      return NextResponse.json({ error: "Activity not found" }, { status: 404 });
-    }
+    return NextResponse.json({ id, status, completed_at, outcome });
 
-    return NextResponse.json(res.rows[0]);
-  } catch (error) {
-    console.error("Activities Update Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) {
+    console.error('[Activities API] Erro ao atualizar:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-export async function DELETE(req: NextRequest) {
+// DELETE - Delete activity
+export async function DELETE(request: NextRequest) {
   try {
-    // Autenticação e contexto do tenant
-    const ctx = await requireWorkspaceContext(req);
-    if (ctx.error) return ctx.error;
-
-    const { workspaceId } = ctx;
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
 
     if (!id) {
-      return NextResponse.json({ error: "Activity ID is required" }, { status: 400 });
+      return NextResponse.json({ error: 'id é obrigatório' }, { status: 400 });
     }
 
-    const res = await dbQuery(
-      `DELETE FROM activities WHERE workspace_id = $1 AND id = $2 RETURNING id`,
-      [workspaceId, id]
-    );
+    // Clear proximo_contato from lead
+    await pool.query('UPDATE cvcrm_leads SET proximo_contato = NULL WHERE id = $1', [id]);
 
-    if (res.rows.length === 0) {
-      return NextResponse.json({ error: "Activity not found" }, { status: 404 });
-    }
+    return NextResponse.json({ success: true });
 
-    return NextResponse.json({ success: true, deleted: id });
-  } catch (error) {
-    console.error("Activities Delete Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) {
+    console.error('[Activities API] Erro ao deletar:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

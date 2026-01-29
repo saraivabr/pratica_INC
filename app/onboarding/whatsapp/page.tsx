@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import QRCode from "qrcode"
 import { useAuth, usePageTracking } from "@/lib/auth-context"
@@ -13,12 +13,19 @@ import {
   CheckCircle2,
   AlertTriangle,
   Smartphone,
+  Monitor,
   ArrowRight,
   Sparkles,
   MessageSquare,
   Zap,
   Shield,
   RefreshCcw,
+  Copy,
+  Check,
+  Settings,
+  Plus,
+  Phone,
+  Hash,
 } from "lucide-react"
 import Image from "next/image"
 
@@ -29,10 +36,11 @@ type StatusPayload = {
   pairedPhone?: string
   deviceName?: string
   lastQr?: string
+  pairingCode?: string
   error?: string
 }
 
-// Glow button component with animated gradient
+// ── Glow Button ──
 function GlowButton({
   children,
   onClick,
@@ -54,7 +62,6 @@ function GlowButton({
 
   return (
     <div className="relative group">
-      {/* Outer glow */}
       <div
         className={cn(
           "absolute -inset-1 bg-gradient-to-r rounded-2xl blur-lg opacity-60 transition-all duration-500",
@@ -62,8 +69,6 @@ function GlowButton({
           disabled ? "opacity-20" : "group-hover:opacity-100 group-hover:blur-xl"
         )}
       />
-
-      {/* Inner glow ring */}
       <div
         className={cn(
           "absolute -inset-0.5 bg-gradient-to-r rounded-xl opacity-0 transition-opacity duration-300",
@@ -71,8 +76,6 @@ function GlowButton({
           !disabled && "group-hover:opacity-75"
         )}
       />
-
-      {/* Button */}
       <button
         onClick={onClick}
         disabled={disabled}
@@ -89,8 +92,6 @@ function GlowButton({
         <span className="relative z-10 flex items-center justify-center gap-2">
           {children}
         </span>
-
-        {/* Shine effect */}
         <div className="absolute inset-0 rounded-xl overflow-hidden">
           <div
             className={cn(
@@ -104,7 +105,7 @@ function GlowButton({
   )
 }
 
-// Step indicator component
+// ── Step Indicator ──
 function StepIndicator({ step, currentStep, label }: { step: number; currentStep: number; label: string }) {
   const isActive = step === currentStep
   const isCompleted = step < currentStep
@@ -142,7 +143,7 @@ function StepIndicator({ step, currentStep, label }: { step: number; currentStep
   )
 }
 
-// Feature card component
+// ── Feature Card ──
 function FeatureCard({ icon: Icon, title, description }: { icon: any; title: string; description: string }) {
   return (
     <div className="group p-4 rounded-2xl bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-800 hover:border-emerald-200 dark:hover:border-emerald-800 hover:shadow-lg transition-all duration-300">
@@ -155,12 +156,262 @@ function FeatureCard({ icon: Icon, title, description }: { icon: any; title: str
   )
 }
 
+// ── Format Phone ──
+function formatPhone(phone: string | null | undefined): string {
+  if (!phone) return ""
+  const digits = phone.replace(/\D/g, "")
+  const local = digits.startsWith("55") ? digits.slice(2) : digits
+  if (local.length === 11) {
+    return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`
+  }
+  if (local.length === 10) {
+    return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`
+  }
+  return phone
+}
+
+// ── Pairing Code Display ──
+function PairingCodeDisplay({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  const part1 = code.slice(0, 4)
+  const part2 = code.slice(4)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-center gap-1">
+        {part1.split("").map((char, i) => (
+          <span
+            key={i}
+            className="text-4xl sm:text-5xl font-bold font-mono bg-gradient-to-br from-emerald-600 to-green-600 bg-clip-text text-transparent"
+          >
+            {char}
+          </span>
+        ))}
+        <span className="text-4xl text-gray-300 mx-2">-</span>
+        {part2.split("").map((char, i) => (
+          <span
+            key={i + 4}
+            className="text-4xl sm:text-5xl font-bold font-mono bg-gradient-to-br from-emerald-600 to-green-600 bg-clip-text text-transparent"
+          >
+            {char}
+          </span>
+        ))}
+      </div>
+      <button
+        onClick={handleCopy}
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors text-sm font-medium"
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        {copied ? "Copiado!" : "📋 Copiar código"}
+      </button>
+    </div>
+  )
+}
+
+// ── Countdown Timer ──
+function CountdownTimer({
+  seconds,
+  onExpired,
+}: {
+  seconds: number
+  onExpired: () => void
+}) {
+  const [remaining, setRemaining] = useState(seconds)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    setRemaining(seconds)
+    if (intervalRef.current) clearInterval(intervalRef.current)
+
+    intervalRef.current = setInterval(() => {
+      setRemaining((prev) => {
+        if (prev <= 1) {
+          if (intervalRef.current) clearInterval(intervalRef.current)
+          onExpired()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [seconds, onExpired])
+
+  const percentage = (remaining / seconds) * 100
+  const isUrgent = remaining <= 15
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative w-16 h-16">
+        <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
+          <circle
+            cx="32"
+            cy="32"
+            r="28"
+            stroke="currentColor"
+            strokeWidth="4"
+            fill="none"
+            className="text-gray-200 dark:text-gray-700"
+          />
+          <circle
+            cx="32"
+            cy="32"
+            r="28"
+            stroke="currentColor"
+            strokeWidth="4"
+            fill="none"
+            strokeDasharray={`${2 * Math.PI * 28}`}
+            strokeDashoffset={`${2 * Math.PI * 28 * (1 - percentage / 100)}`}
+            strokeLinecap="round"
+            className={cn(
+              "transition-all duration-1000",
+              isUrgent ? "text-red-500" : "text-emerald-500"
+            )}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            className={cn(
+              "text-lg font-bold tabular-nums",
+              isUrgent ? "text-red-500" : "text-emerald-600 dark:text-emerald-400"
+            )}
+          >
+            {remaining}s
+          </span>
+        </div>
+      </div>
+      <span
+        className={cn(
+          "text-xs font-medium",
+          isUrgent ? "text-red-500 animate-pulse" : "text-gray-500"
+        )}
+      >
+        {remaining > 0 ? "Expira em..." : "Código expirado"}
+      </span>
+    </div>
+  )
+}
+
+// ── Instruction Step (for mobile preparation) ──
+function InstructionStep({
+  number,
+  icon: Icon,
+  text,
+  highlight,
+}: {
+  number: number
+  icon: React.ElementType
+  text: string
+  highlight?: string
+}) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-xl bg-white/60 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+        <span className="text-sm font-bold text-emerald-600">{number}</span>
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        <Icon className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+        <span className="text-sm text-gray-700 dark:text-gray-300">
+          {text}
+          {highlight && (
+            <span className="font-semibold text-emerald-700 dark:text-emerald-300"> {highlight}</span>
+          )}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ── Success Step (auto-redirects after 4s) ──
+function SuccessStep({
+  pairedPhone,
+  deviceName,
+  onContinue,
+}: {
+  pairedPhone: string | null
+  deviceName: string | null
+  onContinue: () => void
+}) {
+  const [countdown, setCountdown] = useState(4)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          onContinue()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [onContinue])
+
+  return (
+    <div className="space-y-6 animate-fadeInUp text-center">
+      <div className="flex justify-center">
+        <div className="relative">
+          <div className="absolute inset-0 bg-green-500 rounded-full blur-xl opacity-50 animate-pulse" />
+          <div className="relative h-24 w-24 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-2xl">
+            <CheckCircle2 className="h-14 w-14 text-white" />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-green-600">
+          WhatsApp Conectado! 🎉
+        </h1>
+        <p className="text-gray-600 dark:text-gray-300 max-w-md mx-auto">
+          Tudo pronto! A IA já está ativa e vai atender seus leads automaticamente pelo WhatsApp.
+        </p>
+      </div>
+
+      {pairedPhone && (
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800">
+          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-sm text-emerald-700 dark:text-emerald-400">
+            Conectado: {pairedPhone} {deviceName && `(${deviceName})`}
+          </span>
+        </div>
+      )}
+
+      <div className="pt-4 space-y-3">
+        <GlowButton onClick={onContinue} variant="success">
+          Ir para o Dashboard
+          <ArrowRight className="h-5 w-5" />
+        </GlowButton>
+        <p className="text-xs text-gray-400">
+          Redirecionando em {countdown}s...
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ════════════════════════════════════════════════════════════════
+
 export default function WhatsAppOnboardingPage() {
   const router = useRouter()
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   usePageTracking("onboarding-whatsapp")
 
+  // Steps: 1=choose device, 2=prepare (mobile) / connect (desktop), 3=code shown (mobile), 4=success
   const [currentStep, setCurrentStep] = useState(1)
+  const [deviceType, setDeviceType] = useState<"mobile" | "desktop" | null>(null)
   const [status, setStatus] = useState<SessionStatus>("disconnected")
   const [pairedPhone, setPairedPhone] = useState<string | null>(null)
   const [deviceName, setDeviceName] = useState<string | null>(null)
@@ -169,6 +420,13 @@ export default function WhatsAppOnboardingPage() {
   const [pairingCode, setPairingCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [userPhone, setUserPhone] = useState<string | null>(null)
+  const [codeExpired, setCodeExpired] = useState(false)
+  const [countdownKey, setCountdownKey] = useState(0) // force re-mount countdown
+  const [instanceReady, setInstanceReady] = useState(false) // instance created, waiting for user
+
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  const qrRefreshRef = useRef<NodeJS.Timeout | null>(null)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -177,42 +435,35 @@ export default function WhatsAppOnboardingPage() {
     }
   }, [authLoading, isAuthenticated, router])
 
-  // Polling para verificar status (substitui SSE que dependia do worker)
-  const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  // ── Polling (2s interval for fast detection) ──
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) clearInterval(pollingRef.current)
 
-  const startPolling = () => {
-    // Limpar polling anterior
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current)
-    }
-
-    // Polling a cada 2 segundos para verificar status (mais responsivo)
     pollingRef.current = setInterval(async () => {
       try {
         const res = await fetch("/api/whatsapp/session/status")
-        const data: StatusPayload & { qr?: string } = await res.json()
+        const data: StatusPayload & { qr?: string; lastQr?: string; profileName?: string } = await res.json()
 
         if (data.status) setStatus(data.status)
         if (data.pairedPhone !== undefined) setPairedPhone(data.pairedPhone || null)
         if (data.deviceName !== undefined) setDeviceName(data.deviceName || null)
         if (data.error) setError(data.error)
-        if (data.qr || data.lastQr) {
-          setQr(data.qr || data.lastQr || null)
-        }
 
-        // Parar polling quando conectado
+        // Update QR if available (desktop mode)
+        const newQr = data.qr || data.lastQr
+        if (newQr && deviceType === "desktop") setQr(newQr)
+
+        // Connected! Auto-advance immediately — no extra click needed
         if (data.status === "ready") {
-          setCurrentStep(3)
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current)
-            pollingRef.current = null
-          }
+          setCurrentStep(4)
+          stopPolling()
+          stopQrRefresh()
         }
       } catch (pollError) {
         console.error("Polling error", pollError)
       }
-    }, 2000)
-  }
+    }, 2000) // 2s for faster detection
+  }, [deviceType])
 
   const stopPolling = () => {
     if (pollingRef.current) {
@@ -221,82 +472,53 @@ export default function WhatsAppOnboardingPage() {
     }
   }
 
-  // Fetch initial status
-  const fetchStatus = async () => {
-    if (!user) return
-    try {
-      const res = await fetch("/api/whatsapp/session/status")
-      const data: StatusPayload = await res.json()
-      if (res.ok) {
-        setStatus(data.status || "disconnected")
-        setPairedPhone(data.pairedPhone || null)
-        setDeviceName(data.deviceName || null)
-        setQr(data.lastQr || null)
-        setError(data.error || null)
-        if (data.status === "ready") {
-          setCurrentStep(3)
-        }
-      }
-    } catch (statusError) {
-      console.error("Status error", statusError)
+  const stopQrRefresh = () => {
+    if (qrRefreshRef.current) {
+      clearInterval(qrRefreshRef.current)
+      qrRefreshRef.current = null
     }
   }
 
-  // Start WhatsApp session
-  const handleStart = async (freshConnection = false) => {
-    if (!user) return
-    setLoading(true)
-    setError(null)
-    setCurrentStep(2)
-    try {
-      const res = await fetch("/api/whatsapp/session/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ freshConnection }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || "Erro ao iniciar sessão")
-        setStatus("error")
-        return
-      }
-      setStatus(data.status || "connecting")
-      setQr(data.qr || null)
-      setPairingCode(data.pairingCode || null)
-      setPairedPhone(data.pairedPhone || data.userPhone || null)
-      setDeviceName(data.deviceName || null)
-      // Iniciar polling para verificar atualizações de status
-      startPolling()
-      if (data.status === "ready") {
-        setCurrentStep(3)
-      }
-    } catch (startError) {
-      console.error("Start error", startError)
-      setStatus("error")
-      setError("Erro ao iniciar sessão")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Create fresh connection (delete existing and start new)
-  const handleFreshConnection = () => handleStart(true)
-
-  // Generate QR image - fetch initial status and cleanup polling
+  // Cleanup on unmount
   useEffect(() => {
-    fetchStatus()
     return () => {
       stopPolling()
+      stopQrRefresh()
     }
+  }, [])
+
+  // Check initial status
+  useEffect(() => {
+    if (!user) return
+    const checkStatus = async () => {
+      try {
+        const res = await fetch("/api/whatsapp/session/status")
+        const data: StatusPayload = await res.json()
+        if (data.status === "ready") {
+          setPairedPhone(data.pairedPhone || null)
+          setDeviceName(data.deviceName || null)
+          setCurrentStep(4)
+          setStatus("ready")
+        }
+      } catch (e) {
+        console.error("Status check error", e)
+      }
+    }
+    checkStatus()
   }, [user])
 
+  // Generate QR image
   useEffect(() => {
     let active = true
     if (!qr) {
       setQrImage(null)
       return
     }
-    QRCode.toDataURL(qr, { width: 280, margin: 2 })
+    if (qr.startsWith("data:image")) {
+      setQrImage(qr)
+      return
+    }
+    QRCode.toDataURL(qr, { width: 320, margin: 2 })
       .then((url) => {
         if (active) setQrImage(url)
       })
@@ -308,11 +530,211 @@ export default function WhatsAppOnboardingPage() {
     }
   }, [qr])
 
-  // Handle continue to dashboard
+  // ── Create instance (session/start) — only creates the instance, doesn't show code yet for mobile ──
+  const createInstance = async () => {
+    if (!user) return
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/whatsapp/session/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ freshConnection: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || "Erro ao iniciar sessão")
+        setStatus("error")
+        return false
+      }
+
+      setStatus(data.status || "connecting")
+      setQr(data.qr || null)
+      setPairingCode(data.pairingCode || null)
+      setPairedPhone(data.pairedPhone || data.userPhone || null)
+      setUserPhone(data.userPhone || null)
+      setDeviceName(data.deviceName || null)
+      setInstanceReady(true)
+
+      if (data.status === "ready") {
+        setCurrentStep(4)
+        return true
+      }
+
+      // Start polling for connection status
+      startPolling()
+      return true
+    } catch (startError) {
+      console.error("Start error", startError)
+      setStatus("error")
+      setError("Erro ao iniciar sessão")
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ── Refresh code (doesn't recreate instance) ──
+  // Anti-falha: se refresh falha, tenta recriar automaticamente
+  const refreshCode = async (retryCount = 0) => {
+    setLoading(true)
+    setError(null)
+    setCodeExpired(false)
+    try {
+      const res = await fetch("/api/whatsapp/session/refresh-code")
+      const data = await res.json()
+
+      if (!res.ok) {
+        // If instance is dead or exhausted, recreate
+        if (data.needsRecreate) {
+          console.log("[Onboarding] Instance needs recreation, recreating...")
+          await createInstance()
+          // After recreation, the pairing code should be set by createInstance
+          if (pairingCode) {
+            setCountdownKey((k) => k + 1)
+          }
+          return
+        }
+        setError(data.error || "Erro ao gerar novo código")
+        return
+      }
+
+      if (data.status === "ready") {
+        setCurrentStep(4)
+        return
+      }
+
+      if (data.pairingCode) {
+        setPairingCode(data.pairingCode)
+        setCountdownKey((k) => k + 1)
+        setCodeExpired(false)
+      } else if (!data.pairingCode && retryCount < 2) {
+        // Pairing code veio null — tentar novamente após breve delay
+        console.log(`[Onboarding] Pairing code null, retry ${retryCount + 1}/2...`)
+        setTimeout(() => refreshCode(retryCount + 1), 2000)
+        return // Don't setLoading(false) yet
+      } else if (!data.pairingCode) {
+        // Após 2 retries sem código, forçar recriação
+        console.log("[Onboarding] Pairing code null after retries, recreating...")
+        await createInstance()
+        if (pairingCode) {
+          setCountdownKey((k) => k + 1)
+        }
+        return
+      }
+
+      if (data.qr) {
+        setQr(data.qr)
+      }
+
+      // Ensure polling is running
+      startPolling()
+    } catch (e) {
+      setError("Erro ao gerar novo código. Tente novamente.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ── MOBILE: Choose mobile → go to preparation step ──
+  const handleChooseMobile = () => {
+    setDeviceType("mobile")
+    setCurrentStep(2) // preparation step — no API call yet
+  }
+
+  // ── MOBILE: User says they're ready → NOW generate code ──
+  // Anti-falha: se a primeira criação não retorna pairing code, tenta uma segunda vez com freshConnection
+  const handleMobileReady = async () => {
+    setLoading(true)
+    setError(null)
+    setCodeExpired(false)
+
+    // Create instance + get pairing code
+    const ok = await createInstance()
+    if (ok) {
+      setCurrentStep(3) // show the pairing code
+      setCountdownKey((k) => k + 1)
+
+      // Se não veio pairing code na primeira tentativa, esperar e tentar refresh
+      if (!pairingCode) {
+        console.log("[Onboarding] No pairing code after createInstance, trying refresh in 2s...")
+        setTimeout(async () => {
+          try {
+            const res = await fetch("/api/whatsapp/session/refresh-code")
+            const data = await res.json()
+            if (data.pairingCode) {
+              setPairingCode(data.pairingCode)
+              setCountdownKey((k) => k + 1)
+            } else if (data.needsRecreate) {
+              // Force fresh recreation
+              await createInstance()
+            }
+          } catch (e) {
+            console.error("[Onboarding] Refresh fallback error:", e)
+          }
+        }, 2000)
+      }
+    }
+    setLoading(false)
+  }
+
+  // ── DESKTOP: Choose desktop → create instance + show QR immediately ──
+  const handleChooseDesktop = async () => {
+    setDeviceType("desktop")
+    setCurrentStep(2) // connect step (QR shown)
+    setLoading(true)
+    setError(null)
+
+    const ok = await createInstance()
+    if (!ok) return
+
+    // Auto-refresh QR every 25 seconds for desktop
+    if (qrRefreshRef.current) clearInterval(qrRefreshRef.current)
+    qrRefreshRef.current = setInterval(async () => {
+      try {
+        const res = await fetch("/api/whatsapp/session/refresh-code")
+        const data = await res.json()
+        if (data.status === "ready") {
+          setCurrentStep(4)
+          stopQrRefresh()
+          return
+        }
+        if (data.qr) setQr(data.qr)
+        if (data.pairingCode) setPairingCode(data.pairingCode)
+      } catch (e) {
+        console.error("QR refresh error", e)
+      }
+    }, 25000)
+
+    setLoading(false)
+  }
+
+  // ── Countdown expired handler ──
+  const handleCountdownExpired = useCallback(() => {
+    setCodeExpired(true)
+  }, [])
+
+  // ── Go to dashboard ──
   const handleContinue = () => {
     router.push("/corretor")
   }
 
+  // ── Reset to step 1 ──
+  const handleBack = () => {
+    stopPolling()
+    stopQrRefresh()
+    setCurrentStep(1)
+    setDeviceType(null)
+    setQr(null)
+    setQrImage(null)
+    setPairingCode(null)
+    setError(null)
+    setStatus("disconnected")
+    setCodeExpired(false)
+    setInstanceReady(false)
+  }
+
+  // ── Loading screen ──
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-green-50">
@@ -324,6 +746,9 @@ export default function WhatsAppOnboardingPage() {
       </div>
     )
   }
+
+  // Map internal steps to visual progress steps (always 3 visual steps)
+  const visualStep = currentStep === 4 ? 3 : currentStep >= 3 ? 2 : currentStep
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-emerald-50 via-white to-green-50 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950">
@@ -359,32 +784,32 @@ export default function WhatsAppOnboardingPage() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8">
         <div className="w-full max-w-4xl animate-fadeInUp">
           {/* Progress Steps */}
           <div className="flex items-center justify-center gap-4 sm:gap-8 mb-8">
-            <StepIndicator step={1} currentStep={currentStep} label="Iniciar" />
-            <div className={cn("w-16 sm:w-24 h-1 rounded-full transition-colors duration-500", currentStep > 1 ? "bg-emerald-500" : "bg-gray-200")} />
-            <StepIndicator step={2} currentStep={currentStep} label="Conectar" />
-            <div className={cn("w-16 sm:w-24 h-1 rounded-full transition-colors duration-500", currentStep > 2 ? "bg-emerald-500" : "bg-gray-200")} />
-            <StepIndicator step={3} currentStep={currentStep} label="Pronto!" />
+            <StepIndicator step={1} currentStep={visualStep} label="Dispositivo" />
+            <div className={cn("w-16 sm:w-24 h-1 rounded-full transition-colors duration-500", visualStep > 1 ? "bg-emerald-500" : "bg-gray-200")} />
+            <StepIndicator step={2} currentStep={visualStep} label="Conectar" />
+            <div className={cn("w-16 sm:w-24 h-1 rounded-full transition-colors duration-500", visualStep > 2 ? "bg-emerald-500" : "bg-gray-200")} />
+            <StepIndicator step={3} currentStep={visualStep} label="Pronto!" />
           </div>
 
           {/* Card */}
           <div className="relative">
-            {/* Card glow */}
             <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-[2rem] blur-xl opacity-20" />
 
             <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-emerald-900/10 border border-white/60 dark:border-gray-800/60 overflow-hidden">
-              {/* Animated top border */}
               <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-500 to-teal-400 animate-gradient" />
 
               <div className="p-6 sm:p-8">
-                {/* Step 1: Welcome */}
+
+                {/* ═══════════════════════════════════════ */}
+                {/* STEP 1: Explanation + Choose Device    */}
+                {/* ═══════════════════════════════════════ */}
                 {currentStep === 1 && (
                   <div className="space-y-6 animate-fadeInUp">
-                    {/* Icon */}
                     <div className="flex justify-center">
                       <div className="relative">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl blur-xl opacity-50" />
@@ -395,63 +820,222 @@ export default function WhatsAppOnboardingPage() {
                       </div>
                     </div>
 
-                    {/* Title */}
-                    <div className="text-center space-y-2">
+                    <div className="text-center space-y-3">
                       <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                        Conecte seu WhatsApp
+                        Conecte seu WhatsApp à Pratica
                       </h1>
-                      <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                        Conecte seu WhatsApp para enviar mensagens diretamente aos seus leads e receber notificações em tempo real.
+                      <p className="text-gray-600 dark:text-gray-300 max-w-lg mx-auto text-base leading-relaxed">
+                        A Pratica usa inteligência artificial para <strong>atender seus leads automaticamente pelo WhatsApp</strong>. 
+                        Quando um cliente enviar mensagem, a IA responde na hora — com informações sobre imóveis, 
+                        agenda visitas e qualifica o lead pra você.
                       </p>
                     </div>
 
-                    {/* Features */}
-                    <div className="grid sm:grid-cols-3 gap-4">
-                      <FeatureCard
-                        icon={Zap}
-                        title="Respostas Rápidas"
-                        description="Responda seus leads em segundos direto do painel"
-                      />
-                      <FeatureCard
+                    {/* How it works */}
+                    <div className="max-w-lg mx-auto bg-emerald-50/70 dark:bg-emerald-900/20 rounded-2xl p-5 border border-emerald-100 dark:border-emerald-800/50">
+                      <h3 className="font-semibold text-emerald-800 dark:text-emerald-300 mb-3 text-sm uppercase tracking-wide">
+                        Como funciona
+                      </h3>
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-200 dark:bg-emerald-800 flex items-center justify-center mt-0.5">
+                            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">1</span>
+                          </div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            Você conecta seu WhatsApp aqui — <strong>leva menos de 1 minuto</strong>
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-200 dark:bg-emerald-800 flex items-center justify-center mt-0.5">
+                            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">2</span>
+                          </div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            A IA passa a <strong>atender seus leads automaticamente</strong> — responde perguntas, envia informações de imóveis e agenda visitas
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-200 dark:bg-emerald-800 flex items-center justify-center mt-0.5">
+                            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">3</span>
+                          </div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            Você acompanha tudo pelo painel — <strong>vê as conversas, intervém quando quiser</strong> e nunca perde um lead
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Security note */}
+                    <div className="max-w-lg mx-auto flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                      <Shield className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <strong>Seguro e privado:</strong> suas mensagens pessoais continuam privadas. 
+                        A IA só atende conversas de leads — seu WhatsApp pessoal funciona normalmente.
+                      </p>
+                    </div>
+
+                    {/* Device choice */}
+                    <div className="text-center pt-1">
+                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                        Você está acessando pelo celular ou pelo computador?
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto">
+                      <button
+                        onClick={handleChooseMobile}
+                        disabled={loading}
+                        className={cn(
+                          "group relative flex flex-col items-center gap-3 p-6 rounded-2xl border-2 transition-all duration-300",
+                          "bg-white dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20",
+                          "border-gray-200 dark:border-gray-700 hover:border-emerald-400",
+                          "hover:shadow-lg hover:shadow-emerald-500/10",
+                          loading && "opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        <div className="h-16 w-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center group-hover:bg-emerald-500 transition-colors">
+                          <Smartphone className="h-8 w-8 text-emerald-600 group-hover:text-white transition-colors" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900 dark:text-white text-lg">📱 Celular</p>
+                          <p className="text-xs text-gray-500 mt-1">Código de pareamento</p>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={handleChooseDesktop}
+                        disabled={loading}
+                        className={cn(
+                          "group relative flex flex-col items-center gap-3 p-6 rounded-2xl border-2 transition-all duration-300",
+                          "bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/20",
+                          "border-gray-200 dark:border-gray-700 hover:border-blue-400",
+                          "hover:shadow-lg hover:shadow-blue-500/10",
+                          loading && "opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        <div className="h-16 w-16 rounded-2xl bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center group-hover:bg-blue-500 transition-colors">
+                          <Monitor className="h-8 w-8 text-blue-600 group-hover:text-white transition-colors" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900 dark:text-white text-lg">💻 Computador</p>
+                          <p className="text-xs text-gray-500 mt-1">QR Code</p>
+                        </div>
+                      </button>
+                    </div>
+
+                    {loading && (
+                      <div className="flex items-center justify-center gap-2 text-emerald-600">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-sm">Preparando conexão...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ═══════════════════════════════════════ */}
+                {/* STEP 2 (MOBILE): Prepare WhatsApp      */}
+                {/* No code generated yet!                 */}
+                {/* ═══════════════════════════════════════ */}
+                {currentStep === 2 && deviceType === "mobile" && (
+                  <div className="space-y-6 animate-fadeInUp">
+                    <div className="flex justify-center">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl blur-xl opacity-50" />
+                        <div className="relative h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-xl">
+                          <Smartphone className="h-8 w-8 text-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-center space-y-2">
+                      <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                        Prepare seu WhatsApp
+                      </h1>
+                      <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+                        Siga os passos abaixo no seu celular. <strong>Só gere o código quando estiver pronto.</strong>
+                      </p>
+                    </div>
+
+                    {/* Instructions */}
+                    <div className="max-w-md mx-auto space-y-2">
+                      <InstructionStep
+                        number={1}
                         icon={MessageSquare}
-                        title="Mensagens Diretas"
-                        description="Envie materiais e informações sem sair da plataforma"
+                        text="Abra o"
+                        highlight="WhatsApp no seu celular"
                       />
-                      <FeatureCard
-                        icon={Shield}
-                        title="100% Seguro"
-                        description="Sua conexão é criptografada e privada"
+                      <InstructionStep
+                        number={2}
+                        icon={Settings}
+                        text="Toque em"
+                        highlight="⚙️ Configurações"
+                      />
+                      <InstructionStep
+                        number={3}
+                        icon={Smartphone}
+                        text="Toque em"
+                        highlight="📱 Aparelhos conectados"
+                      />
+                      <InstructionStep
+                        number={4}
+                        icon={Plus}
+                        text="Toque em"
+                        highlight="➕ Conectar dispositivo"
+                      />
+                      <InstructionStep
+                        number={5}
+                        icon={Phone}
+                        text="Escolha"
+                        highlight="'Conectar com número de telefone'"
+                      />
+                      <InstructionStep
+                        number={6}
+                        icon={Hash}
+                        text="Digite seu número:"
+                        highlight={formatPhone(userPhone || (user as any)?.telefone || (user as any)?.phone) || "seu número"}
                       />
                     </div>
 
-                    {/* CTA */}
-                    <div className="pt-4">
-                      <GlowButton onClick={() => handleStart(false)} disabled={loading}>
+                    {/* Important notice */}
+                    <div className="max-w-md mx-auto p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                      <p className="text-sm text-amber-700 dark:text-amber-400 text-center">
+                        ⏱️ O código expira em <strong>60 segundos</strong>. Só gere quando estiver na tela{" "}
+                        <strong>&quot;Insira o código&quot;</strong> do WhatsApp.
+                      </p>
+                    </div>
+
+                    {/* Ready button */}
+                    <div className="max-w-md mx-auto">
+                      <GlowButton onClick={handleMobileReady} disabled={loading} variant="primary">
                         {loading ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            Gerando código...
+                          </>
                         ) : (
                           <>
-                            <Smartphone className="h-5 w-5" />
-                            Começar Conexão
+                            ✅ Estou na tela &quot;Insira o código&quot;
                           </>
                         )}
                       </GlowButton>
                     </div>
+
+                    <div className="flex justify-center">
+                      <Button variant="ghost" onClick={handleBack} className="text-gray-500">
+                        ← Voltar
+                      </Button>
+                    </div>
                   </div>
                 )}
 
-                {/* Step 2: Duas opções - QR Code e Pairing Code */}
-                {currentStep === 2 && (
+                {/* ═══════════════════════════════════════ */}
+                {/* STEP 3 (MOBILE): Show Pairing Code     */}
+                {/* ═══════════════════════════════════════ */}
+                {currentStep === 3 && deviceType === "mobile" && (
                   <div className="space-y-6 animate-fadeInUp">
-                    {/* Title */}
                     <div className="text-center space-y-2">
                       <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                        Conecte seu WhatsApp
+                        Código de Pareamento
                       </h1>
-                      <p className="text-gray-500 dark:text-gray-400">
-                        Escolha como você prefere conectar
-                      </p>
-                      {/* Status indicator - shows waiting for connection */}
                       <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 animate-pulse">
                         <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
                         <span className="text-sm text-amber-700 dark:text-amber-400 font-medium">
@@ -460,154 +1044,75 @@ export default function WhatsAppOnboardingPage() {
                       </div>
                     </div>
 
-                    {/* Duas opções lado a lado */}
-                    <div className="grid md:grid-cols-2 gap-6">
-                      {/* OPÇÃO 1: QR CODE */}
-                      <div className="relative">
-                        <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 to-green-400 rounded-2xl blur-lg opacity-20" />
-                        <div className="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 h-full">
-                          <div className="text-center space-y-4">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
-                              <QrCode className="h-4 w-4" />
-                              QR Code
-                              <span className="text-[10px] bg-emerald-600 text-white px-1.5 py-0.5 rounded-full">Recomendado</span>
-                            </div>
-
-                            {/* QR Code Display */}
-                            <div className="relative mx-auto w-fit">
-                              <div className="rounded-xl border-2 border-dashed border-emerald-200 dark:border-emerald-800 bg-gray-50 dark:bg-gray-900 p-3 flex items-center justify-center min-h-[200px] min-w-[200px]">
-                                {(status === "connecting" || status === "pairing") && !qrImage && (
-                                  <div className="text-center space-y-3">
-                                    <Loader2 className="h-10 w-10 mx-auto text-emerald-500 animate-spin" />
-                                    <p className="text-sm text-gray-500">Gerando...</p>
-                                  </div>
-                                )}
-                                {qrImage && (
-                                  <img src={qrImage} alt="QR Code WhatsApp" className="h-48 w-48 rounded-lg" />
-                                )}
-                                {status === "error" && (
-                                  <div className="text-center space-y-3">
-                                    <AlertTriangle className="h-10 w-10 mx-auto text-red-500" />
-                                    <p className="text-sm text-red-500">{error || "Erro"}</p>
-                                  </div>
-                                )}
-                                {!qrImage && status === "disconnected" && (
-                                  <div className="text-center space-y-3">
-                                    <QrCode className="h-10 w-10 mx-auto text-gray-300" />
-                                    <p className="text-sm text-gray-400">Aguardando...</p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Instruções QR */}
-                            <div className="text-left space-y-2 text-sm">
-                              <p className="font-medium text-gray-700 dark:text-gray-300">Como usar:</p>
-                              <ol className="space-y-1 text-gray-500 dark:text-gray-400 text-xs">
-                                <li>1. Abra o WhatsApp</li>
-                                <li>2. Vá em Configurações → Aparelhos conectados</li>
-                                <li>3. Escaneie o código acima</li>
-                              </ol>
-                            </div>
-                          </div>
+                    {/* Pairing Code + Countdown */}
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-8">
+                      {pairingCode && !codeExpired ? (
+                        <div className="flex flex-col items-center gap-6">
+                          <p className="text-sm text-gray-500 font-medium">
+                            Digite este código no WhatsApp:
+                          </p>
+                          <PairingCodeDisplay code={pairingCode} />
+                          <CountdownTimer
+                            key={countdownKey}
+                            seconds={55}
+                            onExpired={handleCountdownExpired}
+                          />
                         </div>
-                      </div>
-
-                      {/* OPÇÃO 2: PAIRING CODE */}
-                      <div className="relative">
-                        <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-2xl blur-lg opacity-20" />
-                        <div className="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 h-full">
-                          <div className="text-center space-y-4">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-sm font-medium">
-                              <Smartphone className="h-4 w-4" />
-                              Código de Pareamento
-                              <span className="text-[10px] opacity-75">(1ª vez)</span>
-                            </div>
-
-                            {/* Pairing Code Display */}
-                            <div className="py-4">
-                              {pairingCode && pairingCode.length === 8 ? (
-                                <div className="space-y-3">
-                                  <div className="flex items-center justify-center gap-1">
-                                    {pairingCode.slice(0, 4).split('').map((char, i) => (
-                                      <span
-                                        key={i}
-                                        className="text-3xl sm:text-4xl font-bold font-mono bg-gradient-to-br from-blue-600 to-indigo-600 bg-clip-text text-transparent"
-                                      >
-                                        {char}
-                                      </span>
-                                    ))}
-                                    <span className="text-3xl text-gray-300 mx-2">-</span>
-                                    {pairingCode.slice(4).split('').map((char, i) => (
-                                      <span
-                                        key={i + 4}
-                                        className="text-3xl sm:text-4xl font-bold font-mono bg-gradient-to-br from-blue-600 to-indigo-600 bg-clip-text text-transparent"
-                                      >
-                                        {char}
-                                      </span>
-                                    ))}
-                                  </div>
-                                  <p className="text-xs text-gray-400">Expira em 60 segundos</p>
-                                </div>
-                              ) : (
-                                <div className="py-6 space-y-3">
-                                  {loading || status === "connecting" ? (
-                                    <>
-                                      <Loader2 className="h-10 w-10 mx-auto text-blue-500 animate-spin" />
-                                      <p className="text-sm text-gray-500">Gerando código...</p>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div className="relative mx-auto w-fit">
-                                        <Smartphone className="h-10 w-10 text-gray-300" />
-                                        <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-amber-100 flex items-center justify-center">
-                                          <span className="text-amber-600 text-xs font-bold">!</span>
-                                        </div>
-                                      </div>
-                                      <div className="space-y-2">
-                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                          Reconexão detectada
-                                        </p>
-                                        <p className="text-xs text-gray-400 max-w-[200px] mx-auto">
-                                          Para usar código de pareamento, crie uma nova conexão
-                                        </p>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="mt-2 text-blue-600 border-blue-200 hover:bg-blue-50"
-                                          onClick={handleFreshConnection}
-                                          disabled={loading}
-                                        >
-                                          {loading ? (
-                                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                          ) : (
-                                            <RefreshCcw className="h-3 w-3 mr-1" />
-                                          )}
-                                          Nova conexão
-                                        </Button>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Instruções Pairing */}
-                            <div className="text-left space-y-2 text-sm">
-                              <p className="font-medium text-gray-700 dark:text-gray-300">Como usar:</p>
-                              <ol className="space-y-1 text-gray-500 dark:text-gray-400 text-xs">
-                                <li>1. Abra o WhatsApp</li>
-                                <li>2. Vá em Configurações → Aparelhos conectados</li>
-                                <li>3. Toque em &quot;Conectar com número&quot;</li>
-                                <li>4. Digite o código acima</li>
-                              </ol>
-                            </div>
+                      ) : codeExpired ? (
+                        <div className="flex flex-col items-center gap-4 py-4">
+                          <div className="h-14 w-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                            <AlertTriangle className="h-7 w-7 text-red-500" />
                           </div>
+                          <div className="text-center">
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              Código expirado
+                            </p>
+                            <p className="text-sm text-gray-500 mt-1">
+                              Gere um novo código para continuar
+                            </p>
+                          </div>
+                          <GlowButton
+                            onClick={refreshCode}
+                            disabled={loading}
+                            variant="primary"
+                            className="max-w-xs"
+                          >
+                            {loading ? (
+                              <>
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                                Gerando...
+                              </>
+                            ) : (
+                              <>
+                                🔄 Gerar novo código
+                              </>
+                            )}
+                          </GlowButton>
                         </div>
-                      </div>
+                      ) : loading || status === "connecting" ? (
+                        <div className="py-4 space-y-3 text-center">
+                          <Loader2 className="h-10 w-10 mx-auto text-emerald-500 animate-spin" />
+                          <p className="text-sm text-gray-500">Gerando código de pareamento...</p>
+                        </div>
+                      ) : (
+                        <div className="py-4 space-y-3 text-center">
+                          <AlertTriangle className="h-10 w-10 mx-auto text-amber-500" />
+                          <p className="text-sm text-gray-500">Não foi possível gerar o código</p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                            onClick={refreshCode}
+                            disabled={loading}
+                          >
+                            {loading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCcw className="h-3 w-3 mr-1" />}
+                            Tentar novamente
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Error message */}
+                    {/* Error */}
                     {error && (
                       <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                         <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
@@ -615,58 +1120,131 @@ export default function WhatsAppOnboardingPage() {
                       </div>
                     )}
 
-                    {/* Retry button */}
-                    <div className="flex justify-center gap-4">
-                      <Button variant="outline" onClick={() => handleStart(false)} disabled={loading}>
-                        <RefreshCcw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-                        Gerar novo código
+                    {/* Back */}
+                    <div className="flex justify-center">
+                      <Button variant="ghost" onClick={handleBack} className="text-gray-500">
+                        ← Voltar ao início
                       </Button>
                     </div>
                   </div>
                 )}
 
-                {/* Step 3: Success */}
-                {currentStep === 3 && (
-                  <div className="space-y-6 animate-fadeInUp text-center">
-                    {/* Success Icon */}
-                    <div className="flex justify-center">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-green-500 rounded-full blur-xl opacity-50 animate-pulse" />
-                        <div className="relative h-24 w-24 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-2xl">
-                          <CheckCircle2 className="h-14 w-14 text-white" />
-                        </div>
+                {/* ═══════════════════════════════════════ */}
+                {/* STEP 2 (DESKTOP): QR Code + Pairing    */}
+                {/* ═══════════════════════════════════════ */}
+                {currentStep === 2 && deviceType === "desktop" && (
+                  <div className="space-y-6 animate-fadeInUp">
+                    <div className="text-center space-y-2">
+                      <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                        Escaneie o QR Code
+                      </h1>
+                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 animate-pulse">
+                        <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                        <span className="text-sm text-amber-700 dark:text-amber-400 font-medium">
+                          Aguardando conexão...
+                        </span>
                       </div>
                     </div>
 
-                    {/* Success Message */}
-                    <div className="space-y-2">
-                      <h1 className="text-2xl sm:text-3xl font-bold text-green-600">
-                        WhatsApp Conectado!
-                      </h1>
-                      <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                        Seu WhatsApp foi conectado com sucesso. Agora você pode enviar mensagens diretamente aos seus leads.
-                      </p>
+                    {/* QR Code */}
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 text-center">
+                      <div className="relative mx-auto w-fit">
+                        <div className="rounded-xl border-2 border-dashed border-emerald-200 dark:border-emerald-800 bg-gray-50 dark:bg-gray-900 p-4 flex items-center justify-center min-h-[280px] min-w-[280px]">
+                          {qrImage ? (
+                            <img src={qrImage} alt="QR Code WhatsApp" className="h-64 w-64 rounded-lg" />
+                          ) : loading || status === "connecting" ? (
+                            <div className="text-center space-y-3">
+                              <Loader2 className="h-10 w-10 mx-auto text-emerald-500 animate-spin" />
+                              <p className="text-sm text-gray-500">Gerando QR Code...</p>
+                            </div>
+                          ) : status === "error" ? (
+                            <div className="text-center space-y-3">
+                              <AlertTriangle className="h-10 w-10 mx-auto text-red-500" />
+                              <p className="text-sm text-red-500">{error || "Erro ao gerar QR"}</p>
+                            </div>
+                          ) : (
+                            <div className="text-center space-y-3">
+                              <QrCode className="h-10 w-10 mx-auto text-gray-300" />
+                              <p className="text-sm text-gray-400">Aguardando QR Code...</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-3">QR Code atualiza automaticamente a cada 25 segundos</p>
                     </div>
 
-                    {/* Connected info */}
-                    {pairedPhone && (
-                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800">
-                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-sm text-emerald-700 dark:text-emerald-400">
-                          Conectado: {pairedPhone} {deviceName && `(${deviceName})`}
-                        </span>
+                    {/* Pairing code as alternative */}
+                    {pairingCode && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800 text-center">
+                        <p className="text-sm text-blue-700 dark:text-blue-300 mb-2 font-medium">
+                          Ou use o código de pareamento:
+                        </p>
+                        <PairingCodeDisplay code={pairingCode} />
                       </div>
                     )}
 
-                    {/* CTA */}
-                    <div className="pt-4">
-                      <GlowButton onClick={handleContinue} variant="success">
-                        Ir para o Dashboard
-                        <ArrowRight className="h-5 w-5" />
-                      </GlowButton>
+                    {/* Instructions */}
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-800">
+                      <p className="font-medium text-emerald-800 dark:text-emerald-300 mb-3 text-sm">
+                        💻 Como conectar:
+                      </p>
+                      <ol className="space-y-2 text-sm text-emerald-700 dark:text-emerald-400">
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold min-w-[20px]">1.</span>
+                          <span>Abra o <strong>WhatsApp</strong> no celular</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold min-w-[20px]">2.</span>
+                          <span>Vá em <strong>Configurações</strong> → <strong>Aparelhos conectados</strong></span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold min-w-[20px]">3.</span>
+                          <span>Toque em <strong>Conectar dispositivo</strong></span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="font-bold min-w-[20px]">4.</span>
+                          <span>Escaneie o <strong>QR Code</strong> acima com a câmera</span>
+                        </li>
+                      </ol>
+                    </div>
+
+                    {/* Error */}
+                    {error && (
+                      <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                        <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
+                        <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex justify-center gap-4">
+                      <Button variant="ghost" onClick={handleBack} className="text-gray-500">
+                        ← Voltar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={refreshCode}
+                        disabled={loading}
+                        className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                      >
+                        <RefreshCcw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+                        Atualizar código
+                      </Button>
                     </div>
                   </div>
                 )}
+
+                {/* ═══════════════════════════════════════ */}
+                {/* STEP 4: Success (auto-redirect 4s)     */}
+                {/* ═══════════════════════════════════════ */}
+                {currentStep === 4 && (
+                  <SuccessStep
+                    pairedPhone={pairedPhone}
+                    deviceName={deviceName}
+                    onContinue={handleContinue}
+                  />
+                )}
+
               </div>
             </div>
           </div>
@@ -678,7 +1256,6 @@ export default function WhatsAppOnboardingPage() {
         Pratica Incorporadora &copy; {new Date().getFullYear()}
       </footer>
 
-      {/* Animations */}
       <style jsx global>{`
         @keyframes shine {
           to {

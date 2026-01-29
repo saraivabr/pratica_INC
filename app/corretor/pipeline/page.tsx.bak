@@ -1,0 +1,527 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { AppShell } from "@/components/app-shell";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { 
+  RefreshCw, 
+  Loader2, 
+  Search,
+  Phone,
+  Clock,
+  MessageCircle,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  Thermometer
+} from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+interface PipelineLead {
+  id: string;
+  phone_number: string;
+  contact_name: string;
+  stage: string;
+  temperature: 'hot' | 'warm' | 'cold';
+  last_message_at: string;
+  last_message_text: string;
+  last_message_from_me: boolean;
+  total_messages: number;
+  created_at: string;
+}
+
+interface PipelineStage {
+  stage: string;
+  display_name: string;
+  emoji: string;
+  count: number;
+  leads: PipelineLead[];
+}
+
+interface LeadDetail {
+  id: string;
+  phone_number: string;
+  contact_name: string;
+  stage: string;
+  temperature: string;
+  last_message_at: string;
+  total_messages: number;
+  messages: Array<{
+    id: number;
+    message_text: string;
+    is_from_me: boolean;
+    timestamp: string;
+  }>;
+}
+
+export default function PipelinePage() {
+  const [pipeline, setPipeline] = useState<PipelineStage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedLead, setSelectedLead] = useState<LeadDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [draggedLead, setDraggedLead] = useState<PipelineLead | null>(null);
+
+  const fetchPipeline = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/pipeline');
+      const data = await response.json();
+      setPipeline(data.pipeline || []);
+    } catch (error) {
+      console.error('Error fetching pipeline:', error);
+    }
+    setLoading(false);
+  };
+
+  const syncPipeline = async () => {
+    setSyncing(true);
+    try {
+      const response = await fetch('/api/pipeline', { method: 'POST' });
+      const data = await response.json();
+      if (response.ok) {
+        await fetchPipeline(); // Refresh data
+        alert(data.message || 'Pipeline sincronizado com sucesso!');
+      } else {
+        alert('Erro ao sincronizar: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error syncing pipeline:', error);
+      alert('Erro ao sincronizar pipeline');
+    }
+    setSyncing(false);
+  };
+
+  const moveLeadToStage = async (phoneNumber: string, newStage: string) => {
+    try {
+      const response = await fetch('/api/pipeline', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: phoneNumber, stage: newStage })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        alert(data.message || 'Lead movido com sucesso!');
+        await fetchPipeline(); // Refresh data
+      } else {
+        alert('Erro ao mover lead');
+      }
+    } catch (error) {
+      console.error('Error moving lead:', error);
+      alert('Erro ao mover lead');
+    }
+  };
+
+  const loadLeadDetail = async (phoneNumber: string) => {
+    setLoadingDetail(true);
+    try {
+      const response = await fetch(`/api/pipeline/${encodeURIComponent(phoneNumber)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedLead(data.lead);
+      } else {
+        // If detailed endpoint doesn't exist, create basic detail from current data
+        const lead = pipeline
+          .flatMap(stage => stage.leads)
+          .find(l => l.phone_number === phoneNumber);
+        
+        if (lead) {
+          setSelectedLead({
+            id: lead.id,
+            phone_number: lead.phone_number,
+            contact_name: lead.contact_name,
+            stage: lead.stage,
+            temperature: lead.temperature,
+            last_message_at: lead.last_message_at,
+            total_messages: lead.total_messages,
+            messages: [] // No detailed messages available
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading lead detail:', error);
+    }
+    setLoadingDetail(false);
+  };
+
+  useEffect(() => {
+    fetchPipeline();
+  }, []);
+
+  // Filter leads based on search term
+  const filteredPipeline = pipeline.map(stage => ({
+    ...stage,
+    leads: stage.leads.filter(lead => 
+      lead.contact_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.phone_number.includes(searchTerm) ||
+      lead.last_message_text?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }));
+
+  const getTemperatureColor = (temp: string) => {
+    switch (temp) {
+      case 'hot': return 'bg-red-50 text-red-700 border-red-200';
+      case 'warm': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'cold': return 'bg-blue-50 text-blue-700 border-blue-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
+    }
+  };
+
+  const getStageColor = (stage: string) => {
+    const colors: Record<string, string> = {
+      new: 'bg-blue-50 border-blue-200',
+      waiting: 'bg-orange-50 border-orange-200', 
+      active: 'bg-green-50 border-green-200',
+      proposal: 'bg-purple-50 border-purple-200',
+      cold: 'bg-gray-50 border-gray-200'
+    };
+    return colors[stage] || 'bg-gray-50 border-gray-200';
+  };
+
+  const handleDragStart = (e: React.DragEvent, lead: PipelineLead) => {
+    setDraggedLead(lead);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, targetStage: string) => {
+    e.preventDefault();
+    if (draggedLead && draggedLead.stage !== targetStage) {
+      moveLeadToStage(draggedLead.phone_number, targetStage);
+    }
+    setDraggedLead(null);
+  };
+
+  const getInitials = (name: string) => {
+    if (!name || name === 'Sem nome') return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const formatTimeAgo = (dateStr: string) => {
+    if (!dateStr) return 'Nunca';
+    try {
+      return formatDistanceToNow(new Date(dateStr), { 
+        addSuffix: true, 
+        locale: ptBR 
+      });
+    } catch {
+      return 'Inválido';
+    }
+  };
+
+  const formatPhone = (phone: string) => {
+    // Simple phone formatting for Brazilian numbers
+    if (phone.length === 11) {
+      return `(${phone.slice(0, 2)}) ${phone.slice(2, 7)}-${phone.slice(7)}`;
+    }
+    if (phone.length === 10) {
+      return `(${phone.slice(0, 2)}) ${phone.slice(2, 6)}-${phone.slice(6)}`;
+    }
+    return phone;
+  };
+
+  const truncateMessage = (message: string, maxLength: number = 60) => {
+    if (!message) return 'Sem mensagens recentes';
+    if (message.length <= maxLength) return message;
+    return message.substring(0, maxLength) + '...';
+  };
+
+  return (
+    <AppShell>
+      <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              Pipeline de Vendas 🎯
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600 mt-1">
+              Gerencie seus leads do WhatsApp
+            </p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Buscar leads..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full sm:w-64 lg:w-80"
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                onClick={syncPipeline}
+                disabled={syncing}
+                variant="outline"
+                className="flex-1 sm:flex-none"
+              >
+                {syncing ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                <span className="sm:inline hidden">Sincronizar</span>
+                <span className="sm:hidden">Sync</span>
+              </Button>
+              
+              <Button onClick={fetchPipeline} disabled={loading} size="icon" variant="outline">
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Kanban Board — horizontal scroll on mobile */}
+        <div className="overflow-x-auto -mx-4 sm:-mx-6 px-4 sm:px-6 pb-4">
+          <div className="flex gap-6 min-w-max lg:min-w-0 lg:grid lg:grid-cols-5">
+          {filteredPipeline.map((stage) => (
+            <div 
+              key={stage.stage}
+              className={`w-80 flex-shrink-0 lg:w-auto ${getStageColor(stage.stage)} rounded-xl p-4 h-fit`}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, stage.stage)}
+            >
+              {/* Stage Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold text-gray-900 flex items-center">
+                    <span className="text-xl mr-2">{stage.emoji}</span>
+                    {stage.display_name}
+                  </h3>
+                  <Badge variant="secondary" className="mt-1">
+                    {stage.count} leads
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Lead Cards */}
+              <div className="space-y-3">
+                {stage.leads.map((lead) => (
+                  <Dialog key={lead.id}>
+                    <DialogTrigger asChild>
+                      <Card 
+                        className="cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4 border-l-emerald-500 bg-white"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, lead)}
+                        onClick={() => loadLeadDetail(lead.phone_number)}
+                      >
+                        <CardHeader className="pb-2">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center space-x-3 min-w-0 flex-1">
+                              <Avatar className="h-12 w-12 flex-shrink-0">
+                                <AvatarFallback className="bg-emerald-100 text-emerald-700 text-sm font-medium">
+                                  {getInitials(lead.contact_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-gray-900 truncate text-sm">
+                                  {lead.contact_name || 'Sem nome'}
+                                </p>
+                                <div className="flex items-center text-xs text-gray-500 mt-1">
+                                  <Phone className="h-3 w-3 mr-1 flex-shrink-0" />
+                                  <span className="truncate">{formatPhone(lead.phone_number)}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ml-2 ${getTemperatureColor(lead.temperature)} flex-shrink-0`}
+                            >
+                              <Thermometer className="h-3 w-3 mr-1" />
+                              {lead.temperature}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+
+                        <CardContent className="pt-0 pb-3">
+                          <div className="space-y-3">
+                            {/* Last Message Preview */}
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <div className="text-xs text-gray-600 line-clamp-3">
+                                <MessageCircle className="h-3 w-3 inline mr-1 flex-shrink-0" />
+                                <span className="italic">
+                                  &ldquo;{truncateMessage(lead.last_message_text)}&rdquo;
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Time and Message Count */}
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                              <div className="flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                <span className="truncate">{formatTimeAgo(lead.last_message_at)}</span>
+                              </div>
+                              <div className="flex items-center ml-2">
+                                <MessageCircle className="h-3 w-3 mr-1" />
+                                <span>{lead.total_messages} msgs</span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </DialogTrigger>
+
+                    {/* Lead Detail Modal */}
+                    <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center space-x-3">
+                          <Avatar className="h-12 w-12">
+                            <AvatarFallback className="bg-emerald-100 text-emerald-700">
+                              {getInitials(selectedLead?.contact_name || lead.contact_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="text-xl font-semibold">
+                              {selectedLead?.contact_name || lead.contact_name || 'Sem nome'}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              {formatPhone(selectedLead?.phone_number || lead.phone_number)}
+                            </p>
+                          </div>
+                        </DialogTitle>
+                      </DialogHeader>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Lead Info */}
+                        <div className="space-y-4">
+                          <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-4">
+                            <div className="flex items-center mb-3">
+                              <TrendingUp className="h-5 w-5 text-emerald-600 mr-2" />
+                              <h4 className="font-semibold text-emerald-900">Status do Lead</h4>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <p className="text-xs text-emerald-700 mb-1">Estágio</p>
+                                <Badge className={`${getStageColor(lead.stage)} text-xs`}>
+                                  {pipeline.find(s => s.stage === lead.stage)?.display_name || lead.stage}
+                                </Badge>
+                              </div>
+                              <div>
+                                <p className="text-xs text-emerald-700 mb-1">Temperatura</p>
+                                <Badge className={`${getTemperatureColor(lead.temperature)} text-xs`}>
+                                  <Thermometer className="h-3 w-3 mr-1" />
+                                  {lead.temperature}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Stats */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-gray-50 rounded-lg p-4 text-center">
+                              <MessageCircle className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                              <p className="text-2xl font-bold text-gray-900">
+                                {selectedLead?.total_messages || lead.total_messages}
+                              </p>
+                              <p className="text-xs text-gray-600">Mensagens</p>
+                            </div>
+                            <div className="bg-gray-50 rounded-lg p-4 text-center">
+                              <Clock className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                              <p className="text-sm font-semibold text-gray-900 leading-tight">
+                                {selectedLead ? formatTimeAgo(selectedLead.last_message_at) : formatTimeAgo(lead.last_message_at)}
+                              </p>
+                              <p className="text-xs text-gray-600">Último contato</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Messages */}
+                        <div>
+                          <h4 className="font-semibold mb-3 flex items-center">
+                            <MessageCircle className="h-5 w-5 mr-2" />
+                            Últimas Mensagens
+                          </h4>
+                          <ScrollArea className="h-96 w-full border rounded-lg p-3">
+                            {loadingDetail ? (
+                              <div className="flex items-center justify-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                              </div>
+                            ) : selectedLead?.messages && selectedLead.messages.length > 0 ? (
+                              <div className="space-y-3">
+                                {selectedLead.messages.map((message) => (
+                                  <div 
+                                    key={message.id}
+                                    className={`flex ${message.is_from_me ? 'justify-end' : 'justify-start'}`}
+                                  >
+                                    <div 
+                                      className={`max-w-xs rounded-lg p-3 text-sm ${
+                                        message.is_from_me 
+                                          ? 'bg-emerald-500 text-white' 
+                                          : 'bg-gray-100 text-gray-900'
+                                      }`}
+                                    >
+                                      <p className="mb-1">{message.message_text}</p>
+                                      <p className={`text-xs ${
+                                        message.is_from_me ? 'text-emerald-100' : 'text-gray-500'
+                                      }`}>
+                                        {formatTimeAgo(message.timestamp)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8 text-gray-500">
+                                <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p className="text-sm">Detalhes das mensagens não disponíveis</p>
+                                <p className="text-xs mt-1">Última mensagem:</p>
+                                <div className="bg-gray-100 rounded p-2 mt-2 text-xs text-gray-700 italic">
+                                  "{lead.last_message_text || 'Sem texto disponível'}"
+                                </div>
+                              </div>
+                            )}
+                          </ScrollArea>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                ))}
+
+                {stage.leads.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-4xl mb-2">{stage.emoji}</div>
+                    <p className="text-sm">Nenhum lead neste estágio</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          </div>
+        </div>
+
+        {loading && (
+          <div className="text-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+            <p className="mt-2 text-gray-600">Carregando pipeline...</p>
+          </div>
+        )}
+      </div>
+    </AppShell>
+  );
+}

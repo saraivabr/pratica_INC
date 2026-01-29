@@ -71,6 +71,14 @@ function parseBancarios(dados: any) {
 
 // POST - Full sync from CV CRM
 export async function POST(request: NextRequest) {
+  // ❌ CV CRM SYNC ADMIN DESABILITADO - Erro 405 constantemente  
+  return NextResponse.json({
+    success: false,
+    message: "CV CRM sync admin desabilitado por Fellipe - erro 405 constante",
+    timestamp: new Date().toISOString()
+  }, { status: 503 });
+
+  /* CÓDIGO ORIGINAL COMENTADO
   try {
     const user = await getAuthenticatedUser(request);
     if (!user || user.role !== "admin") {
@@ -489,4 +497,5 @@ export async function GET(request: NextRequest) {
     console.error("[Sync] Error:", error);
     return NextResponse.json({ error: error.message || "Erro interno" }, { status: 500 });
   }
+  */ // FIM DO CÓDIGO COMENTADO
 }
