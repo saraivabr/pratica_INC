@@ -363,7 +363,8 @@ function LoginContent() {
       setTimeout(() => {
         login(data.user, data.sessionId);
         // Redirect new registrations to WhatsApp onboarding
-        router.push(isNewRegistration ? "/onboarding/whatsapp" : "/");
+        // Redirect existing users to dashboard instead of home
+        router.push(isNewRegistration ? "/onboarding/whatsapp" : "/dashboard");
       }, 1000);
     } catch (err) {
       setOtpError(true);

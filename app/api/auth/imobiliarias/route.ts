@@ -1,27 +1,23 @@
 import { NextResponse } from 'next/server'
-import pool from '@/lib/db'
+import { dbQuery } from '@/lib/db'
 
 export async function GET() {
   try {
-    // Buscar imobiliárias ordenadas por quantidade de corretores (mais populares primeiro)
-    const result = await pool.query(`
-      SELECT i.id, i.nome, COUNT(c.id) as total_corretores
-      FROM imobiliarias i
-      LEFT JOIN cvcrm_corretores c 
-        ON c.imobiliaria_id = i.id 
-        OR LOWER(TRIM(c.imobiliaria_nome)) = LOWER(TRIM(i.nome))
-      WHERE i.is_active = true
-        AND i.nome NOT ILIKE '%construtora%'
-        AND i.nome NOT ILIKE '%incorpora%'
-        AND i.nome NOT ILIKE '%engenharia%'
-      GROUP BY i.id, i.nome
-      ORDER BY COUNT(c.id) DESC, i.nome COLLATE "pt-BR-x-icu" ASC
+    // Buscar imobiliárias ativas ordenadas por nome
+    const { rows } = await dbQuery(`
+      SELECT id, nome
+      FROM imobiliarias
+      WHERE is_active = true
+        AND nome NOT ILIKE '%construtora%'
+        AND nome NOT ILIKE '%incorpora%'
+        AND nome NOT ILIKE '%engenharia%'
+      ORDER BY nome ASC
+      LIMIT 500
     `)
 
-    const imobiliarias = result.rows.map(row => ({
+    const imobiliarias = rows.map(row => ({
       id: row.id,
-      nome: row.nome,
-      corretores: parseInt(row.total_corretores) || 0
+      nome: row.nome
     }))
 
     return NextResponse.json(imobiliarias)
