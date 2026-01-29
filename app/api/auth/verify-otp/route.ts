@@ -3,6 +3,7 @@ import { dbQuery } from '@/lib/db';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 import { validateRequest, VerifyOTPSchema } from '@/lib/validation-schemas';
 import { normalizePhone } from '@/lib/supabase';
+import { createSessionCookie } from '@/lib/session-utils';
 
 export async function POST(request: Request) {
   try {
@@ -106,23 +107,37 @@ export async function POST(request: Request) {
       // Não bloquear login - workspace será criado automaticamente pelo requireWorkspaceContext
     }
 
-    return NextResponse.json({
+    const userData = {
+      id: session.user_id,
+      telefone: session.telefone,
+      nome: session.nome,
+      role: session.role,
+      gerente_id: session.gerente_id,
+      avatar_url: session.avatar_url,
+      workspace_id: session.workspace_id,
+      workspaceId: session.workspace_id,  // Alias
+      imobiliaria_id: session.imobiliaria_id,
+      imobiliaria: session.imobiliaria_nome,
+      onboarding_status: session.onboarding_status,
+    };
+
+    // Criar cookie seguro (httpOnly, secure em prod, 30 dias)
+    const sessionCookie = createSessionCookie({
+      userId: session.user_id,
+      phone: session.telefone,
+      sessionId: session.id,
+      role: session.role,
+      workspaceId: session.workspace_id,
+    });
+
+    const response = NextResponse.json({
       success: true,
       sessionId: session.id,
-      user: {
-        id: session.user_id,
-        telefone: session.telefone,
-        nome: session.nome,
-        role: session.role,
-        gerente_id: session.gerente_id,
-        avatar_url: session.avatar_url,
-        workspace_id: session.workspace_id,
-        workspaceId: session.workspace_id,  // Alias
-        imobiliaria_id: session.imobiliaria_id,
-        imobiliaria: session.imobiliaria_nome,
-        onboarding_status: session.onboarding_status,
-      },
+      user: userData,
     });
+
+    response.headers.set('Set-Cookie', sessionCookie);
+    return response;
   } catch (error) {
     console.error('Error in verify-otp:', error);
     return NextResponse.json(

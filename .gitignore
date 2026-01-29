@@ -55,7 +55,6 @@ playwright-report/
 !package.json
 !tsconfig.json
 !tsconfig.server.json
-!scalingo.json
 !next.config.json
 !.swcrc
 !components.json

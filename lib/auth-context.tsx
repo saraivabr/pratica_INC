@@ -23,6 +23,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Auto-refresh session before expiry (every 7 days)
+  useEffect(() => {
+    if (!user || !sessionId) return;
+
+    const REFRESH_INTERVAL = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+    
+    const refreshSession = async () => {
+      try {
+        console.log('[auth] Auto-refreshing session...');
+        const response = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.user) {
+            setUser(data.user);
+            localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+            console.log('[auth] Session refreshed successfully');
+          }
+        } else {
+          console.warn('[auth] Failed to refresh session, will retry on next interval');
+        }
+      } catch (error) {
+        console.warn('[auth] Error refreshing session:', error);
+      }
+    };
+
+    // Refresh immediately on mount (if logged in)
+    refreshSession();
+
+    // Schedule periodic refresh
+    const intervalId = setInterval(refreshSession, REFRESH_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [user, sessionId]);
+
   // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
@@ -51,15 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSessionId(storedSessionId);
             // Update stored user with latest data
             localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-            // Update cookie with role and workspace_id for middleware
-            const cookieValue = JSON.stringify({ 
-              userId: data.user.id, 
-              phone: data.user.telefone, 
-              sessionId: storedSessionId, 
-              role: data.user.role,
-              workspaceId: data.user.workspace_id || data.user.workspaceId  // NEW: User Workspace
-            });
-            document.cookie = `pratica-session=${encodeURIComponent(cookieValue)}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+            // Cookie já está setado pelo backend (httpOnly, secure)
+            // Apenas sincroniza estado local
           } else {
             // Session invalid, clear storage
             localStorage.removeItem(SESSION_KEY);
@@ -107,15 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(SESSION_KEY, newSessionId);
     localStorage.setItem(USER_KEY, JSON.stringify(userData));
 
-    // Also set cookie for middleware (7 days expiry) - include role and workspace_id for server-side redirects
-    const cookieValue = JSON.stringify({ 
-      userId: userData.id, 
-      phone: userData.telefone, 
-      sessionId: newSessionId, 
-      role: userData.role,
-      workspaceId: (userData as any).workspace_id || (userData as any).workspaceId  // NEW: User Workspace
-    });
-    document.cookie = `pratica-session=${encodeURIComponent(cookieValue)}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    // Cookie será setado pelo backend (httpOnly, secure)
+    // Cliente não precisa mais setar cookie manualmente
 
     // Track login event (fire-and-forget, don't block login)
     fetch('/api/track', {
@@ -149,8 +173,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(USER_KEY);
 
-    // Clear cookie
-    document.cookie = 'pratica-session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    // Cookie será limpo pelo backend via /api/auth/logout
+    // Cliente não precisa mais limpar cookie manualmente (httpOnly protege)
   }, [user]);
 
   const track = useCallback((eventType: string, page: string, data: Record<string, any> = {}) => {

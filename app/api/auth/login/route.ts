@@ -3,6 +3,7 @@ import { dbQuery } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { validateRequest, LoginSchema } from '@/lib/validation-schemas';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
+import { createSessionCookie } from '@/lib/session-utils';
 
 export async function POST(request: Request) {
   try {
@@ -76,10 +77,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Criar sessão válida
+    // Criar sessão válida (30 dias)
     const { rows: sessionRows } = await dbQuery(
       `INSERT INTO sessions (user_id, is_verified, expires_at)
-       VALUES ($1, true, now() + interval '7 days')
+       VALUES ($1, true, now() + interval '30 days')
        RETURNING id`,
       [user.id]
     );
@@ -100,20 +101,34 @@ export async function POST(request: Request) {
       [user.id]
     );
 
-    // Retornar dados da sessão
-    return NextResponse.json({
+    const userData = {
+      id: user.id,
+      nome: user.nome,
+      email: user.email,
+      telefone: user.telefone,
+      role: user.role,
+      imobiliaria_id: user.imobiliaria_id,
+      workspace_id: user.workspace_id,
+      is_active: user.is_active,
+    };
+
+    // Criar cookie seguro (httpOnly, secure em prod, 30 dias)
+    const sessionCookie = createSessionCookie({
+      userId: user.id,
+      phone: user.telefone,
+      sessionId: session.id,
+      role: user.role,
+      workspaceId: user.workspace_id,
+    });
+
+    const response = NextResponse.json({
       success: true,
       sessionId: session.id,
-      user: {
-        id: user.id,
-        nome: user.nome,
-        email: user.email,
-        telefone: user.telefone,
-        role: user.role,
-        imobiliaria_id: user.imobiliaria_id,
-        is_active: user.is_active,
-      },
+      user: userData,
     });
+
+    response.headers.set('Set-Cookie', sessionCookie);
+    return response;
   } catch (error) {
     console.error('[Login] Error:', error);
     return NextResponse.json(

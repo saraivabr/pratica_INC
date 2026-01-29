@@ -1,32 +1,20 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { dbQuery } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { clearSessionCookie, parseSessionCookie } from '@/lib/session-utils';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get session ID from Authorization header or Cookie
+    // Get session ID from Cookie
     let sessionId: string | null = null;
 
-    // Try Authorization header first (Bearer token)
-    const authHeader = request.headers.get('authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-      sessionId = authHeader.substring(7);
-    }
-
-    // Try Cookie if no auth header
-    if (!sessionId) {
-      const cookieStore = await cookies();
-      sessionId = cookieStore.get('session')?.value ?? null;
-    }
-
-    // Also check for session cookie in request header
-    if (!sessionId) {
-      const cookieHeader = request.headers.get('cookie');
-      if (cookieHeader) {
-        const match = cookieHeader.match(/session=([^;]+)/);
-        if (match) {
-          sessionId = match[1];
-        }
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('pratica-session')?.value;
+    
+    if (sessionCookie) {
+      const parsed = parseSessionCookie(sessionCookie);
+      if (parsed) {
+        sessionId = parsed.sessionId;
       }
     }
 
@@ -39,13 +27,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Clear the cookie
-    const cookieStore = await cookies();
-    cookieStore.delete('session');
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: 'Logout realizado com sucesso',
     });
+
+    response.headers.set('Set-Cookie', clearSessionCookie());
+    return response;
   } catch (error) {
     console.error('Error in /api/auth/logout:', error);
     return NextResponse.json(

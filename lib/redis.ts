@@ -8,9 +8,9 @@ export function getRedis(): Redis | null {
   if (connectionFailed) return null;
 
   if (!redisClient) {
-    const url = process.env.SCALINGO_REDIS_URL;
+    const url = process.env.REDIS_URL;
     if (!url) {
-      console.warn('[Redis] SCALINGO_REDIS_URL não configurada');
+      console.warn('[Redis] REDIS_URL não configurada');
       connectionFailed = true;
       return null;
     }

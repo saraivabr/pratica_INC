@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
+import { createSessionCookie } from '@/lib/session-utils';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://corretorparceria.com.br';
 
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
 
     // Find session by magic token
     const { rows } = await dbQuery(
-      `select s.*, u.id as user_id, u.telefone, u.nome, u.role, u.gerente_id, u.is_active
+      `select s.*, u.id as user_id, u.telefone, u.nome, u.role, u.gerente_id, u.is_active, u.workspace_id
        from sessions s
        join users u on u.id = s.user_id
        where s.otp_code = $1 and s.is_verified = false and s.otp_expires_at > now()
@@ -52,14 +53,26 @@ export async function GET(request: Request) {
         nome: session.nome,
         role: session.role,
         gerente_id: session.gerente_id,
+        workspace_id: session.workspace_id,
       },
     };
+
+    // Criar cookie seguro (httpOnly, secure em prod, 30 dias)
+    const sessionCookie = createSessionCookie({
+      userId: session.user_id,
+      phone: session.telefone,
+      sessionId: session.id,
+      role: session.role,
+      workspaceId: session.workspace_id,
+    });
 
     // Redirect to a page that will set the auth state
     const authUrl = new URL('/auth/callback', BASE_URL);
     authUrl.searchParams.set('data', Buffer.from(JSON.stringify(authData)).toString('base64'));
 
-    return NextResponse.redirect(authUrl);
+    const response = NextResponse.redirect(authUrl);
+    response.headers.set('Set-Cookie', sessionCookie);
+    return response;
   } catch (error) {
     console.error('Error in magic link:', error);
     return NextResponse.redirect(new URL('/login?error=server_error', BASE_URL));

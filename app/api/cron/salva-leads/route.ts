@@ -17,7 +17,7 @@ import {
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes max execution time
 
-// Scalingo has 30s timeout, so we need to work quickly
+// Conservative timeout for reliability
 const MAX_EXECUTION_TIME_MS = 25000; // 25 seconds max
 
 interface TenantResult {

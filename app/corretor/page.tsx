@@ -6,16 +6,16 @@ import { Loader2 } from "lucide-react"
 import { AnimatedBackground } from "@/components/animated-background"
 
 /**
- * Dashboard Redirect Page
+ * Corretor Parceria Domain Compatibility
  * 
- * Página principal para corretores que redireciona para /leads
- * (painel de gestão de leads)
+ * Redirect para /dashboard para compatibilidade com domínio antigo
+ * corretorparceria.com.br → corretorparceria.com.br/corretor → /dashboard → /leads
  */
-export default function DashboardPage() {
+export default function CorretorPage() {
   const router = useRouter()
 
   useEffect(() => {
-    router.replace("/leads")
+    router.replace("/dashboard")
   }, [router])
 
   return (

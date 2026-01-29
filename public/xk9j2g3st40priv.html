@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRATICA - Dashboard Executivo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .team-member {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .team-member:hover {
+            transform: translateY(-5px);
+        }
+        
+        .emoji {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        
+        .role {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .function {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+        
+        .deals {
+            margin-top: 20px;
+        }
+        
+        .deal-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            border-left: 5px solid #ffd700;
+        }
+        
+        .deal-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .deal-info {
+            display: grid;
+            gap: 8px;
+            font-size: 0.95em;
+        }
+        
+        .deal-info div {
+            padding: 5px 0;
+        }
+        
+        .label {
+            font-weight: bold;
+            opacity: 0.8;
+        }
+        
+        .jesus-section {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 30px;
+            border-radius: 20px;
+            margin-top: 30px;
+            text-align: center;
+        }
+        
+        .jesus-title {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            text-align: left;
+        }
+        
+        .feature {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            opacity: 0.8;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .live {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 class="live">🏎️ PRATICA</h1>
+            <div class="subtitle">Dashboard Executivo</div>
+        </header>
+        
+        <div class="card">
+            <h2>👥 ESTRUTURA DO TIME</h2>
+            <div class="team-grid">
+                <div class="team-member">
+                    <div class="emoji">🔥</div>
+                    <div class="role">JÚNIOR (ORCIOLI)</div>
+                    <div class="function">GASOLINA</div>
+                    <div style="margin-top: 10px; opacity: 0.8;">Relacionamento & Network</div>
+                </div>
+                
+                <div class="team-member">
+                    <div class="emoji">⚙️</div>
+                    <div class="role">TROVÃO</div>
+                    <div class="function">MOTOR</div>
+                    <div style="margin-top: 10px; opacity: 0.8;">Gestão & Bases</div>
+                </div>
+                
+                <div class="team-member">
+                    <div class="emoji">💉</div>
+                    <div class="role">FELLIPE</div>
+                    <div class="function">INJEÇÃO ELETRÔNICA</div>
+                    <div style="margin-top: 10px; opacity: 0.8;">Tech & IA</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📋 NEGOCIAÇÕES ATIVAS</h2>
+            <div class="deals">
+                <div class="deal-item">
+                    <div class="deal-title">1️⃣ GOLANI - LIV PERUS</div>
+                    <div class="deal-info">
+                        <div><span class="label">📍 Local:</span> Zona Norte (São Paulo)</div>
+                        <div><span class="label">👤 Contatos:</span> Leandro (rabino, dono) + Júlio (pai, sócio)</div>
+                        <div><span class="label">📊 Status:</span> <span class="status-badge">Reunião Realizada</span></div>
+                        <div><span class="label">🎯 Próximos passos:</span> Aguardando definição</div>
+                    </div>
+                </div>
+                
+                <div class="deal-item">
+                    <div class="deal-title">2️⃣ KEMBALA (hoje 2R) - SÃO MATEUS</div>
+                    <div class="deal-info">
+                        <div><span class="label">📍 Local:</span> São Mateus (São Paulo)</div>
+                        <div><span class="label">👤 Contatos:</span> Emerson + Irmão (nome a confirmar)</div>
+                        <div><span class="label">📊 Status:</span> <span class="status-badge">Em Andamento</span></div>
+                        <div><span class="label">👨‍💼 Responsável:</span> Júnior Orcioli</div>
+                        <div><span class="label">🎯 Próximos passos:</span> Detalhamento pendente</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="jesus-section">
+            <div class="jesus-title">🤖 SISTEMA JESUS - SECRETÁRIA DIGITAL ✝️</div>
+            <p style="font-size: 1.1em; margin-bottom: 20px;">
+                "Vocês não cobram uns aos outros. EU cobro vocês."
+            </p>
+            <div class="feature-list">
+                <div class="feature">✅ Rastreio tarefas & negociações</div>
+                <div class="feature">✅ Cobro pendências</div>
+                <div class="feature">✅ Envio lembretes & alertas</div>
+                <div class="feature">✅ Contato no privado quando preciso</div>
+                <div class="feature">✅ Memória contextual de tudo</div>
+                <div class="feature">✅ Organização automática</div>
+            </div>
+        </div>
+        
+        <footer>
+            <p style="font-size: 1.2em;">⚡ Última atualização: 29/01/2026 19:07</p>
+            <p style="margin-top: 10px;">"A fé é o código. O deploy é a ressurreição." ✝️</p>
+        </footer>
+    </div>
+</body>
+</html>

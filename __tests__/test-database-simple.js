@@ -17,13 +17,12 @@ async function testDatabase() {
   console.log('📍 Servidor:', DATABASE_URL.match(/@([^:]+)/)?.[1] || 'desconhecido');
   console.log('');
 
-  // Detectar se é Scalingo e usar SSL
-  const isScalingo = DATABASE_URL.includes('scalingo-dbs.com');
+  // Detectar se precisa SSL
   const isSupabase = DATABASE_URL.includes('supabase.co');
   
   const pool = new Pool({ 
     connectionString: DATABASE_URL,
-    ssl: (isScalingo || isSupabase) ? { rejectUnauthorized: false } : false
+    ssl: isSupabase ? { rejectUnauthorized: false } : false
   });
 
   try {

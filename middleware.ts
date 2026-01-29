@@ -15,6 +15,7 @@ const protectedRoutes = [
   '/chat',
   '/perfil',
   '/corretor',
+  '/dashboard',
   '/leads',
   '/onboarding/whatsapp',
 ]
@@ -151,7 +152,7 @@ export function middleware(request: NextRequest) {
         return NextResponse.next()
       } else {
         // Corretores cannot access admin area
-        return NextResponse.redirect(new URL('/corretor', baseUrl))
+        return NextResponse.redirect(new URL('/dashboard', baseUrl))
       }
     }
 
@@ -189,7 +190,7 @@ export function middleware(request: NextRequest) {
       if (isAdminOrGerente) {
         return NextResponse.redirect(new URL('/admin', baseUrl))
       } else {
-        return NextResponse.redirect(new URL('/corretor', baseUrl))
+        return NextResponse.redirect(new URL('/dashboard', baseUrl))
       }
     }
   }
