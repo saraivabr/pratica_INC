@@ -1,0 +1,78 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# macOS
+.DS_Store
+
+# dependencies
+/node_modules
+package-lock.json
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+/dist
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Capacitor / Android
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+android/*.iml
+android/.idea/
+*.apk
+*.aab
+*.keystore
+
+# Flutter app (develop separately)
+flutter_app/
+
+# Large files
+downloads/
+public/materiais/
+supabase/migrations/full_migration/
+.gemini-clipboard/
+playwright-report/
+*.json
+!package.json
+!tsconfig.json
+!tsconfig.server.json
+!scalingo.json
+!next.config.json
+!.swcrc
+!components.json
+*.txt
+!README.txt
+*.pdf
+*.csv
+
+# Reports
+reports/
+
+# Postman collections
+*.postman_collection*.json
+
+# Misc
+pasta\ sem\ título*/
+dados_sistema_orulo/
+
+# backups
+/backups/

@@ -1,0 +1,76 @@
+{
+  "name": "pratica-imobiliaria",
+  "description": "CRM Pratica Imobiliaria com Sistema de Intermediação",
+  "repository": "https://github.com/saraivabr/appnovo_pratica",
+  "logo": "https://pratica.app/logo.png",
+  "success_url": "/admin/intermediacao",
+  "scripts": {
+    "postdeploy": "echo 'Sistema de Intermediação deployed successfully'"
+  },
+  "env": {
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production"
+    },
+    "DATABASE_URL": {
+      "description": "PostgreSQL connection string (Supabase)",
+      "required": true
+    },
+    "NEXT_PUBLIC_SUPABASE_URL": {
+      "description": "Supabase project URL",
+      "required": true
+    },
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
+      "description": "Supabase anonymous key for client-side",
+      "required": true
+    },
+    "SUPABASE_SERVICE_ROLE_KEY": {
+      "description": "Supabase service role key for server-side",
+      "required": true
+    },
+    "SUPABASE_DB_URL": {
+      "description": "Supabase direct database URL",
+      "required": true
+    },
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API Key for AI features",
+      "required": false
+    },
+    "GOOGLE_AI_API_KEY": {
+      "description": "Google AI API Key for Gemini Voice Agent",
+      "required": false
+    },
+    "ADMIN_SECRET_KEY": {
+      "description": "Secret key for admin authentication",
+      "required": true
+    },
+    "CVCRM_BASE_URL": {
+      "description": "CV CRM API base URL",
+      "required": false
+    },
+    "CVCRM_TOKEN_LEAD": {
+      "description": "CV CRM token for leads API",
+      "required": false
+    },
+    "EVOLUTION_BASE_URL": {
+      "description": "Evolution API URL for WhatsApp",
+      "required": false
+    },
+    "EVOLUTION_API_KEY": {
+      "description": "Evolution API Key",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "amount": 1,
+      "size": "M"
+    }
+  },
+  "addons": [],
+  "buildpacks": [
+    {
+      "url": "https://github.com/Scalingo/nodejs-buildpack"
+    }
+  ]
+}

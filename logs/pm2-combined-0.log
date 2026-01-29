@@ -1,0 +1,1127 @@
+2026-01-28T16:16:27: /var/www/pratica/node_modules/.bin/next:2
+2026-01-28T16:16:27: basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+2026-01-28T16:16:27:           ^^^^^^^
+2026-01-28T16:16:27: 
+2026-01-28T16:16:27: SyntaxError: missing ) after argument list
+2026-01-28T16:16:27:     at wrapSafe (node:internal/modules/cjs/loader:1638:18)
+2026-01-28T16:16:27:     at Module._compile (node:internal/modules/cjs/loader:1680:20)
+2026-01-28T16:16:27:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:27:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:27:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:27:     at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+2026-01-28T16:16:27:     at Module._compile (node:internal/modules/cjs/loader:1706:14)
+2026-01-28T16:16:27:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:27:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:27:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:27: /var/www/pratica/node_modules/.bin/next:2
+2026-01-28T16:16:27: basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+2026-01-28T16:16:27:           ^^^^^^^
+2026-01-28T16:16:27: 
+2026-01-28T16:16:27: SyntaxError: missing ) after argument list
+2026-01-28T16:16:27:     at wrapSafe (node:internal/modules/cjs/loader:1638:18)
+2026-01-28T16:16:27:     at Module._compile (node:internal/modules/cjs/loader:1680:20)
+2026-01-28T16:16:27:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:27:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:27:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:27:     at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+2026-01-28T16:16:27:     at Module._compile (node:internal/modules/cjs/loader:1706:14)
+2026-01-28T16:16:27:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:27:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:27:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:27: /var/www/pratica/node_modules/.bin/next:2
+2026-01-28T16:16:27: basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+2026-01-28T16:16:27:           ^^^^^^^
+2026-01-28T16:16:27: 
+2026-01-28T16:16:27: SyntaxError: missing ) after argument list
+2026-01-28T16:16:27:     at wrapSafe (node:internal/modules/cjs/loader:1638:18)
+2026-01-28T16:16:27:     at Module._compile (node:internal/modules/cjs/loader:1680:20)
+2026-01-28T16:16:27:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:27:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:27:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:27:     at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+2026-01-28T16:16:27:     at Module._compile (node:internal/modules/cjs/loader:1706:14)
+2026-01-28T16:16:27:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:27:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:27:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:27: /var/www/pratica/node_modules/.bin/next:2
+2026-01-28T16:16:27: basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+2026-01-28T16:16:27:           ^^^^^^^
+2026-01-28T16:16:27: 
+2026-01-28T16:16:27: SyntaxError: missing ) after argument list
+2026-01-28T16:16:27:     at wrapSafe (node:internal/modules/cjs/loader:1638:18)
+2026-01-28T16:16:27:     at Module._compile (node:internal/modules/cjs/loader:1680:20)
+2026-01-28T16:16:27:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:27:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:27:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:27:     at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+2026-01-28T16:16:27:     at Module._compile (node:internal/modules/cjs/loader:1706:14)
+2026-01-28T16:16:27:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:27:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:27:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28: /var/www/pratica/node_modules/.bin/next:2
+2026-01-28T16:16:28: basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+2026-01-28T16:16:28:           ^^^^^^^
+2026-01-28T16:16:28: 
+2026-01-28T16:16:28: SyntaxError: missing ) after argument list
+2026-01-28T16:16:28:     at wrapSafe (node:internal/modules/cjs/loader:1638:18)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1680:20)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28:     at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1706:14)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28: /var/www/pratica/node_modules/.bin/next:2
+2026-01-28T16:16:28: basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+2026-01-28T16:16:28:           ^^^^^^^
+2026-01-28T16:16:28: 
+2026-01-28T16:16:28: SyntaxError: missing ) after argument list
+2026-01-28T16:16:28:     at wrapSafe (node:internal/modules/cjs/loader:1638:18)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1680:20)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28:     at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1706:14)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28: /var/www/pratica/node_modules/.bin/next:2
+2026-01-28T16:16:28: basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+2026-01-28T16:16:28:           ^^^^^^^
+2026-01-28T16:16:28: 
+2026-01-28T16:16:28: SyntaxError: missing ) after argument list
+2026-01-28T16:16:28:     at wrapSafe (node:internal/modules/cjs/loader:1638:18)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1680:20)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28:     at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1706:14)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28: /var/www/pratica/node_modules/.bin/next:2
+2026-01-28T16:16:28: basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+2026-01-28T16:16:28:           ^^^^^^^
+2026-01-28T16:16:28: 
+2026-01-28T16:16:28: SyntaxError: missing ) after argument list
+2026-01-28T16:16:28:     at wrapSafe (node:internal/modules/cjs/loader:1638:18)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1680:20)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28:     at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1706:14)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28: /var/www/pratica/node_modules/.bin/next:2
+2026-01-28T16:16:28: basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+2026-01-28T16:16:28:           ^^^^^^^
+2026-01-28T16:16:28: 
+2026-01-28T16:16:28: SyntaxError: missing ) after argument list
+2026-01-28T16:16:28:     at wrapSafe (node:internal/modules/cjs/loader:1638:18)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1680:20)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28:     at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1706:14)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28: /var/www/pratica/node_modules/.bin/next:2
+2026-01-28T16:16:28: basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+2026-01-28T16:16:28:           ^^^^^^^
+2026-01-28T16:16:28: 
+2026-01-28T16:16:28: SyntaxError: missing ) after argument list
+2026-01-28T16:16:28:     at wrapSafe (node:internal/modules/cjs/loader:1638:18)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1680:20)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:28:     at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+2026-01-28T16:16:28:     at Module._compile (node:internal/modules/cjs/loader:1706:14)
+2026-01-28T16:16:28:     at Object..js (node:internal/modules/cjs/loader:1839:10)
+2026-01-28T16:16:28:     at Module.load (node:internal/modules/cjs/loader:1441:32)
+2026-01-28T16:16:28:     at Function._load (node:internal/modules/cjs/loader:1263:12)
+2026-01-28T16:16:54: 
+2026-01-28T16:16:54: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T16:16:54: > next start
+2026-01-28T16:16:54: 
+2026-01-28T16:16:54:    ▲ Next.js 16.0.10
+2026-01-28T16:16:54:    - Local:         http://localhost:3000
+2026-01-28T16:16:54:    - Network:       http://185.182.184.122:3000
+2026-01-28T16:16:54: 
+2026-01-28T16:16:54:  ✓ Starting...
+2026-01-28T16:16:54:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T16:16:54:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T16:16:54:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T16:16:54:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T16:16:54:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T16:16:54:  ✓ Ready in 391ms
+2026-01-28T16:16:55: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+2026-01-28T16:16:55: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+2026-01-28T16:16:55: [Evolution API] EVOLUTION_API_KEY not configured in environment
+2026-01-28T16:16:55: [WhatsApp Sync] EVOLUTION_API_KEY not configured in environment
+2026-01-28T16:18:23: TypeError: Invalid URL
+2026-01-28T16:18:23:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:40185)
+2026-01-28T16:18:23:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:18:23:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:18:23:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:18:23:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:18:23:   code: 'ERR_INVALID_URL',
+2026-01-28T16:18:23:   input: '/login',
+2026-01-28T16:18:23:   base: '\\http://\\185.182.184.122'
+2026-01-28T16:18:23: }
+2026-01-28T16:18:23:  ⨯ Error: Invariant: did not expect response writer to be written to for upgrade request
+2026-01-28T16:18:23:     at ignore-listed frames
+2026-01-28T16:18:54: TypeError: Invalid URL
+2026-01-28T16:18:54:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:40185)
+2026-01-28T16:18:54:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:18:54:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:18:54:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:18:54:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:18:54:   code: 'ERR_INVALID_URL',
+2026-01-28T16:18:54:   input: '/login',
+2026-01-28T16:18:54:   base: '\\http://\\localhost'
+2026-01-28T16:18:54: }
+2026-01-28T16:18:54:  ⨯ Error: Invariant: did not expect response writer to be written to for upgrade request
+2026-01-28T16:18:54:     at ignore-listed frames
+2026-01-28T16:19:51: TypeError: Invalid URL
+2026-01-28T16:19:51:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:40185)
+2026-01-28T16:19:51:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:19:51:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:19:51:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:19:51:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:19:51:   code: 'ERR_INVALID_URL',
+2026-01-28T16:19:51:   input: '/login',
+2026-01-28T16:19:51:   base: '\\http://\\corretorparceria.com.br'
+2026-01-28T16:19:51: }
+2026-01-28T16:19:51:  ⨯ Error: Invariant: did not expect response writer to be written to for upgrade request
+2026-01-28T16:19:51:     at ignore-listed frames
+2026-01-28T16:21:51: TypeError: Invalid URL
+2026-01-28T16:21:51:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:40185)
+2026-01-28T16:21:51:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:21:51:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:21:51:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:21:51:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:21:51:   code: 'ERR_INVALID_URL',
+2026-01-28T16:21:51:   input: '/login',
+2026-01-28T16:21:51:   base: '\\http://\\corretorparceria.com.br'
+2026-01-28T16:21:51: }
+2026-01-28T16:21:51:  ⨯ Error: Invariant: did not expect response writer to be written to for upgrade request
+2026-01-28T16:21:51:     at ignore-listed frames
+2026-01-28T16:23:01: TypeError: Invalid URL
+2026-01-28T16:23:01:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:40185)
+2026-01-28T16:23:01:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:23:01:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:23:01:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:23:01:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:23:01:   code: 'ERR_INVALID_URL',
+2026-01-28T16:23:01:   input: '/login',
+2026-01-28T16:23:01:   base: '\\http://\\corretorparceria.com.br'
+2026-01-28T16:23:01: }
+2026-01-28T16:23:01:  ⨯ Error: Invariant: did not expect response writer to be written to for upgrade request
+2026-01-28T16:23:01:     at ignore-listed frames
+2026-01-28T16:23:15: TypeError: Invalid URL
+2026-01-28T16:23:15:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:40185)
+2026-01-28T16:23:15:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:23:15:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:23:15:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:23:15:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:23:15:   code: 'ERR_INVALID_URL',
+2026-01-28T16:23:15:   input: '/login',
+2026-01-28T16:23:15:   base: '\\http://\\corretorparceria.com.br'
+2026-01-28T16:23:15: }
+2026-01-28T16:23:54: TypeError: Invalid URL
+2026-01-28T16:23:54:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:40185)
+2026-01-28T16:23:54:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:23:54:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:23:54:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:23:54:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:23:54:   code: 'ERR_INVALID_URL',
+2026-01-28T16:23:54:   input: '/login',
+2026-01-28T16:23:54:   base: '\\http://\\localhost'
+2026-01-28T16:23:54: }
+2026-01-28T16:23:54:  ⨯ Error: Invariant: did not expect response writer to be written to for upgrade request
+2026-01-28T16:23:54:     at ignore-listed frames
+2026-01-28T16:24:08: TypeError: Invalid URL
+2026-01-28T16:24:08:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:40185)
+2026-01-28T16:24:08:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:24:08:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:24:08:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:24:08:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:24:08:   code: 'ERR_INVALID_URL',
+2026-01-28T16:24:08:   input: '/login',
+2026-01-28T16:24:08:   base: '\\http://\\localhost'
+2026-01-28T16:24:08: }
+2026-01-28T16:24:08:  ⨯ Error: Invariant: did not expect response writer to be written to for upgrade request
+2026-01-28T16:24:08:     at ignore-listed frames
+2026-01-28T16:24:14: TypeError: Invalid URL
+2026-01-28T16:24:14:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:40185)
+2026-01-28T16:24:14:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:24:14:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:24:14:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:24:14:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:24:14:   code: 'ERR_INVALID_URL',
+2026-01-28T16:24:14:   input: '/login',
+2026-01-28T16:24:14:   base: '\\http://\\corretorparceria.com.br'
+2026-01-28T16:24:14: }
+2026-01-28T16:24:14:  ⨯ Error: Invariant: did not expect response writer to be written to for upgrade request
+2026-01-28T16:24:14:     at ignore-listed frames
+2026-01-28T16:24:34: TypeError: Invalid URL
+2026-01-28T16:24:34:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:39980)
+2026-01-28T16:24:34:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:24:34:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:24:34:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:24:34:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:24:34:   code: 'ERR_INVALID_URL',
+2026-01-28T16:24:34:   input: '/login?error=admin_required',
+2026-01-28T16:24:34:   base: '\\http://\\corretorparceria.com.br'
+2026-01-28T16:24:34: }
+2026-01-28T16:24:34:  ⨯ Error: Invariant: did not expect response writer to be written to for upgrade request
+2026-01-28T16:24:34:     at ignore-listed frames
+2026-01-28T16:25:24: 
+2026-01-28T16:25:24: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T16:25:24: > next start
+2026-01-28T16:25:24: 
+2026-01-28T16:25:25:    ▲ Next.js 16.0.10
+2026-01-28T16:25:25:    - Local:         http://localhost:3000
+2026-01-28T16:25:25:    - Network:       http://185.182.184.122:3000
+2026-01-28T16:25:25: 
+2026-01-28T16:25:25:  ✓ Starting...
+2026-01-28T16:25:25:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T16:25:25:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T16:25:25:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T16:25:25:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T16:25:25:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T16:25:25:  ✓ Ready in 591ms
+2026-01-28T16:25:26: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: ⚙️  override existing env vars with { override: true }
+2026-01-28T16:25:26: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+2026-01-28T16:25:26: [Evolution API] EVOLUTION_API_KEY not configured in environment
+2026-01-28T16:25:26: [WhatsApp Sync] EVOLUTION_API_KEY not configured in environment
+2026-01-28T16:25:46: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/empreendimentos with email  and token MISSING
+2026-01-28T16:25:46: [CVCRM] Error 401 on /api/v1/cadastros/empreendimentos: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T16:25:46: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/corretores with email  and token MISSING
+2026-01-28T16:25:47: [CVCRM] Error 401 on /api/v1/cadastros/corretores: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T16:25:47: TypeError: Invalid URL
+2026-01-28T16:25:47:     at tg (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:40185)
+2026-01-28T16:25:47:     at handler (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:41071)
+2026-01-28T16:25:47:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35700)
+2026-01-28T16:25:47:     at <unknown> (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:35687)
+2026-01-28T16:25:47:     at async ts (.next/server/edge/chunks/[root-of-the-server]__6d85d692._.js:13:32075) {
+2026-01-28T16:25:47:   code: 'ERR_INVALID_URL',
+2026-01-28T16:25:47:   input: '/login',
+2026-01-28T16:25:47:   base: '\\http://\\localhost'
+2026-01-28T16:25:47: }
+2026-01-28T16:25:47:  ⨯ Error: Invariant: did not expect response writer to be written to for upgrade request
+2026-01-28T16:25:47:     at ignore-listed frames
+2026-01-28T16:38:01: 
+2026-01-28T16:38:01: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T16:38:01: > next start
+2026-01-28T16:38:01: 
+2026-01-28T16:38:02:    ▲ Next.js 16.0.10
+2026-01-28T16:38:02:    - Local:         http://localhost:3000
+2026-01-28T16:38:02:    - Network:       http://185.182.184.122:3000
+2026-01-28T16:38:02: 
+2026-01-28T16:38:02:  ✓ Starting...
+2026-01-28T16:38:02:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T16:38:02:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T16:38:02:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T16:38:02:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T16:38:02:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T16:38:02:  ✓ Ready in 412ms
+2026-01-28T16:38:02: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+2026-01-28T16:38:02: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+2026-01-28T16:39:50: [Redis] SCALINGO_REDIS_URL não configurada
+2026-01-28T16:39:50: Error in send-otp: error: column "telefone" does not exist
+2026-01-28T16:39:50:     at async u (.next/server/chunks/[root-of-the-server]__03c95912._.js:75:5309)
+2026-01-28T16:39:50:     at async c (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:4070)
+2026-01-28T16:39:50:     at async d (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:5108)
+2026-01-28T16:39:50:     at async $ (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:6186) {
+2026-01-28T16:39:50:   length: 108,
+2026-01-28T16:39:50:   severity: 'ERROR',
+2026-01-28T16:39:50:   code: '42703',
+2026-01-28T16:39:50:   detail: undefined,
+2026-01-28T16:39:50:   hint: undefined,
+2026-01-28T16:39:50:   position: '27',
+2026-01-28T16:39:50:   internalPosition: undefined,
+2026-01-28T16:39:50:   internalQuery: undefined,
+2026-01-28T16:39:50:   where: undefined,
+2026-01-28T16:39:50:   schema: undefined,
+2026-01-28T16:39:50:   table: undefined,
+2026-01-28T16:39:50:   column: undefined,
+2026-01-28T16:39:50:   dataType: undefined,
+2026-01-28T16:39:50:   constraint: undefined,
+2026-01-28T16:39:50:   file: 'parse_relation.c',
+2026-01-28T16:39:50:   line: '3722',
+2026-01-28T16:39:50:   routine: 'errorMissingColumn'
+2026-01-28T16:39:50: }
+2026-01-28T16:44:19: Error in send-otp: error: column "telefone" does not exist
+2026-01-28T16:44:19:     at async u (.next/server/chunks/[root-of-the-server]__03c95912._.js:75:5309)
+2026-01-28T16:44:19:     at async c (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:4070)
+2026-01-28T16:44:19:     at async d (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:5108)
+2026-01-28T16:44:19:     at async $ (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:6186) {
+2026-01-28T16:44:19:   length: 108,
+2026-01-28T16:44:19:   severity: 'ERROR',
+2026-01-28T16:44:19:   code: '42703',
+2026-01-28T16:44:19:   detail: undefined,
+2026-01-28T16:44:19:   hint: undefined,
+2026-01-28T16:44:19:   position: '27',
+2026-01-28T16:44:19:   internalPosition: undefined,
+2026-01-28T16:44:19:   internalQuery: undefined,
+2026-01-28T16:44:19:   where: undefined,
+2026-01-28T16:44:19:   schema: undefined,
+2026-01-28T16:44:19:   table: undefined,
+2026-01-28T16:44:19:   column: undefined,
+2026-01-28T16:44:19:   dataType: undefined,
+2026-01-28T16:44:19:   constraint: undefined,
+2026-01-28T16:44:19:   file: 'parse_relation.c',
+2026-01-28T16:44:19:   line: '3722',
+2026-01-28T16:44:19:   routine: 'errorMissingColumn'
+2026-01-28T16:44:19: }
+2026-01-28T16:46:58: Error in register: error: relation "imobiliarias" does not exist
+2026-01-28T16:46:58:     at async s (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:20:1118)
+2026-01-28T16:46:58:     at async u (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:3869)
+2026-01-28T16:46:58:     at async d (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:4907)
+2026-01-28T16:46:58:     at async E (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:5985) {
+2026-01-28T16:46:58:   length: 111,
+2026-01-28T16:46:58:   severity: 'ERROR',
+2026-01-28T16:46:58:   code: '42P01',
+2026-01-28T16:46:58:   detail: undefined,
+2026-01-28T16:46:58:   hint: undefined,
+2026-01-28T16:46:58:   position: '16',
+2026-01-28T16:46:58:   internalPosition: undefined,
+2026-01-28T16:46:58:   internalQuery: undefined,
+2026-01-28T16:46:58:   where: undefined,
+2026-01-28T16:46:58:   schema: undefined,
+2026-01-28T16:46:58:   table: undefined,
+2026-01-28T16:46:58:   column: undefined,
+2026-01-28T16:46:58:   dataType: undefined,
+2026-01-28T16:46:58:   constraint: undefined,
+2026-01-28T16:46:58:   file: 'parse_relation.c',
+2026-01-28T16:46:58:   line: '1449',
+2026-01-28T16:46:58:   routine: 'parserOpenTable'
+2026-01-28T16:46:58: }
+2026-01-28T16:47:40:  ELIFECYCLE  Command failed.
+2026-01-28T16:47:41: 
+2026-01-28T16:47:41: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T16:47:41: > next start
+2026-01-28T16:47:41: 
+2026-01-28T16:47:41:    ▲ Next.js 16.0.10
+2026-01-28T16:47:41:    - Local:         http://localhost:3000
+2026-01-28T16:47:41:    - Network:       http://185.182.184.122:3000
+2026-01-28T16:47:41: 
+2026-01-28T16:47:41:  ✓ Starting...
+2026-01-28T16:47:41:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T16:47:41:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T16:47:41:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T16:47:41:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T16:47:41:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T16:47:41:  ✓ Ready in 355ms
+2026-01-28T16:47:42: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+2026-01-28T16:47:42: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+2026-01-28T16:47:46: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/empreendimentos with email  and token MISSING
+2026-01-28T16:47:46: [CVCRM] Error 401 on /api/v1/cadastros/empreendimentos: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T16:47:46: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/corretores with email  and token MISSING
+2026-01-28T16:47:47: [CVCRM] Error 401 on /api/v1/cadastros/corretores: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T16:48:26: [Redis] SCALINGO_REDIS_URL não configurada
+2026-01-28T16:48:26: Error in send-otp: error: relation "sessions" does not exist
+2026-01-28T16:48:26:     at async u (.next/server/chunks/[root-of-the-server]__03c95912._.js:75:6057)
+2026-01-28T16:48:26:     at async c (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:4070)
+2026-01-28T16:48:26:     at async d (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:5108)
+2026-01-28T16:48:26:     at async $ (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:6186) {
+2026-01-28T16:48:26:   length: 107,
+2026-01-28T16:48:26:   severity: 'ERROR',
+2026-01-28T16:48:26:   code: '42P01',
+2026-01-28T16:48:26:   detail: undefined,
+2026-01-28T16:48:26:   hint: undefined,
+2026-01-28T16:48:26:   position: '13',
+2026-01-28T16:48:26:   internalPosition: undefined,
+2026-01-28T16:48:26:   internalQuery: undefined,
+2026-01-28T16:48:26:   where: undefined,
+2026-01-28T16:48:26:   schema: undefined,
+2026-01-28T16:48:26:   table: undefined,
+2026-01-28T16:48:26:   column: undefined,
+2026-01-28T16:48:26:   dataType: undefined,
+2026-01-28T16:48:26:   constraint: undefined,
+2026-01-28T16:48:26:   file: 'parse_relation.c',
+2026-01-28T16:48:26:   line: '1449',
+2026-01-28T16:48:26:   routine: 'parserOpenTable'
+2026-01-28T16:48:26: }
+2026-01-28T16:50:00: Error in send-otp: error: relation "sessions" does not exist
+2026-01-28T16:50:00:     at async u (.next/server/chunks/[root-of-the-server]__03c95912._.js:75:6057)
+2026-01-28T16:50:00:     at async c (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:4070)
+2026-01-28T16:50:00:     at async d (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:5108)
+2026-01-28T16:50:00:     at async $ (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:6186) {
+2026-01-28T16:50:00:   length: 107,
+2026-01-28T16:50:00:   severity: 'ERROR',
+2026-01-28T16:50:00:   code: '42P01',
+2026-01-28T16:50:00:   detail: undefined,
+2026-01-28T16:50:00:   hint: undefined,
+2026-01-28T16:50:00:   position: '13',
+2026-01-28T16:50:00:   internalPosition: undefined,
+2026-01-28T16:50:00:   internalQuery: undefined,
+2026-01-28T16:50:00:   where: undefined,
+2026-01-28T16:50:00:   schema: undefined,
+2026-01-28T16:50:00:   table: undefined,
+2026-01-28T16:50:00:   column: undefined,
+2026-01-28T16:50:00:   dataType: undefined,
+2026-01-28T16:50:00:   constraint: undefined,
+2026-01-28T16:50:00:   file: 'parse_relation.c',
+2026-01-28T16:50:00:   line: '1449',
+2026-01-28T16:50:00:   routine: 'parserOpenTable'
+2026-01-28T16:50:00: }
+2026-01-28T16:50:43:  ELIFECYCLE  Command failed.
+2026-01-28T16:50:44: 
+2026-01-28T16:50:44: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T16:50:44: > next start
+2026-01-28T16:50:44: 
+2026-01-28T16:50:44:    ▲ Next.js 16.0.10
+2026-01-28T16:50:44:    - Local:         http://localhost:3000
+2026-01-28T16:50:44:    - Network:       http://185.182.184.122:3000
+2026-01-28T16:50:44: 
+2026-01-28T16:50:44:  ✓ Starting...
+2026-01-28T16:50:44:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T16:50:44:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T16:50:44:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T16:50:44:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T16:50:44:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T16:50:44:  ✓ Ready in 350ms
+2026-01-28T16:50:45: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: ⚙️  enable debug logging with { debug: true }
+2026-01-28T16:50:45: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+2026-01-28T16:50:46: [Redis] SCALINGO_REDIS_URL não configurada
+2026-01-28T16:50:46: Error in send-otp: error: column "otp_code" of relation "sessions" does not exist
+2026-01-28T16:50:46:     at async u (.next/server/chunks/[root-of-the-server]__03c95912._.js:75:6057)
+2026-01-28T16:50:46:     at async c (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:4070)
+2026-01-28T16:50:46:     at async d (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:5108)
+2026-01-28T16:50:46:     at async $ (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:6186) {
+2026-01-28T16:50:46:   length: 129,
+2026-01-28T16:50:46:   severity: 'ERROR',
+2026-01-28T16:50:46:   code: '42703',
+2026-01-28T16:50:46:   detail: undefined,
+2026-01-28T16:50:46:   hint: undefined,
+2026-01-28T16:50:46:   position: '32',
+2026-01-28T16:50:46:   internalPosition: undefined,
+2026-01-28T16:50:46:   internalQuery: undefined,
+2026-01-28T16:50:46:   where: undefined,
+2026-01-28T16:50:46:   schema: undefined,
+2026-01-28T16:50:46:   table: undefined,
+2026-01-28T16:50:46:   column: undefined,
+2026-01-28T16:50:46:   dataType: undefined,
+2026-01-28T16:50:46:   constraint: undefined,
+2026-01-28T16:50:46:   file: 'parse_target.c',
+2026-01-28T16:50:46:   line: '1066',
+2026-01-28T16:50:46:   routine: 'checkInsertTargets'
+2026-01-28T16:50:46: }
+2026-01-28T16:53:08:  ELIFECYCLE  Command failed.
+2026-01-28T16:53:09: 
+2026-01-28T16:53:09: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T16:53:09: > next start
+2026-01-28T16:53:09: 
+2026-01-28T16:53:09:    ▲ Next.js 16.0.10
+2026-01-28T16:53:09:    - Local:         http://localhost:3000
+2026-01-28T16:53:09:    - Network:       http://185.182.184.122:3000
+2026-01-28T16:53:09: 
+2026-01-28T16:53:09:  ✓ Starting...
+2026-01-28T16:53:09:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T16:53:09:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T16:53:09:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T16:53:09:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T16:53:09:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T16:53:09:  ✓ Ready in 375ms
+2026-01-28T16:53:10: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: ⚙️  write to custom object with { processEnv: myObject }
+2026-01-28T16:53:10: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+2026-01-28T16:53:14: [Redis] SCALINGO_REDIS_URL não configurada
+2026-01-28T16:53:45: Error in send-otp: error: null value in column "session_token" of relation "sessions" violates not-null constraint
+2026-01-28T16:53:45:     at async u (.next/server/chunks/[root-of-the-server]__03c95912._.js:75:6057)
+2026-01-28T16:53:45:     at async c (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:4070)
+2026-01-28T16:53:45:     at async d (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:5108)
+2026-01-28T16:53:45:     at async $ (.next/server/chunks/[root-of-the-server]__03c95912._.js:77:6186) {
+2026-01-28T16:53:45:   length: 376,
+2026-01-28T16:53:45:   severity: 'ERROR',
+2026-01-28T16:53:45:   code: '23502',
+2026-01-28T16:53:45:   detail: 'Failing row contains (1, 26eb9297-5254-4dae-b459-42889b822cb3, null, 2026-02-04 15:53:45.055, 2026-01-28 16:53:45.056599, 2026-01-28 16:53:45.056599, {}, 710630, 2026-01-28 15:58:45.055, f).',
+2026-01-28T16:53:45:   hint: undefined,
+2026-01-28T16:53:45:   position: undefined,
+2026-01-28T16:53:45:   internalPosition: undefined,
+2026-01-28T16:53:45:   internalQuery: undefined,
+2026-01-28T16:53:45:   where: undefined,
+2026-01-28T16:53:45:   schema: 'public',
+2026-01-28T16:53:45:   table: 'sessions',
+2026-01-28T16:53:45:   column: 'session_token',
+2026-01-28T16:53:45:   dataType: undefined,
+2026-01-28T16:53:45:   constraint: undefined,
+2026-01-28T16:53:45:   file: 'execMain.c',
+2026-01-28T16:53:45:   line: '2057',
+2026-01-28T16:53:45:   routine: 'ExecConstraints'
+2026-01-28T16:53:45: }
+2026-01-28T16:54:17: Error sending magic link: Instance not found
+2026-01-28T16:56:10:  ELIFECYCLE  Command failed.
+2026-01-28T16:56:10: 
+2026-01-28T16:56:10: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T16:56:10: > next start
+2026-01-28T16:56:10: 
+2026-01-28T16:56:11:    ▲ Next.js 16.0.10
+2026-01-28T16:56:11:    - Local:         http://localhost:3000
+2026-01-28T16:56:11:    - Network:       http://185.182.184.122:3000
+2026-01-28T16:56:11: 
+2026-01-28T16:56:11:  ✓ Starting...
+2026-01-28T16:56:11:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T16:56:11:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T16:56:11:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T16:56:11:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T16:56:11:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T16:56:11:  ✓ Ready in 341ms
+2026-01-28T16:56:11: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: ⚙️  enable debug logging with { debug: true }
+2026-01-28T16:56:11: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: ⚙️  suppress all logs with { quiet: true }
+2026-01-28T16:56:15: [Redis] SCALINGO_REDIS_URL não configurada
+2026-01-28T16:56:16: Error sending magic link: Instance not found
+2026-01-28T16:56:37: Error in verify-otp: error: relation "imobiliarias" does not exist
+2026-01-28T16:56:37:     at async d (.next/server/chunks/[root-of-the-server]__4518b476._.js:20:5167)
+2026-01-28T16:56:37:     at async u (.next/server/chunks/[root-of-the-server]__4518b476._.js:36:4533)
+2026-01-28T16:56:37:     at async d (.next/server/chunks/[root-of-the-server]__4518b476._.js:36:5571)
+2026-01-28T16:56:37:     at async q (.next/server/chunks/[root-of-the-server]__4518b476._.js:36:6649) {
+2026-01-28T16:56:37:   length: 112,
+2026-01-28T16:56:37:   severity: 'ERROR',
+2026-01-28T16:56:37:   code: '42P01',
+2026-01-28T16:56:37:   detail: undefined,
+2026-01-28T16:56:37:   hint: undefined,
+2026-01-28T16:56:37:   position: '422',
+2026-01-28T16:56:37:   internalPosition: undefined,
+2026-01-28T16:56:37:   internalQuery: undefined,
+2026-01-28T16:56:37:   where: undefined,
+2026-01-28T16:56:37:   schema: undefined,
+2026-01-28T16:56:37:   table: undefined,
+2026-01-28T16:56:37:   column: undefined,
+2026-01-28T16:56:37:   dataType: undefined,
+2026-01-28T16:56:37:   constraint: undefined,
+2026-01-28T16:56:37:   file: 'parse_relation.c',
+2026-01-28T16:56:37:   line: '1449',
+2026-01-28T16:56:37:   routine: 'parserOpenTable'
+2026-01-28T16:56:37: }
+2026-01-28T16:57:32: Error sending magic link: Instance not found
+2026-01-28T16:58:06: Error in verify-otp: error: column "last_login" of relation "users" does not exist
+2026-01-28T16:58:06:     at async d (.next/server/chunks/[root-of-the-server]__4518b476._.js:36:423)
+2026-01-28T16:58:06:     at async u (.next/server/chunks/[root-of-the-server]__4518b476._.js:36:4533)
+2026-01-28T16:58:06:     at async d (.next/server/chunks/[root-of-the-server]__4518b476._.js:36:5571)
+2026-01-28T16:58:06:     at async q (.next/server/chunks/[root-of-the-server]__4518b476._.js:36:6649) {
+2026-01-28T16:58:06:   length: 130,
+2026-01-28T16:58:06:   severity: 'ERROR',
+2026-01-28T16:58:06:   code: '42703',
+2026-01-28T16:58:06:   detail: undefined,
+2026-01-28T16:58:06:   hint: undefined,
+2026-01-28T16:58:06:   position: '18',
+2026-01-28T16:58:06:   internalPosition: undefined,
+2026-01-28T16:58:06:   internalQuery: undefined,
+2026-01-28T16:58:06:   where: undefined,
+2026-01-28T16:58:06:   schema: undefined,
+2026-01-28T16:58:06:   table: undefined,
+2026-01-28T16:58:06:   column: undefined,
+2026-01-28T16:58:06:   dataType: undefined,
+2026-01-28T16:58:06:   constraint: undefined,
+2026-01-28T16:58:06:   file: 'analyze.c',
+2026-01-28T16:58:06:   line: '2527',
+2026-01-28T16:58:06:   routine: 'transformUpdateTargetList'
+2026-01-28T16:58:06: }
+2026-01-28T16:58:12: Error in register: error: insert or update on table "workspaces" violates foreign key constraint "workspaces_owner_id_fkey"
+2026-01-28T16:58:12:     at async s (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:20:1691)
+2026-01-28T16:58:12:     at async u (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:3869)
+2026-01-28T16:58:12:     at async d (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:4907)
+2026-01-28T16:58:12:     at async E (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:5985) {
+2026-01-28T16:58:12:   length: 591,
+2026-01-28T16:58:12:   severity: 'ERROR',
+2026-01-28T16:58:12:   code: '23503',
+2026-01-28T16:58:12:   detail: 'Key (owner_id)=(c8859894-c475-4bcd-becd-d8fdb3d055d3) is not present in table "users".',
+2026-01-28T16:58:12:   hint: undefined,
+2026-01-28T16:58:12:   position: undefined,
+2026-01-28T16:58:12:   internalPosition: undefined,
+2026-01-28T16:58:12:   internalQuery: undefined,
+2026-01-28T16:58:12:   where: 'SQL statement "INSERT INTO workspaces (owner_id, name, slug, type)\n' +
+2026-01-28T16:58:12:     '  VALUES (\n' +
+2026-01-28T16:58:12:     '    NEW.id,\n' +
+2026-01-28T16:58:12:     "    NEW.nome || ' - Workspace',\n" +
+2026-01-28T16:58:12:     "    'user-' || NEW.id || '-' || FLOOR(EXTRACT(EPOCH FROM NOW())),\n" +
+2026-01-28T16:58:12:     "    'personal'\n" +
+2026-01-28T16:58:12:     '  )\n' +
+2026-01-28T16:58:12:     '  RETURNING id"\n' +
+2026-01-28T16:58:12:     'PL/pgSQL function auto_create_workspace() line 11 at SQL statement',
+2026-01-28T16:58:12:   schema: 'public',
+2026-01-28T16:58:12:   table: 'workspaces',
+2026-01-28T16:58:12:   column: undefined,
+2026-01-28T16:58:12:   dataType: undefined,
+2026-01-28T16:58:12:   constraint: 'workspaces_owner_id_fkey',
+2026-01-28T16:58:12:   file: 'ri_triggers.c',
+2026-01-28T16:58:12:   line: '2608',
+2026-01-28T16:58:12:   routine: 'ri_ReportViolation'
+2026-01-28T16:58:12: }
+2026-01-28T16:59:13: Error sending magic link: Instance not found
+2026-01-28T16:59:25:  ELIFECYCLE  Command failed.
+2026-01-28T16:59:26: 
+2026-01-28T16:59:26: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T16:59:26: > next start
+2026-01-28T16:59:26: 
+2026-01-28T16:59:26:    ▲ Next.js 16.0.10
+2026-01-28T16:59:26:    - Local:         http://localhost:3000
+2026-01-28T16:59:26:    - Network:       http://185.182.184.122:3000
+2026-01-28T16:59:26: 
+2026-01-28T16:59:26:  ✓ Starting...
+2026-01-28T16:59:26:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T16:59:26:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T16:59:26:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T16:59:26:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T16:59:26:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T16:59:26:  ✓ Ready in 442ms
+2026-01-28T16:59:27: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+2026-01-28T16:59:27: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+2026-01-28T16:59:28: [Redis] SCALINGO_REDIS_URL não configurada
+2026-01-28T17:03:00: Error in register: error: insert or update on table "workspaces" violates foreign key constraint "workspaces_owner_id_fkey"
+2026-01-28T17:03:00:     at async s (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:20:1691)
+2026-01-28T17:03:00:     at async u (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:3869)
+2026-01-28T17:03:00:     at async d (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:4907)
+2026-01-28T17:03:00:     at async E (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:5985) {
+2026-01-28T17:03:00:   length: 591,
+2026-01-28T17:03:00:   severity: 'ERROR',
+2026-01-28T17:03:00:   code: '23503',
+2026-01-28T17:03:00:   detail: 'Key (owner_id)=(2a51b2ca-229f-4890-8f0c-539fa7cc8c38) is not present in table "users".',
+2026-01-28T17:03:00:   hint: undefined,
+2026-01-28T17:03:00:   position: undefined,
+2026-01-28T17:03:00:   internalPosition: undefined,
+2026-01-28T17:03:00:   internalQuery: undefined,
+2026-01-28T17:03:00:   where: 'SQL statement "INSERT INTO workspaces (owner_id, name, slug, type)\n' +
+2026-01-28T17:03:00:     '  VALUES (\n' +
+2026-01-28T17:03:00:     '    NEW.id,\n' +
+2026-01-28T17:03:00:     "    NEW.nome || ' - Workspace',\n" +
+2026-01-28T17:03:00:     "    'user-' || NEW.id || '-' || FLOOR(EXTRACT(EPOCH FROM NOW())),\n" +
+2026-01-28T17:03:00:     "    'personal'\n" +
+2026-01-28T17:03:00:     '  )\n' +
+2026-01-28T17:03:00:     '  RETURNING id"\n' +
+2026-01-28T17:03:00:     'PL/pgSQL function auto_create_workspace() line 11 at SQL statement',
+2026-01-28T17:03:00:   schema: 'public',
+2026-01-28T17:03:00:   table: 'workspaces',
+2026-01-28T17:03:00:   column: undefined,
+2026-01-28T17:03:00:   dataType: undefined,
+2026-01-28T17:03:00:   constraint: 'workspaces_owner_id_fkey',
+2026-01-28T17:03:00:   file: 'ri_triggers.c',
+2026-01-28T17:03:00:   line: '2608',
+2026-01-28T17:03:00:   routine: 'ri_ReportViolation'
+2026-01-28T17:03:00: }
+2026-01-28T17:16:07:  ELIFECYCLE  Command failed.
+2026-01-28T17:16:08: 
+2026-01-28T17:16:08: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T17:16:08: > next start
+2026-01-28T17:16:08: 
+2026-01-28T17:16:08:    ▲ Next.js 16.0.10
+2026-01-28T17:16:08:    - Local:         http://localhost:3000
+2026-01-28T17:16:08:    - Network:       http://185.182.184.122:3000
+2026-01-28T17:16:08: 
+2026-01-28T17:16:08:  ✓ Starting...
+2026-01-28T17:16:08:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T17:16:08:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T17:16:08:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T17:16:08:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T17:16:08:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T17:16:09:  ✓ Ready in 362ms
+2026-01-28T17:16:09: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+2026-01-28T17:16:09: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: ⚙️  override existing env vars with { override: true }
+2026-01-28T17:17:58: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/empreendimentos with email  and token MISSING
+2026-01-28T17:17:58: [CVCRM] Error 401 on /api/v1/cadastros/empreendimentos: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T17:17:58: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/corretores with email  and token MISSING
+2026-01-28T17:17:59: [CVCRM] Error 401 on /api/v1/cadastros/corretores: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T17:23:15: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/empreendimentos with email  and token MISSING
+2026-01-28T17:23:15: [CVCRM] Error 401 on /api/v1/cadastros/empreendimentos: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T17:23:15: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/corretores with email  and token MISSING
+2026-01-28T17:23:16: [CVCRM] Error 401 on /api/v1/cadastros/corretores: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T17:23:16: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/empreendimentos with email  and token MISSING
+2026-01-28T17:23:16: [CVCRM] Error 401 on /api/v1/cadastros/empreendimentos: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T17:23:16: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/corretores with email  and token MISSING
+2026-01-28T17:23:17: [CVCRM] Error 401 on /api/v1/cadastros/corretores: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T17:23:17: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/empreendimentos with email  and token MISSING
+2026-01-28T17:23:18: [CVCRM] Error 401 on /api/v1/cadastros/empreendimentos: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T17:23:18: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/corretores with email  and token MISSING
+2026-01-28T17:23:18: [CVCRM] Error 401 on /api/v1/cadastros/corretores: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T17:41:06: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/empreendimentos with email  and token MISSING
+2026-01-28T17:41:07: [CVCRM] Error 401 on /api/v1/cadastros/empreendimentos: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T17:41:07: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/corretores with email  and token MISSING
+2026-01-28T17:41:07: [CVCRM] Error 401 on /api/v1/cadastros/corretores: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T17:41:09: [GET /api/analytics/conversao] Error: error: relation "agendamentos" does not exist
+2026-01-28T17:41:09:     at async s (.next/server/chunks/[root-of-the-server]__9f231e86._.js:1:2033)
+2026-01-28T17:41:09:     at async u (.next/server/chunks/[root-of-the-server]__9f231e86._.js:1:6205)
+2026-01-28T17:41:09:     at async d (.next/server/chunks/[root-of-the-server]__9f231e86._.js:1:7243)
+2026-01-28T17:41:09:     at async A (.next/server/chunks/[root-of-the-server]__9f231e86._.js:1:8321) {
+2026-01-28T17:41:09:   length: 111,
+2026-01-28T17:41:09:   severity: 'ERROR',
+2026-01-28T17:41:09:   code: '42P01',
+2026-01-28T17:41:09:   detail: undefined,
+2026-01-28T17:41:09:   hint: undefined,
+2026-01-28T17:41:09:   position: '48',
+2026-01-28T17:41:09:   internalPosition: undefined,
+2026-01-28T17:41:09:   internalQuery: undefined,
+2026-01-28T17:41:09:   where: undefined,
+2026-01-28T17:41:09:   schema: undefined,
+2026-01-28T17:41:09:   table: undefined,
+2026-01-28T17:41:09:   column: undefined,
+2026-01-28T17:41:09:   dataType: undefined,
+2026-01-28T17:41:09:   constraint: undefined,
+2026-01-28T17:41:09:   file: 'parse_relation.c',
+2026-01-28T17:41:09:   line: '1449',
+2026-01-28T17:41:09:   routine: 'parserOpenTable'
+2026-01-28T17:41:09: }
+2026-01-28T17:41:09: [GET /api/analytics/top-imoveis] Error: error: relation "agendamentos" does not exist
+2026-01-28T17:41:09:     at async i (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:1:1949)
+2026-01-28T17:41:09:     at async u (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:3864)
+2026-01-28T17:41:09:     at async d (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:4902)
+2026-01-28T17:41:09:     at async A (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:5980) {
+2026-01-28T17:41:09:   length: 112,
+2026-01-28T17:41:09:   severity: 'ERROR',
+2026-01-28T17:41:09:   code: '42P01',
+2026-01-28T17:41:09:   detail: undefined,
+2026-01-28T17:41:09:   hint: undefined,
+2026-01-28T17:41:09:   position: '188',
+2026-01-28T17:41:09:   internalPosition: undefined,
+2026-01-28T17:41:09:   internalQuery: undefined,
+2026-01-28T17:41:09:   where: undefined,
+2026-01-28T17:41:09:   schema: undefined,
+2026-01-28T17:41:09:   table: undefined,
+2026-01-28T17:41:09:   column: undefined,
+2026-01-28T17:41:09:   dataType: undefined,
+2026-01-28T17:41:09:   constraint: undefined,
+2026-01-28T17:41:09:   file: 'parse_relation.c',
+2026-01-28T17:41:09:   line: '1449',
+2026-01-28T17:41:09:   routine: 'parserOpenTable'
+2026-01-28T17:41:09: }
+2026-01-28T17:43:44: [GET /api/analytics/top-imoveis] Error: error: column a.imovel_id does not exist
+2026-01-28T17:43:44:     at async i (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:1:1949)
+2026-01-28T17:43:44:     at async u (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:3864)
+2026-01-28T17:43:44:     at async d (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:4902)
+2026-01-28T17:43:44:     at async A (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:5980) {
+2026-01-28T17:43:44:   length: 109,
+2026-01-28T17:43:44:   severity: 'ERROR',
+2026-01-28T17:43:44:   code: '42703',
+2026-01-28T17:43:44:   detail: undefined,
+2026-01-28T17:43:44:   hint: undefined,
+2026-01-28T17:43:44:   position: '24',
+2026-01-28T17:43:44:   internalPosition: undefined,
+2026-01-28T17:43:44:   internalQuery: undefined,
+2026-01-28T17:43:44:   where: undefined,
+2026-01-28T17:43:44:   schema: undefined,
+2026-01-28T17:43:44:   table: undefined,
+2026-01-28T17:43:44:   column: undefined,
+2026-01-28T17:43:44:   dataType: undefined,
+2026-01-28T17:43:44:   constraint: undefined,
+2026-01-28T17:43:44:   file: 'parse_relation.c',
+2026-01-28T17:43:44:   line: '3722',
+2026-01-28T17:43:44:   routine: 'errorMissingColumn'
+2026-01-28T17:43:44: }
+2026-01-28T17:43:53: [GET /api/analytics/top-imoveis] Error: error: column a.imovel_id does not exist
+2026-01-28T17:43:53:     at async i (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:1:1949)
+2026-01-28T17:43:53:     at async u (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:3864)
+2026-01-28T17:43:53:     at async d (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:4902)
+2026-01-28T17:43:53:     at async A (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:5980) {
+2026-01-28T17:43:53:   length: 109,
+2026-01-28T17:43:53:   severity: 'ERROR',
+2026-01-28T17:43:53:   code: '42703',
+2026-01-28T17:43:53:   detail: undefined,
+2026-01-28T17:43:53:   hint: undefined,
+2026-01-28T17:43:53:   position: '24',
+2026-01-28T17:43:53:   internalPosition: undefined,
+2026-01-28T17:43:53:   internalQuery: undefined,
+2026-01-28T17:43:53:   where: undefined,
+2026-01-28T17:43:53:   schema: undefined,
+2026-01-28T17:43:53:   table: undefined,
+2026-01-28T17:43:53:   column: undefined,
+2026-01-28T17:43:53:   dataType: undefined,
+2026-01-28T17:43:53:   constraint: undefined,
+2026-01-28T17:43:53:   file: 'parse_relation.c',
+2026-01-28T17:43:53:   line: '3722',
+2026-01-28T17:43:53:   routine: 'errorMissingColumn'
+2026-01-28T17:43:53: }
+2026-01-28T17:44:17: [GET /api/analytics/top-imoveis] Error: error: column a.imovel_nome does not exist
+2026-01-28T17:44:17:     at async i (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:1:1949)
+2026-01-28T17:44:17:     at async u (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:3864)
+2026-01-28T17:44:17:     at async d (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:4902)
+2026-01-28T17:44:17:     at async A (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:5980) {
+2026-01-28T17:44:17:   length: 111,
+2026-01-28T17:44:17:   severity: 'ERROR',
+2026-01-28T17:44:17:   code: '42703',
+2026-01-28T17:44:17:   detail: undefined,
+2026-01-28T17:44:17:   hint: undefined,
+2026-01-28T17:44:17:   position: '45',
+2026-01-28T17:44:17:   internalPosition: undefined,
+2026-01-28T17:44:17:   internalQuery: undefined,
+2026-01-28T17:44:17:   where: undefined,
+2026-01-28T17:44:17:   schema: undefined,
+2026-01-28T17:44:17:   table: undefined,
+2026-01-28T17:44:17:   column: undefined,
+2026-01-28T17:44:17:   dataType: undefined,
+2026-01-28T17:44:17:   constraint: undefined,
+2026-01-28T17:44:17:   file: 'parse_relation.c',
+2026-01-28T17:44:17:   line: '3722',
+2026-01-28T17:44:17:   routine: 'errorMissingColumn'
+2026-01-28T17:44:17: }
+2026-01-28T17:44:25: [GET /api/analytics/top-imoveis] Error: error: column a.imovel_nome does not exist
+2026-01-28T17:44:25:     at async i (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:1:1949)
+2026-01-28T17:44:25:     at async u (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:3864)
+2026-01-28T17:44:25:     at async d (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:4902)
+2026-01-28T17:44:25:     at async A (.next/server/chunks/[root-of-the-server]__aa3f88e4._.js:12:5980) {
+2026-01-28T17:44:25:   length: 111,
+2026-01-28T17:44:25:   severity: 'ERROR',
+2026-01-28T17:44:25:   code: '42703',
+2026-01-28T17:44:25:   detail: undefined,
+2026-01-28T17:44:25:   hint: undefined,
+2026-01-28T17:44:25:   position: '45',
+2026-01-28T17:44:25:   internalPosition: undefined,
+2026-01-28T17:44:25:   internalQuery: undefined,
+2026-01-28T17:44:25:   where: undefined,
+2026-01-28T17:44:25:   schema: undefined,
+2026-01-28T17:44:25:   table: undefined,
+2026-01-28T17:44:25:   column: undefined,
+2026-01-28T17:44:25:   dataType: undefined,
+2026-01-28T17:44:25:   constraint: undefined,
+2026-01-28T17:44:25:   file: 'parse_relation.c',
+2026-01-28T17:44:25:   line: '3722',
+2026-01-28T17:44:25:   routine: 'errorMissingColumn'
+2026-01-28T17:44:25: }
+2026-01-28T17:45:09: [Redis] SCALINGO_REDIS_URL não configurada
+2026-01-28T17:45:14: Error in register: error: insert or update on table "workspaces" violates foreign key constraint "workspaces_owner_id_fkey"
+2026-01-28T17:45:14:     at async s (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:20:1691)
+2026-01-28T17:45:14:     at async u (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:3869)
+2026-01-28T17:45:14:     at async d (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:4907)
+2026-01-28T17:45:14:     at async E (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:5985) {
+2026-01-28T17:45:14:   length: 591,
+2026-01-28T17:45:14:   severity: 'ERROR',
+2026-01-28T17:45:14:   code: '23503',
+2026-01-28T17:45:14:   detail: 'Key (owner_id)=(52387167-7ebf-4bb4-9ea8-603a0e46e0b2) is not present in table "users".',
+2026-01-28T17:45:14:   hint: undefined,
+2026-01-28T17:45:14:   position: undefined,
+2026-01-28T17:45:14:   internalPosition: undefined,
+2026-01-28T17:45:14:   internalQuery: undefined,
+2026-01-28T17:45:14:   where: 'SQL statement "INSERT INTO workspaces (owner_id, name, slug, type)\n' +
+2026-01-28T17:45:14:     '  VALUES (\n' +
+2026-01-28T17:45:14:     '    NEW.id,\n' +
+2026-01-28T17:45:14:     "    NEW.nome || ' - Workspace',\n" +
+2026-01-28T17:45:14:     "    'user-' || NEW.id || '-' || FLOOR(EXTRACT(EPOCH FROM NOW())),\n" +
+2026-01-28T17:45:14:     "    'personal'\n" +
+2026-01-28T17:45:14:     '  )\n' +
+2026-01-28T17:45:14:     '  RETURNING id"\n' +
+2026-01-28T17:45:14:     'PL/pgSQL function auto_create_workspace() line 11 at SQL statement',
+2026-01-28T17:45:14:   schema: 'public',
+2026-01-28T17:45:14:   table: 'workspaces',
+2026-01-28T17:45:14:   column: undefined,
+2026-01-28T17:45:14:   dataType: undefined,
+2026-01-28T17:45:14:   constraint: 'workspaces_owner_id_fkey',
+2026-01-28T17:45:14:   file: 'ri_triggers.c',
+2026-01-28T17:45:14:   line: '2608',
+2026-01-28T17:45:14:   routine: 'ri_ReportViolation'
+2026-01-28T17:45:14: }
+2026-01-28T17:45:19: Error in register: error: insert or update on table "workspaces" violates foreign key constraint "workspaces_owner_id_fkey"
+2026-01-28T17:45:19:     at async s (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:20:1691)
+2026-01-28T17:45:19:     at async u (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:3869)
+2026-01-28T17:45:19:     at async d (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:4907)
+2026-01-28T17:45:19:     at async E (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:5985) {
+2026-01-28T17:45:19:   length: 591,
+2026-01-28T17:45:19:   severity: 'ERROR',
+2026-01-28T17:45:19:   code: '23503',
+2026-01-28T17:45:19:   detail: 'Key (owner_id)=(43684af6-fc57-486d-8d9a-cfe1568115a7) is not present in table "users".',
+2026-01-28T17:45:19:   hint: undefined,
+2026-01-28T17:45:19:   position: undefined,
+2026-01-28T17:45:19:   internalPosition: undefined,
+2026-01-28T17:45:19:   internalQuery: undefined,
+2026-01-28T17:45:19:   where: 'SQL statement "INSERT INTO workspaces (owner_id, name, slug, type)\n' +
+2026-01-28T17:45:19:     '  VALUES (\n' +
+2026-01-28T17:45:19:     '    NEW.id,\n' +
+2026-01-28T17:45:19:     "    NEW.nome || ' - Workspace',\n" +
+2026-01-28T17:45:19:     "    'user-' || NEW.id || '-' || FLOOR(EXTRACT(EPOCH FROM NOW())),\n" +
+2026-01-28T17:45:19:     "    'personal'\n" +
+2026-01-28T17:45:19:     '  )\n' +
+2026-01-28T17:45:19:     '  RETURNING id"\n' +
+2026-01-28T17:45:19:     'PL/pgSQL function auto_create_workspace() line 11 at SQL statement',
+2026-01-28T17:45:19:   schema: 'public',
+2026-01-28T17:45:19:   table: 'workspaces',
+2026-01-28T17:45:19:   column: undefined,
+2026-01-28T17:45:19:   dataType: undefined,
+2026-01-28T17:45:19:   constraint: 'workspaces_owner_id_fkey',
+2026-01-28T17:45:19:   file: 'ri_triggers.c',
+2026-01-28T17:45:19:   line: '2608',
+2026-01-28T17:45:19:   routine: 'ri_ReportViolation'
+2026-01-28T17:45:19: }
+2026-01-28T18:00:08: Error in register: error: insert or update on table "workspaces" violates foreign key constraint "workspaces_owner_id_fkey"
+2026-01-28T18:00:08:     at async s (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:20:1691)
+2026-01-28T18:00:08:     at async u (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:3869)
+2026-01-28T18:00:08:     at async d (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:4907)
+2026-01-28T18:00:08:     at async E (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:5985) {
+2026-01-28T18:00:08:   length: 591,
+2026-01-28T18:00:08:   severity: 'ERROR',
+2026-01-28T18:00:08:   code: '23503',
+2026-01-28T18:00:08:   detail: 'Key (owner_id)=(21d78099-d915-4019-9803-817439854ce0) is not present in table "users".',
+2026-01-28T18:00:08:   hint: undefined,
+2026-01-28T18:00:08:   position: undefined,
+2026-01-28T18:00:08:   internalPosition: undefined,
+2026-01-28T18:00:08:   internalQuery: undefined,
+2026-01-28T18:00:08:   where: 'SQL statement "INSERT INTO workspaces (owner_id, name, slug, type)\n' +
+2026-01-28T18:00:08:     '  VALUES (\n' +
+2026-01-28T18:00:08:     '    NEW.id,\n' +
+2026-01-28T18:00:08:     "    NEW.nome || ' - Workspace',\n" +
+2026-01-28T18:00:08:     "    'user-' || NEW.id || '-' || FLOOR(EXTRACT(EPOCH FROM NOW())),\n" +
+2026-01-28T18:00:08:     "    'personal'\n" +
+2026-01-28T18:00:08:     '  )\n' +
+2026-01-28T18:00:08:     '  RETURNING id"\n' +
+2026-01-28T18:00:08:     'PL/pgSQL function auto_create_workspace() line 11 at SQL statement',
+2026-01-28T18:00:08:   schema: 'public',
+2026-01-28T18:00:08:   table: 'workspaces',
+2026-01-28T18:00:08:   column: undefined,
+2026-01-28T18:00:08:   dataType: undefined,
+2026-01-28T18:00:08:   constraint: 'workspaces_owner_id_fkey',
+2026-01-28T18:00:08:   file: 'ri_triggers.c',
+2026-01-28T18:00:08:   line: '2608',
+2026-01-28T18:00:08:   routine: 'ri_ReportViolation'
+2026-01-28T18:00:08: }
+2026-01-28T18:25:56: Error in register: error: insert or update on table "workspaces" violates foreign key constraint "workspaces_owner_id_fkey"
+2026-01-28T18:25:56:     at async s (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:20:1691)
+2026-01-28T18:25:56:     at async u (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:3869)
+2026-01-28T18:25:56:     at async d (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:4907)
+2026-01-28T18:25:56:     at async E (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:5985) {
+2026-01-28T18:25:56:   length: 591,
+2026-01-28T18:25:56:   severity: 'ERROR',
+2026-01-28T18:25:56:   code: '23503',
+2026-01-28T18:25:56:   detail: 'Key (owner_id)=(f44b83e5-5b3a-47f0-8839-2aad64331b36) is not present in table "users".',
+2026-01-28T18:25:56:   hint: undefined,
+2026-01-28T18:25:56:   position: undefined,
+2026-01-28T18:25:56:   internalPosition: undefined,
+2026-01-28T18:25:56:   internalQuery: undefined,
+2026-01-28T18:25:56:   where: 'SQL statement "INSERT INTO workspaces (owner_id, name, slug, type)\n' +
+2026-01-28T18:25:56:     '  VALUES (\n' +
+2026-01-28T18:25:56:     '    NEW.id,\n' +
+2026-01-28T18:25:56:     "    NEW.nome || ' - Workspace',\n" +
+2026-01-28T18:25:56:     "    'user-' || NEW.id || '-' || FLOOR(EXTRACT(EPOCH FROM NOW())),\n" +
+2026-01-28T18:25:56:     "    'personal'\n" +
+2026-01-28T18:25:56:     '  )\n' +
+2026-01-28T18:25:56:     '  RETURNING id"\n' +
+2026-01-28T18:25:56:     'PL/pgSQL function auto_create_workspace() line 11 at SQL statement',
+2026-01-28T18:25:56:   schema: 'public',
+2026-01-28T18:25:56:   table: 'workspaces',
+2026-01-28T18:25:56:   column: undefined,
+2026-01-28T18:25:56:   dataType: undefined,
+2026-01-28T18:25:56:   constraint: 'workspaces_owner_id_fkey',
+2026-01-28T18:25:56:   file: 'ri_triggers.c',
+2026-01-28T18:25:56:   line: '2608',
+2026-01-28T18:25:56:   routine: 'ri_ReportViolation'
+2026-01-28T18:25:56: }
+2026-01-28T18:52:22: Error in register: error: insert or update on table "workspaces" violates foreign key constraint "workspaces_owner_id_fkey"
+2026-01-28T18:52:22:     at async s (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:20:1691)
+2026-01-28T18:52:22:     at async u (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:3869)
+2026-01-28T18:52:22:     at async d (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:4907)
+2026-01-28T18:52:22:     at async E (.next/server/chunks/[root-of-the-server]__aa379fdc._.js:22:5985) {
+2026-01-28T18:52:22:   length: 591,
+2026-01-28T18:52:22:   severity: 'ERROR',
+2026-01-28T18:52:22:   code: '23503',
+2026-01-28T18:52:22:   detail: 'Key (owner_id)=(48eb61ab-fd70-449c-af40-a641432cec5a) is not present in table "users".',
+2026-01-28T18:52:22:   hint: undefined,
+2026-01-28T18:52:22:   position: undefined,
+2026-01-28T18:52:22:   internalPosition: undefined,
+2026-01-28T18:52:22:   internalQuery: undefined,
+2026-01-28T18:52:22:   where: 'SQL statement "INSERT INTO workspaces (owner_id, name, slug, type)\n' +
+2026-01-28T18:52:22:     '  VALUES (\n' +
+2026-01-28T18:52:22:     '    NEW.id,\n' +
+2026-01-28T18:52:22:     "    NEW.nome || ' - Workspace',\n" +
+2026-01-28T18:52:22:     "    'user-' || NEW.id || '-' || FLOOR(EXTRACT(EPOCH FROM NOW())),\n" +
+2026-01-28T18:52:22:     "    'personal'\n" +
+2026-01-28T18:52:22:     '  )\n' +
+2026-01-28T18:52:22:     '  RETURNING id"\n' +
+2026-01-28T18:52:22:     'PL/pgSQL function auto_create_workspace() line 11 at SQL statement',
+2026-01-28T18:52:22:   schema: 'public',
+2026-01-28T18:52:22:   table: 'workspaces',
+2026-01-28T18:52:22:   column: undefined,
+2026-01-28T18:52:22:   dataType: undefined,
+2026-01-28T18:52:22:   constraint: 'workspaces_owner_id_fkey',
+2026-01-28T18:52:22:   file: 'ri_triggers.c',
+2026-01-28T18:52:22:   line: '2608',
+2026-01-28T18:52:22:   routine: 'ri_ReportViolation'
+2026-01-28T18:52:22: }
+2026-01-28T19:24:04: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/empreendimentos with email  and token MISSING
+2026-01-28T19:24:04: [CVCRM] Error 401 on /api/v1/cadastros/empreendimentos: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T19:24:04: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/corretores with email  and token MISSING
+2026-01-28T19:24:05: [CVCRM] Error 401 on /api/v1/cadastros/corretores: {"error":"Request sem token ou email de autorização","code":401}
+2026-01-28T19:26:17: Error sending magic link: Instance not found
+2026-01-28T19:28:44:  ELIFECYCLE  Command failed.
+2026-01-28T19:28:45: 
+2026-01-28T19:28:45: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T19:28:45: > next start
+2026-01-28T19:28:45: 
+2026-01-28T19:28:45:    ▲ Next.js 16.0.10
+2026-01-28T19:28:45:    - Local:         http://localhost:3000
+2026-01-28T19:28:45:    - Network:       http://185.182.184.122:3000
+2026-01-28T19:28:45: 
+2026-01-28T19:28:45:  ✓ Starting...
+2026-01-28T19:28:45:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T19:28:45:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T19:28:45:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T19:28:45:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T19:28:45:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T19:28:46:  ✓ Ready in 606ms
+2026-01-28T19:28:46: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+2026-01-28T19:28:46: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+2026-01-28T19:28:56:  ELIFECYCLE  Command failed.
+2026-01-28T19:28:57: 
+2026-01-28T19:28:57: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T19:28:57: > next start
+2026-01-28T19:28:57: 
+2026-01-28T19:28:57:    ▲ Next.js 16.0.10
+2026-01-28T19:28:57:    - Local:         http://localhost:3000
+2026-01-28T19:28:57:    - Network:       http://185.182.184.122:3000
+2026-01-28T19:28:57: 
+2026-01-28T19:28:57:  ✓ Starting...
+2026-01-28T19:28:57:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T19:28:57:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T19:28:57:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T19:28:57:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T19:28:57:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T19:28:57:  ✓ Ready in 345ms
+2026-01-28T19:28:57: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+2026-01-28T19:28:57: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+2026-01-28T19:30:58:  ELIFECYCLE  Command failed.
+2026-01-28T19:30:59: 
+2026-01-28T19:30:59: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T19:30:59: > next start
+2026-01-28T19:30:59: 
+2026-01-28T19:30:59:    ▲ Next.js 16.0.10
+2026-01-28T19:30:59:    - Local:         http://localhost:3000
+2026-01-28T19:30:59:    - Network:       http://185.182.184.122:3000
+2026-01-28T19:30:59: 
+2026-01-28T19:30:59:  ✓ Starting...
+2026-01-28T19:30:59:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T19:30:59:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T19:30:59:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T19:30:59:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T19:30:59:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T19:30:59:  ✓ Ready in 339ms
+2026-01-28T19:31:00: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: ⚙️  write to custom object with { processEnv: myObject }
+2026-01-28T19:31:00: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: ⚙️  write to custom object with { processEnv: myObject }
+2026-01-28T19:31:14: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/empreendimentos with email orcioli@pratica-inc.com.br and token [REDACTED]
+2026-01-28T19:31:15: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/corretores with email orcioli@pratica-inc.com.br and token [REDACTED]
+2026-01-28T19:32:26: [Redis] SCALINGO_REDIS_URL não configurada
+2026-01-28T19:33:47: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/empreendimentos with email orcioli@pratica-inc.com.br and token [REDACTED]
+2026-01-28T19:33:48: [CVCRM] Fetching https://pratica.cvcrm.com.br/api/v1/cadastros/corretores with email orcioli@pratica-inc.com.br and token [REDACTED]
+2026-01-28T19:37:20:  ELIFECYCLE  Command failed.
+2026-01-28T19:37:21: 
+2026-01-28T19:37:21: > my-v0-project@0.1.0 start /var/www/pratica
+2026-01-28T19:37:21: > next start
+2026-01-28T19:37:21: 
+2026-01-28T19:37:21:    ▲ Next.js 16.0.10
+2026-01-28T19:37:21:    - Local:         http://localhost:3000
+2026-01-28T19:37:21:    - Network:       http://185.182.184.122:3000
+2026-01-28T19:37:21: 
+2026-01-28T19:37:21:  ✓ Starting...
+2026-01-28T19:37:21:  ⚠ `eslint` configuration in next.config.js is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
+2026-01-28T19:37:21:  ⚠ Invalid next.config.js options detected: 
+2026-01-28T19:37:21:  ⚠     Unrecognized key(s) in object: 'turbo' at "experimental"
+2026-01-28T19:37:21:  ⚠     Unrecognized key(s) in object: 'eslint'
+2026-01-28T19:37:21:  ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+2026-01-28T19:37:22:  ✓ Ready in 401ms
+2026-01-28T19:37:22: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+2026-01-28T19:37:22: [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+2026-01-28T19:37:55:  ELIFECYCLE  Command failed.
