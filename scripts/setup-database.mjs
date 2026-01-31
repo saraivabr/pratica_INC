@@ -3,7 +3,7 @@ import pg from 'pg';
 const { Client } = pg;
 
 // Database connection
-const connectionString = 'postgres://postgres:356d20e7786bbbe6f375@84.247.128.56:3005/pratica?sslmode=disable';
+const connectionString = '${process.env.DATABASE_URL}';
 
 async function setupDatabase() {
   console.log('Connecting to Supabase PostgreSQL...');

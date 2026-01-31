@@ -84,7 +84,7 @@ Sistema de conexão WhatsApp por corretor usando Evolution API.
 
 ---
 
-### Recupera Leads (rotas internas: salva-leads)
+### Salva-Leads
 Sistema de follow-up automático de leads via WhatsApp do corretor.
 
 **Funcionalidades:**

@@ -4,26 +4,22 @@ import { BookTemplate } from '@/components/pdf-templates';
 import { getEmpreendimentosCVCRM, getUnidadesCVCRM } from '@/lib/cvcrm-client';
 import { getUserById } from '@/lib/supabase';
 import { createElement } from 'react';
+import { applyRateLimit } from '@/lib/rate-limit-helper';
+import { validateRequest, PdfBookSchema } from '@/lib/validation-schemas';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-interface RequestBody {
-  empreendimentoId: string;
-  userId: string;
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const body: RequestBody = await request.json();
-    const { empreendimentoId, userId } = body;
+    const rateLimited = await applyRateLimit(request, 'PDF_GENERATE');
+    if (rateLimited) return rateLimited;
 
-    if (!empreendimentoId || !userId) {
-      return NextResponse.json(
-        { success: false, error: 'empreendimentoId e userId são obrigatórios' },
-        { status: 400 }
-      );
+    const validation = await validateRequest(request, PdfBookSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
     }
+    const { empreendimentoId, userId } = validation.data;
 
     // Buscar usuário
     const user = await getUserById(userId);

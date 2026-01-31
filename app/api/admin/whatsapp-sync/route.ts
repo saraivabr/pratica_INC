@@ -1,7 +1,8 @@
 /**
  * Endpoint para sincronizar histórico de WhatsApp da Evolution API
  *
- * POST /api/admin/whatsapp-sync?secret=xxx
+ * POST /api/admin/whatsapp-sync
+ * Authorization: Bearer {CRON_SECRET}
  *
  * Body (opcional):
  * {
@@ -33,7 +34,6 @@ import pool from '@/lib/db';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutos para operações longas
 
-const ADMIN_SECRET = process.env.CRON_SECRET;
 
 interface SyncRequest {
   workspaceId?: number;
@@ -52,11 +52,11 @@ interface SyncResult {
 }
 
 export async function POST(request: NextRequest) {
-  // Validar autenticação
-  const { searchParams } = new URL(request.url);
-  const secret = searchParams.get('secret');
+  // Validar autenticação via Authorization header
+  const authHeader = request.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
 
-  if (!ADMIN_SECRET || secret !== ADMIN_SECRET) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -250,24 +250,24 @@ export async function POST(request: NextRequest) {
 
 // GET retorna instruções de uso
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const secret = searchParams.get('secret');
+  const authHeader = request.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
 
-  if (!ADMIN_SECRET || secret !== ADMIN_SECRET) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   return NextResponse.json({
     endpoint: '/api/admin/whatsapp-sync',
     method: 'POST',
-    authentication: 'Query param: secret=CRON_SECRET',
+    authentication: 'Header: Authorization: Bearer {CRON_SECRET}',
     body: {
       workspaceId: 'number (opcional) - Filtrar por tenant específico',
       instanceName: 'string (opcional) - Filtrar por instância específica',
       limit: 'number (opcional, default: 100) - Limite de mensagens por chat',
     },
     example: {
-      url: '/api/admin/whatsapp-sync?secret=xxx',
+      headers: { Authorization: 'Bearer {CRON_SECRET}' },
       body: { workspaceId: 1, limit: 50 },
     },
   });

@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendTyping, sendPresence } from '@/lib/evolution-api';
 import { getAuthenticatedUser } from '@/lib/api-auth';
+import { validateRequest, WhatsAppTypingSchema } from '@/lib/validation-schemas';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,15 +20,11 @@ export async function POST(request: NextRequest) {
 
     // Nota: Esta API não requer tenant pois apenas envia comando para Evolution API
 
-    const body = await request.json();
-    const { instanceName, phoneNumber, action = 'start', duration = 3000 } = body;
-
-    if (!instanceName || !phoneNumber) {
-      return NextResponse.json(
-        { success: false, error: 'instanceName e phoneNumber são obrigatórios' },
-        { status: 400 }
-      );
+    const validation = await validateRequest(request, WhatsAppTypingSchema);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error, details: validation.details }, { status: 400 });
     }
+    const { instanceName, phoneNumber, action, duration } = validation.data;
 
     if (action === 'start') {
       // Iniciar typing com auto-pause

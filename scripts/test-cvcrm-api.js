@@ -5,8 +5,8 @@
 const https = require('https');
 
 const baseUrl = 'pratica.cvcrm.com.br';
-const token = '8899fff8925165bcfb20d35cdc2443a80744692d';
-const email = 'orcioli@pratica-inc.com.br';
+const token = process.env.CVCRM_TOKEN_LEAD || '';
+const email = process.env.CVCRM_EMAIL || '';
 const endpoint = '/api/v1/comercial/leads';
 
 console.log('🚀 Testing CV CRM API Connection\n');

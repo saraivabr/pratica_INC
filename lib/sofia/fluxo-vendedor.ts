@@ -29,7 +29,7 @@ import {
   buildLeadQualificadoPrompt,
 } from './vendedor-prompts';
 import { updateContext, type ConversationContext } from './context';
-import { sendTextMessage, sendQuickButtons, sendActionButtons } from '@/lib/zapi';
+import { sendTextMessage, sendQuickButtons, sendActionButtons } from '@/lib/whatsapp-sender';
 import { delay } from './persona';
 
 // ============================================================================

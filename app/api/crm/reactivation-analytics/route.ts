@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
       WHERE workspace_id = $1
         AND telefone IS NOT NULL
         AND telefone != ''
-        AND data_cadastro_cvcrm >= $2
-        AND data_cadastro_cvcrm <= $3
+        AND data_cad >= $2
+        AND data_cad <= $3
     `, [workspaceId, date180DaysAgo, date7DaysAgo])
 
     const leads = result.rows || []
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     const porTemperatura = { quente: 0, morno: 0, frio: 0 }
 
     const leadsAnalisados = leadsReativacao.map(lead => {
-      const diasCadastro = Math.floor((Date.now() - new Date(lead.data_cadastro_cvcrm).getTime()) / (24 * 60 * 60 * 1000))
+      const diasCadastro = Math.floor((Date.now() - new Date(lead.data_cad).getTime()) / (24 * 60 * 60 * 1000))
 
       // Empreendimento
       const empreendimentos = lead.empreendimento || []

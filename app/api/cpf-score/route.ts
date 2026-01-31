@@ -1,34 +1,34 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { applyRateLimit } from '@/lib/rate-limit-helper';
+import { validateRequest, CpfScoreSchema } from '@/lib/validation-schemas';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { cpf } = body;
+    const rateLimited = await applyRateLimit(request as NextRequest, 'CPF_SCORE');
+    if (rateLimited) return rateLimited;
 
-    if (!cpf) {
-      return NextResponse.json(
-        { error: 'CPF é obrigatório' },
-        { status: 400 }
-      );
+    const ctx = await requireWorkspaceContext(request as NextRequest);
+    if (ctx.error) return ctx.error;
+
+    const validation = await validateRequest(request, CpfScoreSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
     }
-
-    // Limpa o CPF removendo caracteres não numéricos
-    const cpfLimpo = cpf.replace(/\D/g, '');
-
-    if (cpfLimpo.length !== 11) {
-      return NextResponse.json(
-        { error: 'CPF deve conter 11 dígitos' },
-        { status: 400 }
-      );
-    }
+    const cpfLimpo = validation.data.cpf;
 
     // Controller para timeout de 120 segundos
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     try {
-      // Token fornecido pelo usuário
-      const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2dhdGV3YXkuYXBpYnJhc2lsLmlvL2FwaS92Mi9hdXRoL2xvZ2luIiwiaWF0IjoxNzY4NzYyNzgwLCJleHAiOjE4MDAyOTg3ODAsIm5iZiI6MTc2ODc2Mjc4MCwianRpIjoiOWFTRjl5cVRucHBndk5vQiIsInN1YiI6IjEwODYzIiwicHJ2IjoiMjNiZDVjODk0OWY2MDBhZGIzOWU3MDFjNDAwODcyZGI3YTU5NzZmNyJ9.RVk4-5N_lw3aB60Coa9VOl6tGqu5WRQS_EmnBE_ZVYA";
+      const token = process.env.CPF_SCORE_API_TOKEN;
+      if (!token) {
+        return NextResponse.json(
+          { error: 'CPF Score API não configurada' },
+          { status: 503 }
+        );
+      }
 
       console.log(`[Score API] Consultando CPF: ${cpfLimpo}`);
 
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       else risco = 'Excelente';
 
       const mappedResponse = {
-        cpf: resultData.dadosCadastrais?.cpf || cpf,
+        cpf: resultData.dadosCadastrais?.cpf || cpfLimpo,
         nome: resultData.dadosCadastrais?.nome,
         dataNascimento: resultData.dadosCadastrais?.dataNascimento,
         protocolo: resultData.dadosCadastrais?.protocolo,

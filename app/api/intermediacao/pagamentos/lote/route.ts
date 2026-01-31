@@ -7,51 +7,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { validateRequest, PagamentoLoteSchema } from "@/lib/validation-schemas";
 
 export async function POST(request: NextRequest) {
   try {
     const ctx = await requireWorkspaceContext(request);
     if (ctx.error) return ctx.error;
 
-    const body = await request.json();
-    const { parcela_ids, data_pagamento, metodo, referencia } = body;
-
-    // Validacoes
-    if (!parcela_ids || !Array.isArray(parcela_ids) || parcela_ids.length === 0) {
+    const validation = await validateRequest(request, PagamentoLoteSchema);
+    if (!validation.success) {
       return NextResponse.json(
-        { success: false, error: "Lista de parcelas e obrigatoria" },
+        { success: false, error: validation.error, details: validation.details },
         { status: 400 }
       );
     }
-
-    if (parcela_ids.length > 100) {
-      return NextResponse.json(
-        { success: false, error: "Maximo de 100 parcelas por lote" },
-        { status: 400 }
-      );
-    }
-
-    if (!data_pagamento) {
-      return NextResponse.json(
-        { success: false, error: "Data de pagamento e obrigatoria" },
-        { status: 400 }
-      );
-    }
-
-    if (!metodo) {
-      return NextResponse.json(
-        { success: false, error: "Metodo de pagamento e obrigatorio" },
-        { status: 400 }
-      );
-    }
-
-    const metodosValidos = ["transferencia", "deposito", "pix", "cheque", "outro"];
-    if (!metodosValidos.includes(metodo.toLowerCase())) {
-      return NextResponse.json(
-        { success: false, error: `Metodo invalido. Valores aceitos: ${metodosValidos.join(", ")}` },
-        { status: 400 }
-      );
-    }
+    const { parcela_ids, data_pagamento, metodo, referencia } = validation.data;
 
     // Buscar parcelas - filter by workspace_id
     const placeholders = parcela_ids.map((_, i) => `$${i + 2}`).join(", ");

@@ -1,9 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getLeadInsight } from "@/lib/cvcrm-insight";
+import { applyRateLimit } from '@/lib/rate-limit-helper';
+import { validateRequest, ChatSchema } from '@/lib/validation-schemas';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function POST(request: Request) {
   try {
-    const { text } = await request.json();
+    const rateLimited = await applyRateLimit(request as NextRequest, 'AI_ENDPOINT');
+    if (rateLimited) return rateLimited;
+
+    const ctx = await requireWorkspaceContext(request as NextRequest);
+    if (ctx.error) return ctx.error;
+
+    const validation = await validateRequest(request, ChatSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
+    }
+    const { text } = validation.data;
     const phoneMatch = text.match(/55\d{10}/);
     if (!phoneMatch) {
       return NextResponse.json({

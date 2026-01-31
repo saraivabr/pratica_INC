@@ -3,6 +3,7 @@ import { dbQuery } from "@/lib/db";
 import { getCorretoresCVCRM, getImobiliariaCVCRM } from "@/lib/cvcrm-client";
 import { normalizePhone } from "@/lib/supabase";
 import { getAuthenticatedUser } from "@/lib/api-auth";
+import { applyRateLimit } from '@/lib/rate-limit-helper';
 
 interface SyncLog {
   id: string;
@@ -71,15 +72,10 @@ function parseBancarios(dados: any) {
 
 // POST - Full sync from CV CRM
 export async function POST(request: NextRequest) {
-  // ❌ CV CRM SYNC ADMIN DESABILITADO - Erro 405 constantemente  
-  return NextResponse.json({
-    success: false,
-    message: "CV CRM sync admin desabilitado por Fellipe - erro 405 constante",
-    timestamp: new Date().toISOString()
-  }, { status: 503 });
-
-  /* CÓDIGO ORIGINAL COMENTADO
   try {
+    const rateLimited = await applyRateLimit(request, 'SYNC');
+    if (rateLimited) return rateLimited;
+
     const user = await getAuthenticatedUser(request);
     if (!user || user.role !== "admin") {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -497,5 +493,4 @@ export async function GET(request: NextRequest) {
     console.error("[Sync] Error:", error);
     return NextResponse.json({ error: error.message || "Erro interno" }, { status: 500 });
   }
-  */ // FIM DO CÓDIGO COMENTADO
 }

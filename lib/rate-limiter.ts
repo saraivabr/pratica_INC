@@ -153,11 +153,18 @@ class RateLimiter {
 const rateLimiter = new RateLimiter();
 
 export const RateLimitConfigs = {
-  OTP_SEND: { windowMs: 60 * 60 * 1000, maxRequests: 10 }, // Aumentado de 3 para 10
-  OTP_VERIFY: { windowMs: 15 * 60 * 1000, maxRequests: 10 }, // Aumentado de 5 para 10
+  OTP_SEND: { windowMs: 60 * 60 * 1000, maxRequests: 3 },
+  OTP_VERIFY: { windowMs: 15 * 60 * 1000, maxRequests: 5 },
   WHATSAPP_SEND: { windowMs: 60 * 1000, maxRequests: 20 },
   API_GENERAL: { windowMs: 60 * 1000, maxRequests: 100 },
-  LOGIN: { windowMs: 15 * 60 * 1000, maxRequests: 10 }, // Aumentado de 5 para 10
+  LOGIN: { windowMs: 15 * 60 * 1000, maxRequests: 5 },
+  AI_ENDPOINT: { windowMs: 60 * 1000, maxRequests: 10 },
+  WEBHOOK: { windowMs: 60 * 1000, maxRequests: 200 },
+  SYNC: { windowMs: 5 * 60 * 1000, maxRequests: 3 },
+  CPF_SCORE: { windowMs: 60 * 1000, maxRequests: 5 },
+  PDF_GENERATE: { windowMs: 60 * 1000, maxRequests: 10 },
+  ADMIN_ACTION: { windowMs: 60 * 1000, maxRequests: 30 },
+  NOTIFICATION: { windowMs: 60 * 1000, maxRequests: 50 },
 };
 
 export default rateLimiter;

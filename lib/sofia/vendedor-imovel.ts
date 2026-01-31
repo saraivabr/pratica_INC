@@ -7,7 +7,7 @@
  */
 
 import { dbQuery } from '@/lib/db';
-import { sendActionButtons, sendQuickButtons, sendTextMessage } from '@/lib/zapi';
+import { sendActionButtons, sendQuickButtons, sendTextMessage } from '@/lib/whatsapp-sender';
 import { delay } from './persona';
 import type { ConversationContext } from './context';
 

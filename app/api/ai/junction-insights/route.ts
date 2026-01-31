@@ -1,18 +1,28 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import OpenAI from "openai"
+import { applyRateLimit } from '@/lib/rate-limit-helper';
+import { getAuthenticatedUser } from '@/lib/api-auth'
+import { validateRequest, JunctionInsightsSchema } from '@/lib/validation-schemas'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 30000,
 })
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { config, units, flow, totals } = body
-
-    if (!units || units.length === 0) {
-      return NextResponse.json({ error: "No units provided" }, { status: 400 })
+    const user = await getAuthenticatedUser(req as NextRequest)
+    if (!user) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
+
+    const rateLimited = await applyRateLimit(req as NextRequest, 'AI_ENDPOINT');
+    if (rateLimited) return rateLimited;
+    const validation = await validateRequest(req, JunctionInsightsSchema)
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 })
+    }
+    const { config, units, flow, totals } = validation.data
 
     const prompt = `
       Você é um especialista em engenharia financeira imobiliária.

@@ -16,7 +16,7 @@ const EVOLUTION_BASE_URL = process.env.EVOLUTION_BASE_URL || process.env.EVOLUTI
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 const WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL || process.env.NEXT_PUBLIC_APP_URL;
 const WEBHOOK_SECRET = process.env.EVOLUTION_WEBHOOK_SECRET;
-const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+const DATABASE_URL = process.env.DATABASE_URL || process.env.SCALINGO_POSTGRESQL_URL;
 
 if (!DATABASE_URL) {
   console.error('ERRO: DATABASE_URL não configurado');
@@ -176,8 +176,11 @@ async function main() {
           continue;
         }
 
-        // Montar URL do webhook
-        const webhookUrl = `${WEBHOOK_BASE_URL}/api/webhook/evolution/${tenantId}`;
+        // Montar URL do webhook (com secret se configurado)
+        const webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET;
+        const webhookUrl = webhookSecret
+          ? `${WEBHOOK_BASE_URL}/api/webhook/evolution/${tenantId}?secret=${webhookSecret}`
+          : `${WEBHOOK_BASE_URL}/api/webhook/evolution/${tenantId}`;
 
         // Atualizar webhook
         console.log(`📌 ${instanceName}: Atualizando webhook...`);

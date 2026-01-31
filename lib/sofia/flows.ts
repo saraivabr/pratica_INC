@@ -21,7 +21,7 @@ import {
   sendBairrosMenu,
   askEntrada,
   askPostSimulacao,
-} from '@/lib/zapi';
+} from '@/lib/whatsapp-sender';
 import { createInteracao, normalizePhone } from '@/lib/supabase';
 import { getEmpreendimentosCVCRM, getUnidadesCVCRM } from '@/lib/cvcrm-client';
 import {
@@ -39,134 +39,6 @@ import {
 import { criarLembrete, registrarAtividade } from './actions';
 import { createSipOutboundCall } from '@/lib/elevenlabs';
 import { processarTextoVenda } from './fluxo-vendedor';
-import { getCorretorContext, buildProactiveGreeting, type CorretorContext } from './corretor-context';
-
-// ============================================
-// GEMINI AI INTEGRATION
-// ============================================
-
-/**
- * Generate proactive greeting with Gemini 2.0 Flash (primary) and OpenAI fallback
- */
-async function generateProactiveGreeting(
-  user: User,
-  context: ConversationContext,
-  corretorContext: CorretorContext,
-  isReturn: boolean
-): Promise<string> {
-  const { leadSummary, pendingLeads, recentWins, propertiesCount } = corretorContext;
-  
-  // Calculate useful stats
-  const totalLeads = leadSummary.reduce((sum, item) => sum + parseInt(item.total.toString()), 0);
-  const pendingCount = pendingLeads.length;
-  
-  // Build context for AI
-  let contextInfo = '';
-  
-  if (pendingCount > 0) {
-    const pendingNames = pendingLeads.slice(0, 3).map(lead => lead.nome).join(', ');
-    contextInfo += `${pendingCount} leads aguardando atendimento: ${pendingNames}. `;
-  }
-  
-  if (recentWins.length > 0) {
-    const winText = recentWins.map(win => `${win.nome} fechou ${win.situacao_nome}`).join(', ');
-    contextInfo += `Vendas recentes: ${winText}. `;
-  }
-  
-  if (totalLeads > 0) {
-    contextInfo += `${totalLeads} leads ativos no funil. `;
-  }
-  
-  contextInfo += `${propertiesCount} empreendimentos ativos.`;
-
-  const greetingPrompt = `Você é a Sofia, uma assistente super atenciosa da Corretor Parceria. Fale como uma secretária carinhosa no WhatsApp.
-
-Corretor: ${user.nome}
-Situação atual: ${contextInfo}
-
-${isReturn ? 'Esse corretor voltou a falar comigo.' : 'Primeiro contato hoje.'}
-
-Responda de forma natural e calorosa, igual uma secretária que se importa. Fale das coisas importantes sem esperar perguntar.
-
-CRUCIAL:
-- Escreva como no WhatsApp: *negrito* (um asterisco), mensagens curtas, linguagem solta
-- SEM listas, SEM bullets, SEM estrutura formal
-- Português brasileiro bem casual e amigável  
-- Se tem leads esperando, fale os nomes
-- Se teve venda, comemore junto!
-- Termine de forma natural, sem oferecer menus ou opções
-
-Exemplo: "Oi João! Parabéns, vi que a Ana fechou! 🎉 Tem uns 2 leads te esperando, a Maria e o Carlos. Quer que eu puxe os contatos?"
-
-Sua resposta natural:`;
-
-  // Try Gemini 2.0 Flash first
-  try {
-    const googleAiKey = process.env.GOOGLE_AI_API_KEY;
-    if (googleAiKey) {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${googleAiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: greetingPrompt }]
-            }],
-            generationConfig: {
-              maxOutputTokens: 200,
-              temperature: 0.8,
-            }
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (content && content.trim()) {
-          console.log('[Sofia] Gemini 2.0 Flash response generated successfully');
-          return content.trim();
-        }
-      }
-    }
-  } catch (error) {
-    console.warn('[Sofia] Gemini request failed, falling back to OpenAI:', error);
-  }
-
-  // Fallback to OpenAI
-  try {
-    const completion = await getOpenAI().chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'user', content: greetingPrompt },
-      ],
-      max_tokens: 200,
-      temperature: 0.8,
-    });
-
-    const response = completion.choices[0]?.message?.content;
-    if (response && response.trim()) {
-      console.log('[Sofia] OpenAI fallback response generated successfully');
-      return response.trim();
-    }
-  } catch (error) {
-    console.error('[Sofia] Both Gemini and OpenAI failed:', error);
-  }
-
-  // Final fallback: use a context-aware static response
-  if (pendingCount > 0) {
-    const firstName = pendingLeads[0].nome.split(' ')[0];
-    return `Oi, ${user.nome}! Tudo bem? Vi que você tem *${pendingCount} leads* esperando retorno, incluindo o ${firstName}. Quer que eu te ajude a priorizar os contatos de hoje? 😊`;
-  } else if (recentWins.length > 0) {
-    const winName = recentWins[0].nome.split(' ')[0];
-    return `E aí, ${user.nome}! Parabéns pelo ${winName} que fechou! 🎉 Como posso te ajudar hoje?`;
-  } else {
-    return `Oi, ${user.nome}! Pronto pra mais um dia de vendas? Como posso te ajudar? 😊`;
-  }
-}
 
 import { buildSofiaSystemPrompt, buildPsychologicalSystemPrompt, delay, getTypingDelay, getPersonaByUser } from './persona';
 import {
@@ -240,6 +112,7 @@ function getOpenAI(): OpenAI {
   if (!_openai) {
     _openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      timeout: 30000,
     });
   }
   return _openai;
@@ -312,13 +185,13 @@ async function sendSplitMessages(
 }
 
 function buildEmpreendimentoLink(id: string, tab?: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://corretorparceria.com.br';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.escreve.ai';
   const tabParam = tab ? `?tab=${tab}` : '';
   return `${baseUrl}/empreendimentos/${id}${tabParam}`;
 }
 
 function buildEmpreendimentosListLink(): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://corretorparceria.com.br';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.escreve.ai';
   return `${baseUrl}/empreendimentos`;
 }
 
@@ -327,7 +200,8 @@ async function registerEmpreendimentoInteracao(
   empreendimento: { id: string; nome: string },
   tipo: 'resumo' | 'comparacao' | 'unidade' | 'simulacao' | 'book' | 'condicoes',
   mensagem: string,
-  context: ConversationContext
+  context: ConversationContext,
+  workspaceId?: number
 ): Promise<void> {
   try {
     await createInteracao({
@@ -338,7 +212,7 @@ async function registerEmpreendimentoInteracao(
       lead_nome: context.entities?.nomeCliente,
       mensagem_enviada: mensagem,
       notas_internas: 'Sofia WhatsApp',
-    });
+    }, workspaceId || 0);
   } catch (error) {
     console.warn('[Sofia] Erro ao registrar interacao:', error);
   }
@@ -469,7 +343,8 @@ async function handleCheapestPriceFlow(
       { id: cheapest.empId, nome },
       'comparacao',
       mensagemCompleta,
-      context
+      context,
+      user.workspace_id
     );
 
     return {
@@ -677,7 +552,7 @@ function findMateriaisByName(name: string) {
 }
 
 function normalizeUrl(url: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://corretorparceria.com.br';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.escreve.ai';
   if (url.startsWith('http')) return url;
   if (url.startsWith('/')) return `${baseUrl}${url}`;
   return `${baseUrl}/${url}`;
@@ -905,7 +780,7 @@ export async function handleOnboarding(
   sender: User
 ): Promise<void> {
   const imobName = sender.imobiliarias?.nome || 'Pratica';
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://corretorparceria.com.br';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.escreve.ai';
 
   // Sequência de onboarding com delays psicológicos
   const messages = [
@@ -946,53 +821,108 @@ async function handleGreeting(
     actionIds.add(id);
   };
 
-  // Check if it's a return visit or first time
-  const isReturn = context.topics_discussed.length > 0;
-  
-  // **ENHANCED: Get corretor context for proactive response**
-  try {
-    // Fetch corretor context to enable proactive responses
-    const corretorContext = await getCorretorContext(user.cvcrm_id?.toString() || user.id, user.nome, user.role);
-    
-    // Generate proactive AI response using context
-    const proactiveMessage = await generateProactiveGreeting(user, context, corretorContext, isReturn);
-    
-    if (proactiveMessage && proactiveMessage.trim()) {
-      messages.push(proactiveMessage);
-      console.log('[Sofia] Proactive greeting generated successfully');
+  // Verificar se é retorno ou primeira vez
+  if (context.topics_discussed.length > 0) {
+    messages.push(SAUDACOES.oiRetorno(user.nome));
+  } else {
+    // Se agentConfig tem greetingMessage customizado, usar ele
+    if (agentConfig?.greetingMessage) {
+      // Substituir placeholders no greetingMessage
+      const greeting = agentConfig.greetingMessage
+        .replace(/\{nome\}/gi, user.nome)
+        .replace(/\{usuario\}/gi, user.nome);
+      messages.push(greeting);
+    } else if (user.imobiliarias?.nome) {
+      messages.push(SAUDACOES.comImobiliaria(user.nome, user.imobiliarias.nome));
     } else {
-      throw new Error('Empty proactive message');
-    }
-  } catch (error) {
-    console.warn('[Sofia] Proactive greeting failed, using fallback:', error);
-    
-    // Fallback to original static greetings
-    if (isReturn) {
-      messages.push(SAUDACOES.oiRetorno(user.nome));
-    } else {
-      // Se agentConfig tem greetingMessage customizado, usar ele
-      if (agentConfig?.greetingMessage) {
-        const greeting = agentConfig.greetingMessage
-          .replace(/\{nome\}/gi, user.nome)
-          .replace(/\{usuario\}/gi, user.nome);
-        messages.push(greeting);
-      } else if (user.imobiliarias?.nome) {
-        messages.push(SAUDACOES.comImobiliaria(user.nome, user.imobiliarias.nome));
-      } else {
-        messages.push(getSaudacaoHorario(user.nome));
-      }
+      messages.push(getSaudacaoHorario(user.nome));
     }
   }
 
-  // Minimal actions for non-corretores
+  let recentPages: string[] = [];
+  try {
+    const { rows: activities } = await dbQuery(
+      `select page
+       from tracking_events
+       where user_id = $1
+       order by created_at desc
+       limit 6`,
+      [user.id]
+    );
+    recentPages = activities.map((row) => String(row.page || "").toLowerCase());
+  } catch (error) {
+    console.error("[Sofia] Erro ao carregar atividades recentes:", error);
+  }
+
+  const persona = await getPersonaByUser(user);
+
   if (user.role === "gerente" || user.role === "admin") {
     addAction("ranking", "🏆", "Ranking equipe");
     addAction("metas", "🎯", "Metas do mês");
     addAction("campanha", "📣", "Campanhas");
   } else {
+    for (const page of recentPages) {
+      if (page.includes("corretor-propostas")) {
+        addAction("propostas", "📌", "Status propostas");
+      }
+      if (page.includes("corretor-imoveis") || page.includes("empreendimentos")) {
+        addAction("buscar", "🔎", "Buscar imóvel");
+      }
+      if (page.includes("corretor-clientes") || page.includes("leads")) {
+        addAction("simular", "💰", "Simular cliente");
+      }
+      if (page.includes("corretor-mensagens")) {
+        addAction("objecao", "🧠", "Argumentos/objeções");
+      }
+      if (page.includes("corretor-relatorios")) {
+        addAction("comissao", "💵", "Comissões");
+      }
+      if (page.includes("corretor-salva-leads")) {
+        addAction("agenda", "📅", "Agenda");
+      }
+    if (actions.length >= 3) break;
+    }
+
+    if (persona.perfil === "corretor_junior") {
+      addAction("objecao", "🧠", "Argumentos/objeções");
+    }
+
     addAction("buscar", "🔎", "Buscar imóvel");
     addAction("simular", "💰", "Simular cliente");
     addAction("tabela", "📊", "Materiais/tabela");
+  }
+
+  if (user.role === "corretor" && user.workspace_id) {
+    try {
+      const corretorId = await getCorretorIdByUserId(user.id);
+      if (corretorId) {
+        const leadsPayload = await getLeadsByCorretor(String(corretorId), user.workspace_id, {
+          limit: 3,
+          periodo: "semana",
+        });
+        const leadMessages = formatLeadInsights(leadsPayload);
+        messages.push(...leadMessages);
+      }
+    } catch (error) {
+      console.error("[Sofia] Erro ao carregar insights de leads:", error);
+    }
+  }
+
+  if (recentPages.length > 0 && user.role === "corretor") {
+    const recent = recentPages[0] || "";
+    if (recent.includes("corretor-propostas")) {
+      messages.push("Quer que eu puxe o status das suas propostas e já te diga o próximo passo?");
+    } else if (recent.includes("corretor-imoveis") || recent.includes("empreendimentos")) {
+      messages.push("Quer que eu já te indique 3 opções quentes pra fechar mais rápido?");
+    } else if (recent.includes("corretor-clientes") || recent.includes("leads")) {
+      messages.push("Quer que eu sugira o melhor próximo contato pra destravar venda?");
+    } else if (recent.includes("corretor-mensagens")) {
+      messages.push("Quer que eu te ajude a responder as objeções que chegaram?");
+    } else if (recent.includes("corretor-relatorios")) {
+      messages.push("Quer que eu destaque as comissões pendentes e o que dá pra acelerar?");
+    } else if (recent.includes("corretor-salva-leads")) {
+      messages.push("Quer que eu organize seus próximos follow-ups do salva leads?");
+    }
   }
 
   return {
@@ -1001,8 +931,8 @@ async function handleGreeting(
       topic: 'saudacao',
     }),
     shouldUseAI: false,
-    // **FELLIPE REQUEST: NO BUTTONS for corretores, minimal for others**
-    followUp: (user.role === 'corretor') ? undefined : async (phone: string) => {
+    // Enviar menu de ações após saudação
+    followUp: async (phone: string) => {
       await delay(1000);
       await askAction(phone, 'Como posso te ajudar agora?', actions);
     },
@@ -1108,7 +1038,8 @@ async function handleSearchFlow(
         { id: empreendimentoId, nome },
         'unidade',
         `${messages[0]}\n${url}`,
-        context
+        context,
+        user.workspace_id
       );
       return {
         messages,
@@ -1133,7 +1064,8 @@ async function handleSearchFlow(
         { id: empreendimentoId, nome },
         'simulacao',
         `${messages[0]}\n${url}`,
-        context
+        context,
+        user.workspace_id
       );
       return {
         messages,
@@ -1158,7 +1090,8 @@ async function handleSearchFlow(
         { id: empreendimentoId, nome },
         'book',
         `${messages[0]}\n${url}`,
-        context
+        context,
+        user.workspace_id
       );
       return {
         messages,
@@ -2482,7 +2415,7 @@ function detectarFuncionalidadeAjuda(text: string): FuncionalidadeAjuda {
 async function handleAjudaAppFlow(user: User, text: string, context: ConversationContext): Promise<FlowResult> {
   const messages: string[] = [];
   const funcionalidade = detectarFuncionalidadeAjuda(text);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://corretorparceria.com.br';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.escreve.ai';
 
   if (context.current_flow === 'ajuda_app' && context.awaiting_response === 'escolha_funcionalidade') {
     const escolha = text.toLowerCase().trim();
@@ -2781,7 +2714,8 @@ async function handleObjecaoFlow(user: User, text: string, context: Conversation
       { id: empreendimento.id, nome: empreendimento.nome },
       'resumo',
       mensagemRegistro,
-      context
+      context,
+      user.workspace_id
     );
   }
   await registrarAtividade(
@@ -2869,38 +2803,6 @@ async function generateAIResponse(
   eventoPrompt?: string
 ): Promise<string> {
   let portfolioSummary = '';
-  let corretorContextInfo = '';
-
-  // **ENHANCED: Get corretor context for natural responses**
-  try {
-    const corretorContext = await getCorretorContext(
-      user.cvcrm_id?.toString() || user.id, 
-      user.nome, 
-      user.role
-    );
-    
-    const { leadSummary, pendingLeads, recentWins, propertiesCount } = corretorContext;
-    const totalLeads = leadSummary.reduce((sum, item) => sum + parseInt(item.total.toString()), 0);
-    const pendingCount = pendingLeads.length;
-    
-    if (pendingCount > 0) {
-      const pendingNames = pendingLeads.slice(0, 3).map(lead => lead.nome).join(', ');
-      corretorContextInfo += `${pendingCount} leads aguardando: ${pendingNames}. `;
-    }
-    
-    if (recentWins.length > 0) {
-      const winText = recentWins.map(win => `${win.nome} (${win.situacao_nome})`).join(', ');
-      corretorContextInfo += `Vendas recentes: ${winText}. `;
-    }
-    
-    if (totalLeads > 0) {
-      corretorContextInfo += `${totalLeads} leads no funil. `;
-    }
-    
-    corretorContextInfo += `${propertiesCount} empreendimentos ativos.`;
-  } catch (error) {
-    console.warn('[Sofia] Error fetching corretor context for AI response:', error);
-  }
 
   try {
     const response = await getEmpreendimentosCVCRM();
@@ -2985,60 +2887,33 @@ async function generateAIResponse(
     }
   }
 
-  // **ENHANCED: Natural WhatsApp prompt for corretores**
-  let systemPrompt = '';
-  
-  if (user.role === 'corretor' || user.role === 'gerente' || user.role === 'admin') {
-    // Natural, human-like prompt for corretores
-    systemPrompt = `Você é a Sofia, uma assistente super carinhosa da Corretor Parceria. Fale como uma secretária atenciosa no WhatsApp.
-
-INFORMAÇÕES DO CORRETOR:
-Nome: ${user.nome}
-Contexto atual: ${corretorContextInfo || 'Sem informações específicas no momento.'}
-
-COMO RESPONDER:
-- Escreva como no WhatsApp: *negrito* (um asterisco), linguagem solta e amigável
-- SEM listas, SEM bullets, SEM estrutura formal, SEM menus, SEM "escolha uma opção"
-- Português brasileiro casual e carinhoso
-- Se tem leads esperando, mencione os nomes naturalmente
-- Se teve vendas, comemore!
-- Responda à pergunta de forma útil e natural
-- Termine de forma humana, sem oferecer menus ou opções estruturadas
-
-JAMAIS use: "Como posso ajudar", "precisa de algo mais", listas numeradas, bullets, menus estruturados.
-
-Mensagem do corretor: "${text}"
-
-Sua resposta natural e carinhosa:`;
-  } else {
-    // Use original system prompt for other users
-    systemPrompt = psychology
-      ? buildPsychologicalSystemPrompt({
-          userName: user.nome,
-          userRole: user.role,
-          imobiliaria: user.imobiliarias?.nome || 'Pratica',
-          psychology,
-          recentActivities,
-          conversationHistory: formatMessagesForPrompt(messages),
-          currentIntent: context.last_intent || undefined,
-          sentiment,
-          portfolioSummary,
-          persona,
-          ragContext,
-        })
-      : buildSofiaSystemPrompt({
-          userName: user.nome,
-          userRole: user.role,
-          imobiliaria: user.imobiliarias?.nome || 'Pratica',
-          recentActivities,
-          conversationHistory: formatMessagesForPrompt(messages),
-          currentIntent: context.last_intent || undefined,
-          sentiment,
-          portfolioSummary,
-          persona,
-          ragContext,
-        });
-  }
+  // Use psychological system prompt when psychology data is available
+  let systemPrompt = psychology
+    ? buildPsychologicalSystemPrompt({
+        userName: user.nome,
+        userRole: user.role,
+        imobiliaria: user.imobiliarias?.nome || 'Pratica',
+        psychology,
+        recentActivities,
+        conversationHistory: formatMessagesForPrompt(messages),
+        currentIntent: context.last_intent || undefined,
+        sentiment,
+        portfolioSummary,
+        persona,
+        ragContext,
+      })
+    : buildSofiaSystemPrompt({
+        userName: user.nome,
+        userRole: user.role,
+        imobiliaria: user.imobiliarias?.nome || 'Pratica',
+        recentActivities,
+        conversationHistory: formatMessagesForPrompt(messages),
+        currentIntent: context.last_intent || undefined,
+        sentiment,
+        portfolioSummary,
+        persona,
+        ragContext,
+      });
 
   // Se temos agentConfig, ajustar o prompt com nome e personalidade customizados
   if (agentConfig) {
@@ -3056,47 +2931,6 @@ Sua resposta natural e carinhosa:`;
     systemPrompt = `${systemPrompt}\n\n${eventoPrompt}`;
   }
 
-  // **ENHANCED: Use Gemini 2.0 Flash for natural responses (primary) with OpenAI fallback**
-  
-  // Try Gemini first for corretor natural responses
-  if (user.role === 'corretor' || user.role === 'gerente' || user.role === 'admin') {
-    try {
-      const googleAiKey = process.env.GOOGLE_AI_API_KEY;
-      if (googleAiKey) {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${googleAiKey}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [{
-                parts: [{ text: systemPrompt }]
-              }],
-              generationConfig: {
-                maxOutputTokens: 300,
-                temperature: 0.8,
-              }
-            }),
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (content && content.trim()) {
-            console.log('[Sofia AI] Gemini response for corretor generated successfully');
-            return content.trim();
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('[Sofia AI] Gemini request failed, falling back to OpenAI:', error);
-    }
-  }
-
-  // Fallback to OpenAI or for non-corretor users
   try {
     const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
@@ -3113,8 +2947,8 @@ Sua resposta natural e carinhosa:`;
       'Desculpa, não consegui processar sua mensagem.'
     );
   } catch (error) {
-    console.error('Error with AI response:', error);
-    return 'Oi! Tive um probleminha aqui, mas já estou de volta! 😊 Me conta de novo o que você precisa?';
+    console.error('Error with OpenAI:', error);
+    return SUPORTE.erroGenerico();
   }
 }
 
@@ -3936,7 +3770,8 @@ export async function processMessage(
         { id: empreendimentoId, nome: empreendimento.nome || 'Empreendimento' },
         'resumo',
         messages.join('\n'),
-        context
+        context,
+        user.workspace_id
       );
       const directResult: FlowResult = {
         messages,
@@ -3989,13 +3824,7 @@ export async function processMessage(
   switch (intentResult.category) {
     case 'SAUDACAO':
       if (isSimpleGreeting(text)) {
-        // For corretores: use AI-powered proactive greeting, NO buttons
-        if (user.role === 'corretor' || user.role === 'gerente' || user.role === 'admin') {
-          flowResult = await handleGreeting(user, context, agentConfig);
-        } else {
-          // For other roles, use old structured flow if needed
-          flowResult = await handleGreeting(user, context, agentConfig);
-        }
+        flowResult = await handleGreeting(user, context, agentConfig);
       }
       break;
 
@@ -4108,12 +3937,8 @@ export async function processMessage(
       break;
   }
 
-  // **ENHANCED: For corretores, prefer natural AI responses over structured flows**
-  const shouldUseNaturalAI = (user.role === 'corretor' || user.role === 'gerente' || user.role === 'admin') 
-    && !['BUSCA_IMOVEL', 'SIMULACAO', 'TABELA_PRECO', 'MATERIAL'].includes(intentResult.category);
-
-  // Se tem resultado do fluxo E não deve usar IA natural
-  if (flowResult && !shouldUseNaturalAI) {
+  // Se tem resultado do fluxo
+  if (flowResult) {
     if (flowResult.messages.length > 0) {
       await sendSplitMessages(phone, flowResult.messages);
       for (const msg of flowResult.messages) {
@@ -4123,10 +3948,10 @@ export async function processMessage(
 
     context = flowResult.context;
 
-    // NO MORE BUTTONS! Skip followUp entirely
-    // if (flowResult.followUp) {
-    //   await flowResult.followUp(phone);
-    // }
+    // Executar followUp se existir (botões, menus, etc)
+    if (flowResult.followUp) {
+      await flowResult.followUp(phone);
+    }
 
     // Se fluxo indica usar IA para complementar
     if (flowResult.shouldUseAI) {
@@ -4144,7 +3969,7 @@ export async function processMessage(
       updatedMessages = addMessage(updatedMessages, 'assistant', aiResponse);
     }
   } else {
-    // Use natural AI response (for corretores or when no specific flow)
+    // Sem fluxo específico - usar IA
     const aiResponse = await generateAIResponse(
       user,
       sanitizedText,
@@ -4157,11 +3982,6 @@ export async function processMessage(
     );
     await sendSplitMessages(phone, [aiResponse]);
     updatedMessages = addMessage(updatedMessages, 'assistant', aiResponse);
-    
-    // Update context if we had a flow result
-    if (flowResult) {
-      context = flowResult.context;
-    }
   }
 
   // Salvar conversa

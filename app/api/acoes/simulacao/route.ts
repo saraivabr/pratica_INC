@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
 import { sendTextMessage } from '@/lib/zapi';
+import { validateRequest, AcaoSimulacaoSchema } from '@/lib/validation-schemas';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const validation = await validateRequest(request, AcaoSimulacaoSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
+    }
     const {
       lead_id,
-      corretor_id = 'default-user',
+      corretor_id,
       valor_imovel,
       entrada: entrada_input,
       entrada_percentual: entrada_perc_input,
@@ -15,15 +19,8 @@ export async function POST(request: NextRequest) {
       prazo_meses,
       imovel_id,
       imovel_nome,
-      enviar_whatsapp = true,
-    } = body;
-
-    if (!lead_id || !valor_imovel || !taxa_juros || !prazo_meses) {
-      return NextResponse.json(
-        { error: 'Campos obrigatórios: lead_id, valor_imovel, taxa_juros, prazo_meses' },
-        { status: 400 }
-      );
-    }
+      enviar_whatsapp,
+    } = validation.data;
 
     const { rows: leadRows } = await dbQuery(
       `SELECT id, name, phone FROM leads WHERE id = $1`,
@@ -44,6 +41,9 @@ export async function POST(request: NextRequest) {
     } else if (entrada && !entrada_percentual) {
       entrada_percentual = (entrada / valor_imovel) * 100;
     }
+
+    if (!entrada) entrada = 0;
+    if (!entrada_percentual) entrada_percentual = 0;
 
     const valor_financiado = valor_imovel - entrada;
     const taxa_mensal = taxa_juros / 100 / 12;

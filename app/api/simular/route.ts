@@ -1,24 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-interface SimulacaoRequest {
-    valorImovel: number;
-    percentualEntrada: number;
-    prazoMeses: number;
-    taxaAnual: number;
-}
+import { validateRequest, SimularSchema } from '@/lib/validation-schemas';
 
 export async function POST(request: NextRequest) {
     try {
-        const body: SimulacaoRequest = await request.json();
-
-        const { valorImovel, percentualEntrada, prazoMeses, taxaAnual } = body;
-
-        if (!valorImovel || !percentualEntrada || !prazoMeses || !taxaAnual) {
-            return NextResponse.json(
-                { success: false, error: 'Parâmetros obrigatórios ausentes' },
-                { status: 400 }
-            );
+        const validation = await validateRequest(request, SimularSchema);
+        if (!validation.success) {
+            return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
         }
+        const { valorImovel, percentualEntrada, prazoMeses, taxaAnual } = validation.data;
 
         const entrada = valorImovel * (percentualEntrada / 100);
         const valorFinanciado = valorImovel - entrada;

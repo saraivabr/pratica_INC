@@ -33,11 +33,9 @@ import {
   Merge,
   Bot,
   Smartphone,
-  Wifi,
   GraduationCap,
   Briefcase,
   Shield,
-  TrendingUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -58,14 +56,14 @@ const navItems = [
   { href: "/calculadora", icon: Calculator, label: "Calculadora" },
 ]
 
-// Grouped admin navigation (ROTAS UNIFICADAS)
+// Grouped admin navigation
 const adminGroups = {
   principal: {
     title: "Principal",
     defaultOpen: true,
     items: [
-      { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-      { href: "/pipeline", icon: Workflow, label: "Pipeline" },
+      { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
+      { href: "/admin/pipeline", icon: Workflow, label: "Pipeline" },
       { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
     ],
   },
@@ -73,9 +71,8 @@ const adminGroups = {
     title: "Comunicação",
     defaultOpen: true,
     items: [
-      { href: "/chat", icon: MessageSquare, label: "Chat" },
-      { href: "/whatsapp", icon: Smartphone, label: "WhatsApp" },
-      { href: "/admin/whatsapp-status", icon: Wifi, label: "WhatsApp Status" },
+      { href: "/admin/chat", icon: MessageSquare, label: "Chat" },
+      { href: "/admin/whatsapp", icon: Smartphone, label: "WhatsApp" },
       { href: "/admin/campaigns", icon: Megaphone, label: "Campanhas" },
     ],
   },
@@ -83,7 +80,7 @@ const adminGroups = {
     title: "Inteligência",
     defaultOpen: true,
     items: [
-      { href: "/catavendas", icon: Search, label: "CataVendas" },
+      { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads" },
       { href: "/admin/score", icon: ShieldCheck, label: "Consulta Score" },
     ],
   },
@@ -91,11 +88,9 @@ const adminGroups = {
     title: "Gestão",
     defaultOpen: false,
     items: [
-      { href: "/clientes", icon: UserCircle, label: "Leads" },
-      { href: "/agenda", icon: Calendar, label: "Agenda" },
-      { href: "/performance", icon: TrendingUp, label: "Performance" },
+      { href: "/admin/leads", icon: UserCircle, label: "Leads" },
+      { href: "/admin/agenda", icon: Calendar, label: "Agenda" },
       { href: "/admin/equipe", icon: Users, label: "Equipe" },
-      { href: "/admin/gerentes", icon: Users, label: "Gerentes" },
       { href: "/admin/eventos", icon: Calendar, label: "Eventos" },
       { href: "/admin/intermediacao/vendas", icon: Briefcase, label: "Intermediação" },
     ],
@@ -130,27 +125,36 @@ const adminGroups = {
 // Flat list for mobile and collapsed mode
 const adminItems = Object.values(adminGroups).flatMap(g => g.items)
 
-// Corretor navigation (ROTAS UNIFICADAS)
+// Corretor navigation (for real estate agents)
 const corretorNavItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Home" },
-  { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
-  { href: "/catavendas", icon: Search, label: "CataVendas" },
+  { href: "/corretor", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/corretor/clientes", icon: Users, label: "Meus Clientes" },
+  { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads" },
+  { href: "/corretor/imoveis", icon: Building2, label: "Imóveis" },
+  { href: "/corretor/agenda", icon: Calendar, label: "Agenda" },
+  { href: "/corretor/chat", icon: MessageSquare, label: "Chat CRM" },
+  { href: "/corretor/propostas", icon: Workflow, label: "Propostas" },
+  { href: "/corretor/relatorios", icon: BarChart3, label: "Relatórios" },
+  { href: "/academy", icon: GraduationCap, label: "Academy" },
+  { href: "/corretor/configuracoes", icon: Settings, label: "Configurações" },
 ]
 
-// Mobile bottom nav for corretor (3 main items)
+// Mobile bottom nav for corretor (5 main items)
 const corretorMobileNavItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Home" },
-  { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
-  { href: "/catavendas", icon: Search, label: "CataVendas" },
+  { href: "/corretor", icon: LayoutDashboard, label: "Home" },
+  { href: "/corretor/clientes", icon: Users, label: "Clientes" },
+  { href: "/corretor/imoveis", icon: Building2, label: "Imóveis" },
+  { href: "/corretor/chat", icon: MessageSquare, label: "Chat" },
+  { href: "/corretor/agenda", icon: Calendar, label: "Agenda" },
 ]
 
 // Mobile bottom nav for admin (5 main items)
 const adminMobileNavItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Home" },
-  { href: "/pipeline", icon: Workflow, label: "Pipeline" },
+  { href: "/admin", icon: LayoutDashboard, label: "Home" },
+  { href: "/admin/pipeline", icon: Workflow, label: "Pipeline" },
   { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
-  { href: "/chat", icon: MessageSquare, label: "Chat" },
-  { href: "/leads", icon: UserCircle, label: "Leads" },
+  { href: "/admin/chat", icon: MessageSquare, label: "Chat" },
+  { href: "/admin/leads", icon: UserCircle, label: "Leads" },
 ]
 
 // Role Switch Component

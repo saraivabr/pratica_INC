@@ -2,7 +2,7 @@ const https = require('https');
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  connectionString: 'postgres://postgres:356d20e7786bbbe6f375@84.247.128.56:3005/pratica?sslmode=disable'
+  connectionString: '${process.env.DATABASE_URL}'
 });
 
 const imobIds = [2,135,3,192,10,8,18,14,253,15,16,13,20,21,22,23,24,9,26,34,31,35,28,40,41,42,43,82,49,50,11,51,53,60,225,33,244,68,12,344,73,74,71,75,77,78,80,83,61,104,93,110,119,262,351,130,131,132,65,251,134,136,137,141,142,145,64];

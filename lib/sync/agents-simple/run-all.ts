@@ -1,7 +1,6 @@
 /**
- * CV CRM Sync Orchestrator - DESABILITADO
+ * CV CRM Sync Orchestrator
  *
- * ❌ DESABILITADO por Fellipe - erro 405 constante
  * Runs all 5 sync agents to pull data from CV CRM API
  * Total records: ~64,688
  */
@@ -24,13 +23,6 @@ interface SyncResult {
 }
 
 async function runAllAgents(workspaceId: number, parallel = false): Promise<void> {
-  // ❌ SYNC DESABILITADO - Erro 405 constantemente
-  console.log('\n🚫 CV CRM Sync DESABILITADO por Fellipe');
-  console.log('Motivo: Erro 405 Method Not Allowed constantemente');
-  console.log('Para reativar, remover este comentário e descomentar o código abaixo.');
-  return;
-  
-  /* CÓDIGO ORIGINAL COMENTADO
   console.log('\n🚀 CV CRM Complete Sync Starting...');
   console.log('=' .repeat(80));
   console.log(`Tenant ID: ${workspaceId}`);
@@ -48,7 +40,6 @@ async function runAllAgents(workspaceId: number, parallel = false): Promise<void
     { name: 'atendimentos-core', fn: syncAtendimentosCore, records: '~1,558' },
     { name: 'assistencias-core', fn: syncAssistenciasCore, records: '~1' }
   ];
-  */ // FIM DO CÓDIGO COMENTADO
 
   if (parallel) {
     console.log('\n⚡ Running all agents in PARALLEL...\n');

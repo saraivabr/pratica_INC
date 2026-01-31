@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
 import { normalizePhone } from '@/lib/supabase';
+import { validateRequest, RegisterSchema } from '@/lib/validation-schemas';
 
 export async function POST(request: Request) {
   try {
-    const { telefone, nome, imobiliaria, gerente } = await request.json();
-
-    // Validate required fields
-    if (!telefone || !nome) {
-      return NextResponse.json(
-        { error: 'Telefone e nome são obrigatórios' },
-        { status: 400 }
-      );
+    const validation = await validateRequest(request, RegisterSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
     }
+    const { telefone, nome, imobiliaria, gerente } = validation.data;
 
     const normalizedPhone = normalizePhone(telefone);
 
@@ -81,22 +78,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // Generate placeholder email from phone (email is NOT NULL in DB)
-    const digits = normalizedPhone.replace(/\D/g, '');
-    const placeholderEmail = `${digits}@phone.pratica.digital`;
-
-    // Get default tenant_id (all existing users use tenant 1)
-    const { rows: tenantRows } = await dbQuery(
-      `select id from tenants order by id limit 1`
-    );
-    const tenantId = tenantRows[0]?.id || 1;
-
-    // Create user with email and tenant_id
+    // Create user
     const { rows: userRows } = await dbQuery(
-      `insert into users (telefone, nome, email, role, imobiliaria_id, gerente_id, tenant_id, onboarding_status, is_active)
-       values ($1, $2, $3, 'corretor', $4, $5, $6, 'completed', true)
+      `insert into users (telefone, nome, role, imobiliaria_id, gerente_id, onboarding_status, is_active)
+       values ($1, $2, 'corretor', $3, $4, 'completed', true)
        returning id, telefone, nome, role, imobiliaria_id, gerente_id`,
-      [normalizedPhone, nome, placeholderEmail, imobiliariaId, gerenteId, tenantId]
+      [normalizedPhone, nome, imobiliariaId, gerenteId]
     );
 
     const newUser = userRows[0];

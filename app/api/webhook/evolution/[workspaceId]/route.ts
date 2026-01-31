@@ -17,25 +17,13 @@ import {
   pauseBot,
   appendPendingMessage,
   setDebounceUntil,
-  addMessage,
-  updateContext,
 } from '@/lib/salva-leads/conversation';
-import {
-  scheduleSilenceTimer,
-  cancelSilenceTimer,
-  getCorretorConfig,
-  isWithinBusinessHours as isWithinSilenceBusinessHours,
-  isEmojiOrStickerOnly,
-  isLunaAlreadyActive,
-  findCorretorByInstance,
-  incrementConfigCounter,
-} from '@/lib/salva-leads/silence-monitor';
-import { generateConversationSummary } from '@/lib/salva-leads/summary';
 import { sendTextMessage } from '@/lib/evolution-api';
 import {
   processMessage as processSofiaMessage,
   handleUnregisteredUserConversation,
 } from '@/lib/sofia';
+import { withProvider } from '@/lib/whatsapp-sender';
 import { dbQuery } from '@/lib/db';
 import {
   getAgentConfig,
@@ -49,12 +37,14 @@ import {
   deveUsarFluxoEventos,
   gerarSofiaEventoPrompt,
 } from '@/lib/eventos';
-import { emitNewMessage, emitConnectionUpdate } from '@/lib/message-events';
-import { isAudioMessage, extractAudioMessage, transcribeWhatsAppAudio } from '@/lib/whisper';
+
+// AsyncLocalStorage (used by withProvider) requires Node.js runtime
+export const runtime = 'nodejs';
 
 /**
  * Valida autenticação do webhook.
  * Aceita:
+ * - Query parameter: ?secret={secret} (Evolution API v2 não suporta headers)
  * - Authorization: Bearer {secret}
  * - x-webhook-secret: {secret}
  * Em desenvolvimento, aceita qualquer request.
@@ -67,10 +57,15 @@ function validateWebhookAuth(request: NextRequest): boolean {
     return true;
   }
 
-  // Se secret não está configurado em produção, logar aviso mas aceitar
-  // (para não quebrar integrações existentes durante migração)
+  // Se secret não está configurado em produção, rejeitar
   if (!webhookSecret) {
-    console.warn('[Webhook Evolution] AVISO: EVOLUTION_WEBHOOK_SECRET não configurado. Configurar para segurança em produção.');
+    console.error('[Webhook Evolution] EVOLUTION_WEBHOOK_SECRET não configurado. Rejeitando request.');
+    return false;
+  }
+
+  // Verificar query parameter (Evolution API v2 não suporta headers customizados)
+  const urlSecret = request.nextUrl.searchParams.get('secret');
+  if (urlSecret === webhookSecret) {
     return true;
   }
 
@@ -286,9 +281,6 @@ async function handleConnectionUpdate(workspaceId: number, data: any) {
   }
 
   console.log(`[Connection Update] Instance: ${instanceName}, State: ${state}, Connected: ${isConnected}`);
-  
-  // Emitir evento SSE
-  emitConnectionUpdate(instanceName, isConnected ? 'connected' : 'disconnected');
 }
 
 /**
@@ -299,61 +291,14 @@ async function handleNewMessage(workspaceId: number, data: any) {
     const message = data.data;
     const isFromMe = message.key?.fromMe || false;
 
-    // Extrair dados da mensagem — resolver LID para telefone real
-    const remoteJid = message.key?.remoteJid || '';
-    const remoteJidAlt = message.key?.remoteJidAlt || '';
-    
-    // 🔍 LOGGING TEMPORÁRIO: Captura grupos pra configuração
-    if (remoteJid.endsWith('@g.us')) {
-      const participantJid = message.key?.participant || '';
-      const messageText = message.message?.conversation ||
-                         message.message?.extendedTextMessage?.text ||
-                         '';
-      console.log('📱 GRUPO DETECTADO (Evolution):', {
-        groupId: remoteJid,
-        participantJid,
-        messageText,
-        isFromMe,
-        pushName: message.pushName,
-        timestamp: new Date().toISOString(),
-      });
-      
-      // Por enquanto, ignora grupos (será configurado depois)
-      return;
-    }
-    
-    let phoneNumber: string;
-    
-    if (remoteJid.includes('@s.whatsapp.net')) {
-      phoneNumber = remoteJid.replace('@s.whatsapp.net', '');
-    } else if (remoteJidAlt.includes('@s.whatsapp.net')) {
-      phoneNumber = remoteJidAlt.replace('@s.whatsapp.net', '');
-    } else if (remoteJid.includes('@lid') && remoteJidAlt) {
-      phoneNumber = remoteJidAlt.split('@')[0];
-    } else {
-      phoneNumber = remoteJid.split('@')[0];
-    }
-    
-    let messageText = message.message?.conversation ||
-                      message.message?.extendedTextMessage?.text ||
-                      '';
+    // Extrair dados da mensagem
+    const phoneNumber = message.key?.remoteJid?.replace('@s.whatsapp.net', '');
+    const messageText = message.message?.conversation ||
+                       message.message?.extendedTextMessage?.text ||
+                       '';
 
     const messageType = Object.keys(message.message || {})[0];
     const timestamp = new Date(message.messageTimestamp * 1000);
-
-    // ✅ NOVA FEATURE: Transcrição de Áudio com Whisper
-    if (isAudioMessage(message)) {
-      try {
-        console.log('[Webhook] Audio message detected, transcribing...');
-        const audioMessage = extractAudioMessage(message);
-        const transcription = await transcribeWhatsAppAudio(data.instance, audioMessage);
-        messageText = `[Áudio transcrito]: ${transcription.text}`;
-        console.log('[Webhook] Audio transcribed:', messageText.substring(0, 100));
-      } catch (error: any) {
-        console.error('[Webhook] Audio transcription failed:', error);
-        messageText = '[Áudio recebido - erro na transcrição]';
-      }
-    }
 
     console.log('[New Message]', {
       from: phoneNumber,
@@ -377,25 +322,24 @@ async function handleNewMessage(workspaceId: number, data: any) {
     }
 
     // Salvar mensagem no banco (tanto recebidas quanto enviadas)
+    // Usar upsert para evitar duplicatas se webhook enviar mesmo evento duas vezes
     const messageId = message.key?.id;
-    const contactName = message.pushName || phoneNumber;
     if (messageId) {
       await dbQuery(
         `INSERT INTO whatsapp_messages (
-          tenant_id, instance_name, phone_number, message_id, contact_name, message_type,
-          message_text, is_from_me, timestamp, raw_data, workspace_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $1)
-        ON CONFLICT (instance_name, message_id)
+          tenant_id, workspace_id, instance_name, phone_number, message_id, message_type,
+          message_text, is_from_me, timestamp, raw_data
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (workspace_id, message_id)
         DO UPDATE SET
-          phone_number = EXCLUDED.phone_number,
           updated_at = NOW(),
           raw_data = EXCLUDED.raw_data`,
         [
           workspaceId,
+          workspaceId,
           data.instance,
           phoneNumber,
           messageId,
-          contactName,
           messageType,
           messageText,
           isFromMe,
@@ -403,44 +347,19 @@ async function handleNewMessage(workspaceId: number, data: any) {
           JSON.stringify(message),
         ]
       );
-    }
-    
-    // Emitir evento SSE pra atualização real-time no frontend
-    emitNewMessage(data.instance, {
-      phone_number: phoneNumber,
-      contact_name: contactName,
-      message_text: messageText,
-      message_type: messageType,
-      is_from_me: isFromMe,
-      timestamp: timestamp.toISOString(),
-      status: 'received',
-    });
-
-    // === CataVendas AI Bot ===
-    // Check if sender is a registered corretor messaging the main instance
-    if (!isFromMe && messageText) {
-      try {
-        const corretor = await dbQuery(
-          `SELECT id, name, nome, evolution_instance_name, telefone, phone, workspace_id
-           FROM users WHERE (telefone = $1 OR phone = $1) AND role = 'corretor' LIMIT 1`,
-          [phoneNumber]
-        );
-        
-        if (corretor.rows.length > 0) {
-          console.log(`[CataVendas] Message from corretor ${phoneNumber}, routing to CataVendas`);
-          const { processCataVendasMessage } = await import('@/lib/catavendas');
-          await processCataVendasMessage(
-            data.instance, // the instance that received the message  
-            phoneNumber,
-            messageText, 
-            workspaceId,
-            corretor.rows[0]
-          );
-          return; // Handled by CataVendas, stop processing
-        }
-      } catch (err) {
-        console.error('[CataVendas] Error:', err);
-      }
+    } else {
+      // Mensagens sem ID (raro, mas possível)
+      const query = tenantQuery(workspaceId);
+      await query.insert('whatsapp_messages', {
+        instance_name: data.instance,
+        phone_number: phoneNumber,
+        message_id: messageId,
+        message_type: messageType,
+        message_text: messageText,
+        is_from_me: isFromMe,
+        timestamp: timestamp.toISOString(),
+        raw_data: message,
+      });
     }
 
     // Apenas processar leads para mensagens recebidas
@@ -541,14 +460,16 @@ async function handleNewMessage(workspaceId: number, data: any) {
 
             if (user) {
               // Passa contexto do evento para Sofia processar
-              await processSofiaMessage(
-                user as any,
-                messageText,
-                agentConfig || undefined,
-                {
-                  eventoContext,
-                  eventoPrompt: gerarSofiaEventoPrompt(eventoContext.evento, eventoContext.convidado.status),
-                }
+              await withProvider('evolution', data.instance, () =>
+                processSofiaMessage(
+                  user as any,
+                  messageText,
+                  agentConfig || undefined,
+                  {
+                    eventoContext,
+                    eventoPrompt: gerarSofiaEventoPrompt(eventoContext.evento, eventoContext.convidado.status),
+                  }
+                )
               );
             } else {
               // Convidado não é usuário cadastrado, mas é convidado de evento
@@ -584,7 +505,9 @@ async function handleNewMessage(workspaceId: number, data: any) {
 
           // Process with Sofia (sends response internally)
           // Pass agentConfig to customize response based on tenant configuration
-          await processSofiaMessage(user as any, messageText, agentConfig || undefined);
+          await withProvider('evolution', data.instance, () =>
+            processSofiaMessage(user as any, messageText, agentConfig || undefined)
+          );
 
           console.log(`[Sofia] Message processed for ${phoneNumber}`);
 
@@ -601,7 +524,9 @@ async function handleNewMessage(workspaceId: number, data: any) {
         } else {
           // Handle unregistered user (handles response internally)
           console.log(`[Sofia] Unregistered user: ${phoneNumber}`);
-          await handleUnregisteredUserConversation(phoneNumber, messageText);
+          await withProvider('evolution', data.instance, () =>
+            handleUnregisteredUserConversation(phoneNumber, messageText)
+          );
         }
       } catch (error) {
         console.error('[Sofia] Error processing message:', error);
@@ -655,14 +580,16 @@ async function handleNewMessage(workspaceId: number, data: any) {
             { phone_number: phoneNumber },
             {
               last_message_at: timestamp.toISOString(),
+              last_interaction_at: timestamp.toISOString(),
               total_messages_received: existingContacts[0].total_messages_received + 1,
             }
           );
         } else {
           await query.insert('whatsapp_contacts', {
             phone_number: phoneNumber,
-            contact_name: phoneNumber,
+            name: phoneNumber,
             last_message_at: timestamp.toISOString(),
+            last_interaction_at: timestamp.toISOString(),
             total_messages_received: 1,
             total_messages_sent: 0,
           });
@@ -691,158 +618,26 @@ async function handleSalvaLeadsCheck(
   // Verificar se há conversa Salva-Leads ativa para este telefone
   const salvaLeadsConv = await getConversationByPhone(workspaceId, phoneNumber);
 
-  // === SILENCE MONITOR INTEGRATION ===
+  if (!salvaLeadsConv || !['pending', 'active'].includes(salvaLeadsConv.status)) {
+    return false; // Não há conversa ativa, continuar fluxo normal
+  }
+
+  // Se corretor enviou mensagem -> pausar bot
   if (isFromMe) {
-    // Corretor sent a message -> cancel any silence timer for this lead
-    await cancelSilenceTimer(workspaceId, phoneNumber);
+    await pauseBot(salvaLeadsConv.id);
+    console.log(`[Salva-Leads] Bot pausado pelo corretor para ${phoneNumber}`);
+    return true;
+  }
 
-    if (salvaLeadsConv && ['pending', 'active'].includes(salvaLeadsConv.status)) {
-      // If Luna was active via silence takeover, generate summary
-      if (salvaLeadsConv.silence_takeover && !salvaLeadsConv.bot_paused) {
-        await handleCorretorReturn(workspaceId, salvaLeadsConv, instanceName);
-      }
-
-      await pauseBot(salvaLeadsConv.id);
-      console.log(`[Salva-Leads] Bot pausado pelo corretor para ${phoneNumber}`);
-      return true;
-    }
+  // Se bot está pausado, não processar
+  if (salvaLeadsConv.bot_paused) {
+    console.log(`[Salva-Leads] Bot pausado, ignorando mensagem de ${phoneNumber}`);
     return false;
   }
 
-  // Lead sent a message
-  if (!isFromMe) {
-    // If there's an active salva-leads conversation with Luna
-    if (salvaLeadsConv && ['pending', 'active'].includes(salvaLeadsConv.status)) {
-      if (salvaLeadsConv.bot_paused) {
-        // Bot is paused (corretor is handling), but we should schedule silence timer
-        // in case corretor stops responding again
-        await scheduleTimerIfNeeded(workspaceId, phoneNumber, messageText, instanceName);
-        return false;
-      }
-
-      // Luna is active - process with debounce
-      await handleSalvaLeadsResponse(workspaceId, salvaLeadsConv, messageText, instanceName);
-      return true;
-    }
-
-    // No active salva-leads conversation - schedule silence timer
-    // This is the key new behavior: when lead messages and there's no Luna active,
-    // start a timer to check if corretor responds
-    await scheduleTimerIfNeeded(workspaceId, phoneNumber, messageText, instanceName);
-  }
-
-  return false;
-}
-
-/**
- * Schedule a silence timer if conditions are met.
- * Called when lead sends message and no Luna conversation is active.
- */
-async function scheduleTimerIfNeeded(
-  workspaceId: number,
-  phoneNumber: string,
-  messageText: string,
-  instanceName: string
-): Promise<void> {
-  try {
-    // Don't trigger for emoji/sticker-only messages
-    if (isEmojiOrStickerOnly(messageText)) return;
-
-    // Find the corretor who owns this instance
-    const corretor = await findCorretorByInstance(instanceName);
-    if (!corretor) return;
-
-    // Get corretor's config
-    const config = await getCorretorConfig(corretor.id);
-
-    // Check if auto-assistant is enabled
-    if (!config.autoAssistantEnabled) return;
-
-    // Check business hours
-    if (!isWithinSilenceBusinessHours(config)) return;
-
-    // Check if Luna is already active for this lead
-    const alreadyActive = await isLunaAlreadyActive(workspaceId, phoneNumber);
-    if (alreadyActive) return;
-
-    // Get lead name from contacts if available
-    const { rows: contactRows } = await dbQuery(
-      `SELECT contact_name FROM whatsapp_contacts WHERE tenant_id = $1 AND phone_number = $2 LIMIT 1`,
-      [workspaceId, phoneNumber]
-    );
-    const leadName = contactRows[0]?.contact_name || null;
-
-    const now = Date.now();
-    const timeoutMs = config.silenceTimeoutMinutes * 60 * 1000;
-
-    await scheduleSilenceTimer({
-      workspaceId,
-      leadPhone: phoneNumber,
-      leadName,
-      corretorId: corretor.id,
-      corretorPhone: corretor.telefone,
-      instanceName,
-      messageText,
-      createdAt: now,
-      timeoutMinutes: config.silenceTimeoutMinutes,
-      expiresAt: now + timeoutMs,
-    });
-  } catch (error) {
-    console.error('[Silence Monitor] Error scheduling timer:', error);
-  }
-}
-
-/**
- * Handle corretor returning while Luna was handling a silence takeover.
- * Generates summary and notifies corretor.
- */
-async function handleCorretorReturn(
-  workspaceId: number,
-  conversation: any,
-  instanceName: string
-): Promise<void> {
-  try {
-    // Get messages exchanged during Luna's takeover
-    const lunaMessages = (conversation.messages || []).filter((m: any) => {
-      if (!conversation.silence_takeover_at) return true;
-      return new Date(m.timestamp) >= new Date(conversation.silence_takeover_at);
-    });
-
-    if (lunaMessages.length === 0) return;
-
-    // Generate summary
-    const summary = await generateConversationSummary(lunaMessages);
-
-    // Save summary to conversation context
-    await updateContext(conversation.id, {
-      lunaSummary: summary,
-      corretorResumedAt: new Date().toISOString(),
-    });
-
-    // Update DB fields
-    await dbQuery(
-      `UPDATE salva_leads_conversations
-       SET luna_summary = $1, corretor_resumed_at = NOW()
-       WHERE id = $2`,
-      [summary, conversation.id]
-    );
-
-    // Send internal notification to corretor via WhatsApp (from the same instance)
-    // This is a message the corretor sees in the same chat
-    const leadName = conversation.lead_name || 'lead';
-    const notificationMsg = `📋 *Resumo da assistente:*\n\n${summary}\n\n_A assistente segurou a conversa com ${leadName} enquanto você estava ocupado._`;
-
-    // Note: We don't send this as a WhatsApp message to avoid confusion.
-    // Instead, it's available in the dashboard. The corretor sees the conversation
-    // messages naturally in WhatsApp.
-
-    console.log(`[Silence Monitor] Corretor returned. Summary for conv ${conversation.id}: ${summary}`);
-
-    // Increment leads saved counter
-    await incrementConfigCounter(conversation.corretor_id, workspaceId, 'total_leads_saved');
-  } catch (error) {
-    console.error('[Silence Monitor] Error handling corretor return:', error);
-  }
+  // Cliente respondeu -> processar com debounce
+  await handleSalvaLeadsResponse(workspaceId, salvaLeadsConv, messageText, instanceName);
+  return true;
 }
 
 /**

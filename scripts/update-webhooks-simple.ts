@@ -15,7 +15,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || 'https://evoapi.pratica.digital';
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY!;
-const BASE_URL = process.env.WEBHOOK_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://185.182.184.122:3000';
+const BASE_URL = process.env.WEBHOOK_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.osc-fr1.scalingo.io';
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   console.error('❌ Variáveis de ambiente Supabase não configuradas!');

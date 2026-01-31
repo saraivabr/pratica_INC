@@ -38,6 +38,7 @@ import { Progress } from "@/components/ui/progress"
 import { useDashboardStats, useLeads } from "@/lib/hooks"
 import { useAuth, usePageTracking } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import { VoiceAgentPanel } from "@/components/voice-agent/VoiceAgentPanel"
 import { UrgentLeadsQueue } from "@/components/dashboard/urgent-leads-queue"
 import {
@@ -184,6 +185,7 @@ export default function AdminPage() {
         if (reactivationRes.ok) setReactivation(await reactivationRes.json())
       } catch (error) {
         console.error("Error fetching dashboard data:", error)
+        toast.error("Erro ao carregar dados do dashboard. Tente atualizar a página.")
       }
     }
     fetchAllData()
@@ -251,6 +253,7 @@ export default function AdminPage() {
       if (reactivationRes.ok) setReactivation(await reactivationRes.json())
     } catch (error) {
       console.error("Error refreshing:", error)
+      toast.error("Erro ao atualizar dados. Tente novamente.")
     }
     setTimeout(() => setRefreshing(false), 500)
   }

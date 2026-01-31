@@ -53,27 +53,10 @@ export async function POST(request: Request) {
     const user = userRows[0];
 
     if (!user) {
-      // User not found in users table - check if they exist in cvcrm_corretores
-      const { rows: corretorRows } = await dbQuery(
-        `SELECT nome, celular, telefone, imobiliaria_nome, email
-         FROM cvcrm_corretores 
-         WHERE regexp_replace(celular, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
-            OR regexp_replace(telefone, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
-         LIMIT 1`,
-        [normalizedPhone]
-      );
-      const corretor = corretorRows[0];
-
+      // User not found - needs to be invited by a manager
       return NextResponse.json({
         exists: false,
-        message: corretor 
-          ? 'Número encontrado! Complete seu cadastro para continuar.'
-          : 'Número não cadastrado. Preencha seus dados para se cadastrar.',
-        corretor: corretor ? {
-          nome: corretor.nome,
-          imobiliaria: corretor.imobiliaria_nome,
-          email: corretor.email,
-        } : null,
+        message: 'Você ainda não foi cadastrado. Peça ao seu gerente para te adicionar.',
       });
     }
 

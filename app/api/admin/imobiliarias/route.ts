@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbQuery } from "@/lib/db";
 import { getAuthenticatedUser } from "@/lib/api-auth";
+import { validateRequest, AdminImobiliariaSchema } from "@/lib/validation-schemas";
 
 // GET - List all imobiliarias
 export async function GET(request: NextRequest) {
@@ -32,12 +33,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { nome, cnpj, telefone, email, endereco } = body;
-
-    if (!nome) {
-      return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
+    const validation = await validateRequest(request, AdminImobiliariaSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
     }
+    const { nome, cnpj, telefone, email, endereco } = validation.data;
 
     const { rows } = await dbQuery(
       `INSERT INTO imobiliarias (nome, cnpj, telefone, email, endereco)

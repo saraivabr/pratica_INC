@@ -1,7 +1,13 @@
-import { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { getAuthenticatedUser } from '@/lib/api-auth'
 
 // Server-Sent Events para atualização em tempo real do dashboard
 export async function GET(request: NextRequest) {
+  const user = await getAuthenticatedUser(request)
+  if (!user) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  }
+
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({

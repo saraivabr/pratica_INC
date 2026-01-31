@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
 import { dbQuery } from '@/lib/db';
+import { validateRequest, LeadStageSchema } from '@/lib/validation-schemas';
 
 // Mapeamento de estágios do frontend para situação do CV CRM
 const STAGE_TO_SITUACAO: Record<string, number> = {
@@ -39,12 +40,11 @@ export async function POST(
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { stage } = body;
-
-    if (!stage) {
-      return NextResponse.json({ error: 'Estágio não informado' }, { status: 400 });
+    const validation = await validateRequest(request, LeadStageSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
     }
+    const { stage } = validation.data;
 
     // Converter estágio para situação_id
     const situacaoId = STAGE_TO_SITUACAO[stage];

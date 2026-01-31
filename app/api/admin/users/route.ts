@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbQuery } from "@/lib/db";
 import { normalizePhone } from "@/lib/supabase";
 import { getAuthenticatedUser } from "@/lib/api-auth";
+import { validateRequest, AdminUserCreateSchema } from "@/lib/validation-schemas";
 
 // GET - List all users
 export async function GET(request: NextRequest) {
@@ -47,12 +48,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { nome, telefone, role, imobiliaria_id, gerente_id } = body;
-
-    if (!nome || !telefone) {
-      return NextResponse.json({ error: "Nome e telefone são obrigatórios" }, { status: 400 });
+    const validation = await validateRequest(request, AdminUserCreateSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
     }
+    const { nome, telefone, role, imobiliaria_id, gerente_id } = validation.data;
 
     const normalizedPhone = normalizePhone(telefone);
 

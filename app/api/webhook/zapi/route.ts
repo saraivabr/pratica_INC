@@ -10,6 +10,7 @@ import {
 } from '@/lib/sofia';
 import { isSimpleGreeting } from '@/lib/sofia';
 import { getLeadInsight, saveLeadInsight } from '@/lib/cvcrm-insight';
+import * as crypto from 'crypto';
 
 // ============================================
 // TYPES
@@ -92,6 +93,81 @@ interface ZAPIWebhook {
 }
 
 // ============================================
+// NORMALIZED EVENT + STRUCTURED LOGGING
+// ============================================
+
+/**
+ * Normalized payload extracted from a raw Z-API webhook body.
+ */
+interface ZapiEvent {
+  phone: string;
+  messageId: string;
+  text?: string;
+  type: string;
+  fromMe: boolean;
+  timestamp: number;
+  contactName?: string;
+  media?: { url?: string; mimetype?: string };
+}
+
+/**
+ * Parse a raw Z-API webhook body into a clean, normalized ZapiEvent.
+ * Returns null when the payload lacks the minimum required fields.
+ */
+function parseZapiPayload(body: ZAPIWebhook): ZapiEvent | null {
+  const message: any = body.message || {};
+
+  const phone = message.phone || body.phone;
+  if (!phone) return null;
+
+  const messageId =
+    message.messageId || message.id || (body as any).messageId || (body as any).id || '';
+
+  const type = String(message.type || body.type || 'unknown');
+
+  const fromMe = !!(message.fromMe || body.fromMe || body.fromApi);
+
+  const timestamp = message.momment || body.momment || Date.now();
+
+  const contactName = message.contactName || message.pushName || '';
+
+  // Extract text from all known locations (lightweight — full extraction still in extractMessageText)
+  const text =
+    message.body ||
+    body.text?.message ||
+    message.text?.message ||
+    undefined;
+
+  // Extract media metadata if present
+  const rawMedia = message.media || body.media || message.audio || body.audio;
+  const media = rawMedia
+    ? { url: rawMedia.url, mimetype: rawMedia.mimetype || rawMedia.mimeType }
+    : undefined;
+
+  return { phone, messageId, text, type, fromMe, timestamp, contactName, media };
+}
+
+/**
+ * Structured log helper. All webhook logs go through here for uniform format.
+ */
+function zapiLog(
+  level: 'info' | 'warn' | 'error',
+  cid: string,
+  action: string,
+  meta?: Record<string, unknown>
+) {
+  const prefix = `[ZAPI][cid=${cid}]`;
+  const payload = meta ? JSON.stringify(meta) : '';
+  if (level === 'error') {
+    console.error(`${prefix} ${action}`, payload);
+  } else if (level === 'warn') {
+    console.warn(`${prefix} ${action}`, payload);
+  } else {
+    console.log(`${prefix} ${action}`, payload);
+  }
+}
+
+// ============================================
 // UTILITÁRIOS
 // ============================================
 
@@ -100,6 +176,7 @@ function getOpenAI(): OpenAI {
   if (!_openai) {
     _openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      timeout: 30000,
     });
   }
   return _openai;
@@ -200,7 +277,7 @@ async function fetchAudioBuffer(url: string): Promise<{ buffer: Buffer; mime?: s
     const arrayBuffer = await response.arrayBuffer();
     return { buffer: Buffer.from(arrayBuffer), mime };
   } catch (error) {
-    console.error('Audio fetch error:', error);
+    console.error('[ZAPI] Audio fetch error:', error);
     return null;
   }
 }
@@ -348,6 +425,36 @@ async function releaseConversationLock(phone: string): Promise<void> {
   );
 }
 
+/**
+ * Check if a messageId has already been processed (idempotency guard).
+ * Uses the existing inbound_messages table which is the de-facto message dedup store.
+ * Returns true if the message is a duplicate and should be skipped.
+ */
+async function isDuplicateMessage(messageId: string, cid: string): Promise<boolean> {
+  if (!messageId) return false;
+  try {
+    const { rows } = await dbQuery(
+      `SELECT 1 FROM inbound_messages WHERE message_id = $1 LIMIT 1`,
+      [messageId]
+    );
+    if (rows.length > 0) {
+      zapiLog('info', cid, `Duplicate messageId=${messageId}, skipping`);
+      return true;
+    }
+  } catch {
+    // Table may not exist yet or column mismatch — not a reason to block processing
+  }
+  return false;
+}
+
+/**
+ * Dry-run context: when active, records actions instead of executing them.
+ */
+interface DryRunContext {
+  enabled: boolean;
+  actions: string[];
+}
+
 async function maybeReactToMessage(
   phone: string,
   messageId: string | null,
@@ -377,8 +484,9 @@ async function maybeReactToMessage(
 
 /**
  * Busca usuário por telefone (múltiplos formatos)
+ * IMPORTANTE: Filtra por workspace_id para garantir isolamento entre tenants
  */
-async function findUserByPhone(phone: string): Promise<User | undefined> {
+async function findUserByPhone(phone: string, workspaceId: number): Promise<User | undefined> {
   const numbers = phone.replace(/\D/g, '');
 
   // Formatos possíveis para buscar
@@ -397,9 +505,9 @@ async function findUserByPhone(phone: string): Promise<User | undefined> {
       `select u.*, i.nome as imobiliaria_nome
        from users u
        left join imobiliarias i on i.id = u.imobiliaria_id
-       where u.telefone = $1
+       where u.telefone = $1 and u.workspace_id = $2
        limit 1`,
-      [format]
+      [format, workspaceId]
     );
     const data = rows[0];
 
@@ -418,9 +526,9 @@ async function findUserByPhone(phone: string): Promise<User | undefined> {
     `select u.*, i.nome as imobiliaria_nome
      from users u
      left join imobiliarias i on i.id = u.imobiliaria_id
-     where u.telefone like $1
+     where u.telefone like $1 and u.workspace_id = $2
      limit 1`,
-    [`%${lastDigits}`]
+    [`%${lastDigits}`, workspaceId]
   );
   const data = rows[0];
 
@@ -435,6 +543,44 @@ async function findUserByPhone(phone: string): Promise<User | undefined> {
 }
 
 // ============================================
+// WORKSPACE RESOLUTION
+// ============================================
+
+/**
+ * Resolve workspace_id para o webhook Z-API.
+ * Z-API usa uma única instância global (configurada via env vars),
+ * então o workspace é definido via ZAPI_WORKSPACE_ID.
+ * Fallback: busca o workspace associado ao instanceId no banco.
+ */
+async function resolveWorkspaceId(instanceId?: string): Promise<number | null> {
+  // 1. Variável de ambiente explícita (preferencial)
+  const envWorkspaceId = process.env.ZAPI_WORKSPACE_ID;
+  if (envWorkspaceId) {
+    const parsed = parseInt(envWorkspaceId, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+
+  // 2. Fallback: buscar workspace pelo instanceId do Z-API nos metadados do tenant
+  if (instanceId) {
+    const { rows } = await dbQuery(
+      `SELECT id FROM tenants
+       WHERE metadata->>'zapi_instance_id' = $1
+       LIMIT 1`,
+      [instanceId]
+    );
+    if (rows[0]) return rows[0].id;
+  }
+
+  // 3. Último recurso: se há apenas 1 workspace ativo, usar esse
+  const { rows } = await dbQuery(
+    `SELECT id FROM tenants WHERE status = 'active' LIMIT 2`
+  );
+  if (rows.length === 1) return rows[0].id;
+
+  return null;
+}
+
+// ============================================
 // HANDLERS
 // ============================================
 
@@ -444,9 +590,10 @@ async function findUserByPhone(phone: string): Promise<User | undefined> {
 async function handleSharedContact(
   senderPhone: string,
   contactVcard: string,
-  contactDisplayName: string
+  contactDisplayName: string,
+  workspaceId: number
 ) {
-  const sender = await findUserByPhone(senderPhone);
+  const sender = await findUserByPhone(senderPhone, workspaceId);
 
   if (!sender || sender.role !== 'gerente') {
     await sendTextMessage(
@@ -470,7 +617,7 @@ async function handleSharedContact(
   }
 
   // Verificar se já existe
-  const existing = await findUserByPhone(newPhone);
+  const existing = await findUserByPhone(newPhone, workspaceId);
 
   if (existing) {
     await sendTextMessage(
@@ -481,10 +628,10 @@ async function handleSharedContact(
   }
 
   const { rows: newUserRows } = await dbQuery(
-    `insert into users (telefone, nome, role, imobiliaria_id, gerente_id, onboarding_status, is_active)
-     values ($1, $2, 'corretor', $3, $4, 'completed', true)
+    `insert into users (telefone, nome, role, imobiliaria_id, gerente_id, onboarding_status, is_active, workspace_id)
+     values ($1, $2, 'corretor', $3, $4, 'completed', true, $5)
      returning *`,
-    [newPhone, newName, sender.imobiliaria_id || null, sender.id]
+    [newPhone, newName, sender.imobiliaria_id || null, sender.id, workspaceId]
   );
   const newUser = newUserRows[0];
 
@@ -515,7 +662,7 @@ async function tryHandleCvcrmInsight(phone: string) {
   if (shouldPersist) {
     slug = await saveLeadInsight(phone, insight.summary, insight.detail);
   }
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://corretorparceria.com.br";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratica.escreve.ai";
   let text = `${insight.summary}\n${insight.detail}`;
   if (slug) {
     text += `\n\nDetalhes completos: ${baseUrl}/insights/${slug}`;
@@ -530,10 +677,11 @@ async function tryHandleCvcrmInsight(phone: string) {
 async function handleTextMessage(
   senderPhone: string,
   messageText: string,
+  workspaceId: number,
   messageId?: string | null,
   contactName?: string
 ) {
-  const user = await findUserByPhone(senderPhone);
+  const user = await findUserByPhone(senderPhone, workspaceId);
   const normalizedPhone = normalizePhone(senderPhone);
 
   await maybeReactToMessage(normalizedPhone, messageId || null, messageText);
@@ -547,18 +695,7 @@ async function handleTextMessage(
     return;
   }
 
-  // === Nova Sofia: IA conversacional natural ===
-  if (user.role === 'corretor' || user.role === 'admin' || user.role === 'gerente') {
-    try {
-      const { processNovaSofia } = await import('@/lib/sofia/nova-sofia');
-      await processNovaSofia(senderPhone, messageText, user as any);
-      return;
-    } catch (err) {
-      console.error('[Nova Sofia] Error, falling back to old Sofia:', err);
-    }
-  }
-
-  // Fallback: Sofia antiga (para roles sem Nova Sofia)
+  // Processar mensagem via Sofia
   await processMessage(user, messageText);
 }
 
@@ -567,36 +704,65 @@ async function handleTextMessage(
 // ============================================
 
 export async function POST(request: Request) {
+  const cid = crypto.randomUUID();
+  const dryRun: DryRunContext = {
+    enabled: request.headers.get('X-Dry-Run') === '1',
+    actions: [],
+  };
+
   try {
     const body: ZAPIWebhook = await request.json();
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Z-API Webhook received:', JSON.stringify(body, null, 2));
-    }
+    // Parse normalized payload for logging context
+    const event = parseZapiPayload(body);
 
-    // 🔍 LOGGING TEMPORÁRIO: Captura grupos pra configuração
-    const rawPhone = body.message?.phone || body.phone;
-    if (rawPhone && rawPhone.endsWith('@g.us')) {
-      const participantPhone = body.message?.participantPhone;
-      const messageText = extractMessageText(body);
-      console.log('📱 GRUPO DETECTADO:', {
-        groupId: rawPhone,
-        participantPhone,
-        messageText,
-        contactName: body.message?.contactName || body.message?.pushName,
-        timestamp: new Date().toISOString(),
+    if (process.env.NODE_ENV === 'development') {
+      zapiLog('info', cid, 'Webhook received', {
+        type: body.type,
+        instanceId: body.instanceId,
+        phone: event?.phone,
+        messageId: event?.messageId,
+        dryRun: dryRun.enabled,
       });
     }
 
     if (!isInboundUserMessage(body)) {
+      zapiLog('info', cid, 'Skipping non-inbound message', {
+        type: body.type,
+        status: body.status,
+        fromMe: body.fromMe || body.message?.fromMe,
+      });
       return NextResponse.json({ received: true });
     }
 
     const senderPhone = body.message?.phone || body.phone;
     if (!senderPhone) {
+      zapiLog('warn', cid, 'No sender phone found in payload');
       return NextResponse.json({ received: true });
     }
     const normalizedSender = normalizePhone(senderPhone);
+
+    // Idempotency check: skip already-processed messageIds
+    const messageId = extractMessageId(body);
+    if (messageId && await isDuplicateMessage(messageId, cid)) {
+      return NextResponse.json({ received: true });
+    }
+
+    // Resolver workspace para isolamento de tenant
+    const workspaceId = await resolveWorkspaceId(body.instanceId);
+    if (!workspaceId) {
+      zapiLog('error', cid, 'Could not resolve workspace_id. Set ZAPI_WORKSPACE_ID env var.', {
+        instanceId: body.instanceId,
+      });
+      return NextResponse.json({ error: 'Workspace not resolved' }, { status: 400 });
+    }
+
+    zapiLog('info', cid, 'Processing inbound message', {
+      phone: normalizedSender,
+      messageId,
+      workspace: workspaceId,
+      dryRun: dryRun.enabled,
+    });
 
     // Processar contato compartilhado
     if (body.message?.type === 'contactCard' || body.contacts) {
@@ -605,55 +771,102 @@ export async function POST(request: Request) {
         body.message?.contactName || body.contacts?.[0]?.displayName || '';
 
       if (vcard) {
-        await handleSharedContact(senderPhone, vcard, displayName);
+        if (dryRun.enabled) {
+          dryRun.actions.push(`handleSharedContact(${normalizedSender}, vcard, "${displayName}", workspace=${workspaceId})`);
+          zapiLog('info', cid, 'DRY-RUN: would handleSharedContact', { phone: normalizedSender, displayName });
+        } else {
+          await handleSharedContact(senderPhone, vcard, displayName, workspaceId);
+        }
+      }
+
+      if (dryRun.enabled) {
+        return NextResponse.json({ dryRun: true, correlationId: cid, actions: dryRun.actions });
       }
       return NextResponse.json({ received: true });
     }
 
     // Processar mensagem de texto
     let messageText = extractMessageText(body);
-    const messageId = extractMessageId(body);
     const contactName = body.message?.contactName || body.message?.pushName || '';
 
     if (!messageText && isAudioMessage(body)) {
       try {
-        messageText = await transcribeAudio(body);
+        zapiLog('info', cid, 'Attempting audio transcription', { phone: normalizedSender });
+        if (dryRun.enabled) {
+          dryRun.actions.push(`transcribeAudio(phone=${normalizedSender})`);
+        } else {
+          messageText = await transcribeAudio(body);
+        }
       } catch (error) {
-        console.error('Audio transcription error:', error);
+        zapiLog('error', cid, 'Audio transcription error', {
+          phone: normalizedSender,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
     if (!messageText && isAudioMessage(body)) {
+      if (dryRun.enabled) {
+        dryRun.actions.push(`sendTextMessage(${normalizedSender}, "audio-not-understood fallback")`);
+        return NextResponse.json({ dryRun: true, correlationId: cid, actions: dryRun.actions });
+      }
       await sendTextMessage(
         normalizedSender,
         'Recebi seu audio, mas nao consegui entender. Pode mandar em texto ou reenviar o audio?'
       );
       return NextResponse.json({ received: true });
     }
-    
+
     if (messageText) {
-      const allowed = await shouldProcessInbound(
-        normalizedSender,
-        messageId,
-        body.momment
-      );
-      if (!allowed) {
-        return NextResponse.json({ received: true });
-      }
-      const lockAcquired = await acquireConversationLock(normalizedSender);
-      if (!lockAcquired) {
-        return NextResponse.json({ received: true });
-      }
-      try {
-        await handleTextMessage(senderPhone, messageText, messageId, contactName);
-      } finally {
-        await releaseConversationLock(normalizedSender);
+      if (!dryRun.enabled) {
+        const allowed = await shouldProcessInbound(
+          normalizedSender,
+          messageId,
+          body.momment
+        );
+        if (!allowed) {
+          zapiLog('info', cid, 'shouldProcessInbound returned false (dedup)', {
+            phone: normalizedSender,
+            messageId,
+          });
+          return NextResponse.json({ received: true });
+        }
+        const lockAcquired = await acquireConversationLock(normalizedSender);
+        if (!lockAcquired) {
+          zapiLog('warn', cid, 'Could not acquire conversation lock', { phone: normalizedSender });
+          return NextResponse.json({ received: true });
+        }
+        try {
+          await handleTextMessage(senderPhone, messageText, workspaceId, messageId, contactName);
+        } finally {
+          await releaseConversationLock(normalizedSender);
+        }
+      } else {
+        dryRun.actions.push(`handleTextMessage(${normalizedSender}, text="${messageText.slice(0, 80)}...", workspace=${workspaceId}, messageId=${messageId})`);
+        zapiLog('info', cid, 'DRY-RUN: would handleTextMessage', {
+          phone: normalizedSender,
+          textPreview: messageText.slice(0, 80),
+          workspace: workspaceId,
+        });
       }
     }
 
+    if (dryRun.enabled) {
+      zapiLog('info', cid, 'DRY-RUN complete', { actionsCount: dryRun.actions.length });
+      return NextResponse.json({ dryRun: true, correlationId: cid, actions: dryRun.actions });
+    }
+
+    zapiLog('info', cid, 'Webhook processed successfully', {
+      phone: normalizedSender,
+      messageId,
+      workspace: workspaceId,
+    });
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Webhook error:', error);
+    zapiLog('error', cid, 'Webhook error', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

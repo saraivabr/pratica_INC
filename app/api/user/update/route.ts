@@ -1,21 +1,25 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
+import { getAuthenticatedUser } from '@/lib/api-auth';
+import { validateRequest, UserUpdateSchema } from '@/lib/validation-schemas';
 
 export async function POST(request: Request) {
   try {
-    const { userId, nome } = await request.json();
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId é obrigatório' },
-        { status: 400 }
-      );
+    const user = await getAuthenticatedUser(request as NextRequest);
+    if (!user) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    if (!nome || typeof nome !== 'string' || nome.trim().length < 2) {
+    const validation = await validateRequest(request, UserUpdateSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
+    }
+    const { userId, nome } = validation.data;
+
+    if (userId !== user.id) {
       return NextResponse.json(
-        { error: 'Nome deve ter pelo menos 2 caracteres' },
-        { status: 400 }
+        { error: 'Não autorizado a atualizar outro usuário' },
+        { status: 403 }
       );
     }
 
@@ -23,9 +27,9 @@ export async function POST(request: Request) {
       `update users set nome = $1 where id = $2 returning *`,
       [nome.trim(), userId]
     );
-    const user = rows[0];
+    const updatedUser = rows[0];
 
-    if (!user) {
+    if (!updatedUser) {
       return NextResponse.json(
         { error: 'Erro ao atualizar usuário' },
         { status: 500 }
@@ -34,7 +38,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      user
+      user: updatedUser
     });
   } catch (error) {
     console.error('Error in user update:', error);

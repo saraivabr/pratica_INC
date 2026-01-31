@@ -359,27 +359,22 @@ export async function createInteracao(data: {
   simulacao_data?: Record<string, any>;
   notas_internas?: string;
   mensagem_enviada?: string;
-}): Promise<Interacao | null> {
+}, workspaceId?: number): Promise<Interacao | null> {
   const { rows } = await dbQuery<Interacao>(
-    `insert into interacoes (
-      corretor_id, empreendimento_id, empreendimento_nome, tipo_material,
-      lead_nome, lead_telefone, lead_id, unidade_id, simulacao_data,
-      notas_internas, mensagem_enviada
+    `insert into cvcrm_lead_interacoes (
+      usuario_id, usuario_nome, tipo, descricao, workspace_id, data_cadastro
     )
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    values (
+      (SELECT cvcrm_id FROM users WHERE id = $1),
+      (SELECT nome FROM users WHERE id = $1),
+      $2, $3, $4, NOW()
+    )
     returning *`,
     [
       data.corretor_id,
-      data.empreendimento_id,
-      data.empreendimento_nome || null,
       data.tipo_material,
-      data.lead_nome || null,
-      data.lead_telefone || null,
-      data.lead_id || null,
-      data.unidade_id || null,
-      data.simulacao_data ? JSON.stringify(data.simulacao_data) : null,
-      data.notas_internas || null,
-      data.mensagem_enviada || null,
+      data.notas_internas || data.mensagem_enviada || '',
+      workspaceId || null,
     ]
   );
   return rows[0] || null;
@@ -387,8 +382,21 @@ export async function createInteracao(data: {
 
 export async function getInteracoesByEmpreendimento(
   empreendimentoId: string,
-  limit = 10
+  limit = 10,
+  workspaceId?: number
 ): Promise<Interacao[]> {
+  if (workspaceId) {
+    const { rows } = await dbQuery(
+      `select i.*, u.nome as corretor_nome
+       from cvcrm_lead_interacoes i
+       left join users u on u.cvcrm_id = i.usuario_id
+       where i.workspace_id = $1
+       order by i.created_at desc
+       limit $2`,
+      [workspaceId, limit]
+    );
+    return rows as Interacao[];
+  }
   const { rows } = await dbQuery(
     `select i.*, u.nome as corretor_nome
      from interacoes i
@@ -403,8 +411,19 @@ export async function getInteracoesByEmpreendimento(
 
 export async function getInteracoesByCorretor(
   corretorId: string,
-  limit = 50
+  limit = 50,
+  workspaceId?: number
 ): Promise<Interacao[]> {
+  if (workspaceId) {
+    const { rows } = await dbQuery(
+      `select * from cvcrm_lead_interacoes
+       where workspace_id = $1 AND usuario_id = (SELECT cvcrm_id FROM users WHERE id = $2)
+       order by created_at desc
+       limit $3`,
+      [workspaceId, corretorId, limit]
+    );
+    return rows as Interacao[];
+  }
   const { rows } = await dbQuery(
     `select * from interacoes
      where corretor_id = $1
@@ -416,8 +435,16 @@ export async function getInteracoesByCorretor(
 }
 
 export async function getInteracoesCountByEmpreendimento(
-  empreendimentoId: string
+  empreendimentoId: string,
+  workspaceId?: number
 ): Promise<number> {
+  if (workspaceId) {
+    const { rows } = await dbQuery(
+      `select count(*) as total from cvcrm_lead_interacoes where workspace_id = $1`,
+      [workspaceId]
+    );
+    return parseInt(rows[0]?.total || '0', 10);
+  }
   const { rows } = await dbQuery(
     `select count(*) as total from interacoes
      where empreendimento_id = $1`,

@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
 import { dbQuery } from '@/lib/db';
+import { validateRequest, LeadCpfSchema } from '@/lib/validation-schemas';
 
 /**
  * Validate CPF format (Brazilian tax ID)
@@ -60,12 +61,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { cpf } = body;
-
-    if (!cpf) {
-      return NextResponse.json({ error: 'CPF não informado' }, { status: 400 });
+    const validation = await validateRequest(request, LeadCpfSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
     }
+    const { cpf } = validation.data;
 
     // Clean CPF (remove formatting)
     const cleanCpf = cpf.replace(/\D/g, '');

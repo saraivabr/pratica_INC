@@ -1,12 +1,33 @@
 import { NextRequest, NextResponse } from "next/server"
 import { dbQuery } from "@/lib/db"
+import { requireWorkspaceContext } from "@/lib/api-helpers"
+import { validateRequest, TrackEventSchema } from "@/lib/validation-schemas"
 
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { name, category, properties, timestamp, url, userAgent } = body
+  // 1. Authentication
+  const ctx = await requireWorkspaceContext(request)
+  if (ctx.error) return ctx.error
 
-    // Inserir evento de analytics no banco
+  // 2. Validation (own try-catch so parse errors return 400, not 500)
+  let data: typeof TrackEventSchema._output
+  try {
+    const validation = await validateRequest(request, TrackEventSchema)
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 })
+    }
+    data = validation.data
+  } catch (error) {
+    console.error('Analytics validation error:', error)
+    return NextResponse.json(
+      { error: 'Corpo da requisição inválido ou ausente' },
+      { status: 400 }
+    )
+  }
+
+  // 3. Database insert
+  try {
+    const { name, category, properties, timestamp, url, userAgent } = data
+
     await dbQuery(
       `INSERT INTO analytics_events (
         event_name,
@@ -14,15 +35,17 @@ export async function POST(request: NextRequest) {
         properties,
         url,
         user_agent,
-        created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6)`,
+        created_at,
+        workspace_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         name,
         category,
         JSON.stringify(properties || {}),
         url,
         userAgent,
-        timestamp || new Date().toISOString()
+        timestamp || new Date().toISOString(),
+        ctx.workspaceId
       ]
     )
 

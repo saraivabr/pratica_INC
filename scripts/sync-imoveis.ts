@@ -11,12 +11,12 @@ import { Pool } from 'pg';
 // Configurações
 const CONFIG = {
   cvcrm: {
-    baseUrl: 'https://pratica.cvcrm.com.br',
-    email: 'orcioli@pratica-inc.com.br',
-    token: '0d06bcd2704de36ba8fadbb1c282cab646d1b256'
+    baseUrl: process.env.CVCRM_BASE_URL || 'https://pratica.cvcrm.com.br',
+    email: process.env.CVCRM_EMAIL || '',
+    token: process.env.CVCRM_TOKEN_LEAD || ''
   },
   db: {
-    connectionString: process.env.DATABASE_URL || 'postgres://postgres:356d20e7786bbbe6f375@84.247.128.56:3005/pratica?sslmode=disable'
+    connectionString: process.env.DATABASE_URL || ''
   },
   rateLimit: {
     delayMs: 350

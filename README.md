@@ -311,60 +311,23 @@ sudo certbot --nginx -d seudominio.com.br -d www.seudominio.com.br
 ## 📁 Estrutura do Projeto
 
 ```
-pratica/
-├── app/                      # Rotas Next.js 13+ (App Router)
-│   ├── api/                 # API Routes (autenticação, leads, WhatsApp, etc)
-│   ├── login/               # Autenticação
-│   ├── admin/               # Área administrativa
-│   │   ├── intermediacao/   # Sistema de vendas e comissões
-│   │   ├── eventos/         # Gestão de eventos
-│   │   ├── equipe/          # Gerenciamento de equipe
-│   │   └── ...
-│   ├── catavendas/          # Recuperação inteligente de leads (ex: salva-leads)
-│   ├── dashboard/           # Dashboard do corretor
-│   ├── leads/               # Gestão de leads
-│   ├── pipeline/            # Funil de vendas
-│   ├── mensagens/           # Chat e mensagens
-│   ├── whatsapp/            # Gestão WhatsApp
-│   ├── performance/         # Métricas e relatórios
-│   ├── empreendimentos/     # Catálogo de imóveis
+appnovo_pratica/
+├── app/                    # Rotas Next.js 13+ (App Router)
+│   ├── api/               # API Routes
+│   ├── login/             # Página de login
+│   ├── admin/             # Área administrativa
 │   └── ...
-├── components/              # Componentes React reutilizáveis (170+ arquivos)
-├── lib/                     # Utilitários, hooks e helpers
-├── migrations/              # Migrações SQL (23+ arquivos)
-├── scripts/                 # Scripts de automação e manutenção
-├── public/                  # Arquivos estáticos (imagens, fontes)
-├── docs/                    # Documentação técnica
-├── .env.production          # Variáveis de ambiente (produção)
-├── next.config.js           # Configuração Next.js
-├── package.json             # Dependências npm
-├── CHANGELOG.md             # Histórico de mudanças
-└── README.md               # Este arquivo
+├── components/            # Componentes React (172 arquivos)
+├── lib/                   # Utilitários e helpers
+├── migrations/            # Migrações SQL (23 arquivos)
+├── scripts/               # Scripts de automação
+├── public/                # Arquivos estáticos
+├── docs/                  # Documentação
+├── .env.production        # Variáveis de ambiente
+├── next.config.mjs        # Configuração Next.js
+├── package.json           # Dependências
+└── README.md             # Este arquivo
 ```
-
-### 🗂️ Estrutura de Rotas (App Router)
-
-**Rotas Unificadas** (sem prefixo `/corretor/`):
-- `/` → Home / Landing page
-- `/login` → Autenticação
-- `/dashboard` → Dashboard do usuário
-- `/catavendas` → Recuperação de leads (CataVendas)
-- `/leads` → Gestão de leads
-- `/pipeline` → Funil de vendas
-- `/mensagens` → Chat e conversas
-- `/whatsapp` → Status e configuração WhatsApp
-- `/performance` → Relatórios e métricas
-- `/empreendimentos` → Catálogo de imóveis
-- `/calculadora` → Simulador financeiro
-
-**Área Administrativa** (`/admin/*`):
-- `/admin` → Dashboard admin/gerente
-- `/admin/intermediacao` → Sistema de vendas e comissões
-- `/admin/eventos` → Gestão de eventos
-- `/admin/equipe` → Gerenciamento de equipe
-- `/admin/whatsapp-status` → Status geral WhatsApp
-- `/admin/automations` → Automações
-- `/admin/reports` → Relatórios avançados
 
 ---
 
@@ -508,17 +471,4 @@ Proprietário - Prática Incorporadora
 - ⚠️ CV CRM (configurar tokens se necessário)
 - ⚠️ OpenAI (configurar chave se usar IA)
 
-**Última atualização:** 29 Jan 2026
-
----
-
-## 🔄 Changelog & Atualizações Recentes
-
-Para ver o histórico completo de mudanças, consulte [CHANGELOG.md](./CHANGELOG.md).
-
-### v2.0.0 - Reestruturação Completa (29/01/2026)
-- ✅ Removida pasta `/corretor/` - rotas unificadas na raiz
-- ✅ CataVendas E2E com análise de IA
-- ✅ Command Center - tela unificada de controle
-- ✅ Melhorias de UX (loading states, empty states, breadcrumbs)
-- ✅ Sistema de navegação otimizado
+**Última atualização:** 28 Jan 2026

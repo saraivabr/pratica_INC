@@ -5,10 +5,10 @@ const config: CapacitorConfig = {
   appName: 'Pratica',
   webDir: 'out',
 
-  // Carrega o app do servidor próprio (modo híbrido)
+  // Carrega o app do servidor Scalingo (modo híbrido)
   server: {
-    url: 'http://185.182.184.122:3000',
-    cleartext: true,
+    url: 'https://pratica-app.osc-fr1.scalingo.io',
+    cleartext: false, // HTTPS only
   },
 
   // Configurações Android

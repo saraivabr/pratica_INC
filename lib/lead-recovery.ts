@@ -49,6 +49,7 @@ function getOpenAI(): OpenAI {
   if (!_openai) {
     _openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      timeout: 30000,
     });
   }
   return _openai;
@@ -170,7 +171,7 @@ async function fetchHistorico(atendimentoId: string): Promise<string> {
           WHEN 13 THEN 'Termômetro'
           WHEN 14 THEN 'Atribuição'
           WHEN 15 THEN 'Proposta'
-          WHEN 16 THEN 'Recupera Leads'
+          WHEN 16 THEN 'Salva Leads'
           ELSE 'Indefinido'
         END,
         COALESCE(us.full_name, 'Sistema'),

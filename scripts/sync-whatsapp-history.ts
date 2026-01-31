@@ -24,7 +24,7 @@ dotenv.config({ path: '.env.local' });
 
 const EVOLUTION_BASE_URL = process.env.EVOLUTION_BASE_URL || process.env.EVOLUTION_API_URL;
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
-const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+const DATABASE_URL = process.env.DATABASE_URL || process.env.SCALINGO_POSTGRESQL_URL;
 
 // Validar configuracao
 if (!DATABASE_URL) {
@@ -39,7 +39,7 @@ if (!EVOLUTION_BASE_URL || !EVOLUTION_API_KEY) {
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
-  ssl: DATABASE_URL.includes('supabase.co')
+  ssl: DATABASE_URL.includes('supabase.co') || DATABASE_URL.includes('scalingo')
     ? { rejectUnauthorized: false }
     : undefined,
 });

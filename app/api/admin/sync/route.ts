@@ -3,17 +3,25 @@ import { dbQuery } from "@/lib/db";
 import { getImobiliariasCVCRM, getCorretoresCVCRM } from "@/lib/cvcrm-client";
 import { normalizePhone } from "@/lib/supabase";
 import { getAuthenticatedUser } from "@/lib/api-auth";
+import { applyRateLimit } from '@/lib/rate-limit-helper';
+import { validateRequest, AdminSyncSchema } from '@/lib/validation-schemas';
 
 // POST - Sync data from CV CRM
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = await applyRateLimit(request, 'SYNC');
+    if (rateLimited) return rateLimited;
+
     const user = await getAuthenticatedUser(request);
     if (!user || user.role !== "admin") {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { type } = body; // 'imobiliarias' or 'corretores'
+    const validation = await validateRequest(request, AdminSyncSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
+    }
+    const { type } = validation.data;
 
     const results = {
       created: 0,
@@ -122,8 +130,6 @@ export async function POST(request: NextRequest) {
       } catch (err: any) {
         return NextResponse.json({ error: `Erro ao buscar corretores: ${err.message}` }, { status: 500 });
       }
-    } else {
-      return NextResponse.json({ error: "Tipo inválido. Use 'imobiliarias' ou 'corretores'" }, { status: 400 });
     }
 
     return NextResponse.json({

@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { dbQuery } from "@/lib/db";
+import { validateRequest, TrackEventSchema } from "@/lib/validation-schemas";
 
 export async function POST(request: Request) {
   try {
-    const { userId, eventType, page, data } = await request.json();
+    const validation = await validateRequest(request, TrackEventSchema);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
+    }
+    const { userId, eventType, page, data } = validation.data;
 
     if (!userId || !eventType || !page) {
       return NextResponse.json({ success: false }, { status: 400 });

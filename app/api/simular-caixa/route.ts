@@ -5,50 +5,15 @@ import {
   CONFIGURACAO_CAIXA_MCMV,
   type SimulacaoCaixa,
 } from '@/lib/financial-calculations-caixa';
-
-interface SimulacaoRequest {
-  valorImovel: number;
-  valorEntrada: number;
-  prazoMeses: number;
-  usarMCMV?: boolean;
-  valorFGTS?: number;
-  cidade?: 'sp' | 'rj' | 'outros';
-}
+import { validateRequest, SimularCaixaSchema } from '@/lib/validation-schemas';
 
 export async function POST(request: NextRequest) {
   try {
-    const body: SimulacaoRequest = await request.json();
-
-    const {
-      valorImovel,
-      valorEntrada,
-      prazoMeses,
-      usarMCMV = false,
-      valorFGTS = 0,
-      cidade = 'outros',
-    } = body;
-
-    // Validações
-    if (!valorImovel || valorImovel <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Valor do imóvel inválido' },
-        { status: 400 }
-      );
+    const validation = await validateRequest(request, SimularCaixaSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
     }
-
-    if (!valorEntrada || valorEntrada < 0) {
-      return NextResponse.json(
-        { success: false, error: 'Valor da entrada inválido' },
-        { status: 400 }
-      );
-    }
-
-    if (!prazoMeses || prazoMeses <= 0 || prazoMeses > 420) {
-      return NextResponse.json(
-        { success: false, error: 'Prazo deve estar entre 1 e 420 meses' },
-        { status: 400 }
-      );
-    }
+    const { valorImovel, valorEntrada, prazoMeses, usarMCMV, valorFGTS, cidade } = validation.data;
 
     // Selecionar configuração
     const configuracao = usarMCMV ? CONFIGURACAO_CAIXA_MCMV : CONFIGURACAO_CAIXA_SBPE;

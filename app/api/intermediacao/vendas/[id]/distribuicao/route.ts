@@ -8,17 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
-import { z } from "zod";
-
-// Schema de validacao
-const distribuicaoItemSchema = z.object({
-  beneficiario_id: z.string().uuid(),
-  percentual: z.number().min(0).max(100),
-});
-
-const distribuicaoSchema = z.object({
-  distribuicoes: z.array(distribuicaoItemSchema).min(1),
-});
+import { validateRequest, VendaDistribuicaoSchema } from "@/lib/validation-schemas";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -173,22 +163,15 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
-
-    // Validar dados de entrada
-    const parseResult = distribuicaoSchema.safeParse(body);
-    if (!parseResult.success) {
+    const validation = await validateRequest(request, VendaDistribuicaoSchema);
+    if (!validation.success) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Dados invalidos",
-          details: parseResult.error.errors
-        },
+        { success: false, error: validation.error, details: validation.details },
         { status: 400 }
       );
     }
 
-    const { distribuicoes } = parseResult.data;
+    const { distribuicoes } = validation.data;
 
     // Validar soma dos percentuais
     const somaPercentuais = distribuicoes.reduce((acc, d) => acc + d.percentual, 0);

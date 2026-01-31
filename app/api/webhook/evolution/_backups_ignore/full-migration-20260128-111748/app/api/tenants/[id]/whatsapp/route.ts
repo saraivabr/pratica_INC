@@ -1,0 +1,203 @@
+/**
+ * API: Gerenciar Instâncias WhatsApp por Tenant
+ *
+ * GET /api/tenants/:id/whatsapp - Listar instâncias do tenant
+ * POST /api/tenants/:id/whatsapp - Criar nova instância
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getTenant, updateTenant } from '@/lib/tenant-context';
+import {
+  createInstance,
+  fetchInstances,
+  getQRCode,
+  getConnectionStatus,
+  setWebhook,
+} from '@/lib/evolution-api';
+
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const params = await context.params;
+    const tenantId = parseInt(params.id);
+
+    if (isNaN(tenantId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid tenant ID' },
+        { status: 400 }
+      );
+    }
+
+    const tenant = await getTenant(tenantId);
+
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Tenant not found' },
+        { status: 404 }
+      );
+    }
+
+    // Retornar instâncias do tenant
+    const instances = tenant.evolution_instances || [];
+
+    // Buscar status atual de cada instância
+    const instancesWithStatus = await Promise.all(
+      instances.map(async (instance: any) => {
+        try {
+          const status = await getConnectionStatus(instance.instance_name);
+          return {
+            ...instance,
+            connection_state: status.state,
+          };
+        } catch {
+          return {
+            ...instance,
+            connection_state: 'unknown',
+          };
+        }
+      })
+    );
+
+    return NextResponse.json({
+      success: true,
+      data: instancesWithStatus,
+      total: instancesWithStatus.length,
+    });
+  } catch (error: any) {
+    console.error('Error listing WhatsApp instances:', error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const params = await context.params;
+    const tenantId = parseInt(params.id);
+
+    if (isNaN(tenantId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid tenant ID' },
+        { status: 400 }
+      );
+    }
+
+    const tenant = await getTenant(tenantId);
+
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Tenant not found' },
+        { status: 404 }
+      );
+    }
+
+    const body = await request.json();
+
+    // Gerar nome único da instância
+    const instanceName = body.instanceName || `${tenant.slug}-${Date.now()}`;
+
+    // Determinar URL base para webhooks dinamicamente
+    // 1. Usa WEBHOOK_BASE_URL se configurado (mais confiável)
+    // 2. Usa NEXT_PUBLIC_APP_URL se configurado
+    // 3. Detecta dinamicamente do request (host + protocolo)
+    // 4. Fallback para localhost apenas em desenvolvimento local real
+    let baseUrl = process.env.WEBHOOK_BASE_URL || process.env.NEXT_PUBLIC_APP_URL;
+
+    if (!baseUrl) {
+      const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
+      const proto = request.headers.get('x-forwarded-proto') ||
+                    (host?.includes('localhost') ? 'http' : 'https');
+
+      if (host && !host.includes('localhost')) {
+        baseUrl = `${proto}://${host}`;
+      } else {
+        baseUrl = 'http://localhost:3000';
+      }
+    }
+
+    // Configurar webhook
+    const webhookUrl = `${baseUrl}/api/webhook/evolution/${tenantId}`;
+    console.log(`[WhatsApp] Webhook URL configurado: ${webhookUrl}`);
+
+    // Criar instância na Evolution API com webhook
+    // Se body.number fornecido, habilita pairing code
+    console.log(`[WhatsApp] Criando instância ${instanceName} com telefone: ${body.number || 'não informado'}`);
+
+    const evolutionInstance = await createInstance({
+      instanceName,
+      number: body.number, // Telefone para pairing code (opcional)
+      qrcode: true,
+      integration: 'WHATSAPP-BAILEYS',
+      reject_call: body.reject_call ?? false,
+      msg_call: body.msg_call,
+      groups_ignore: body.groups_ignore ?? true,
+      always_online: body.always_online ?? false,
+      read_messages: body.read_messages ?? false,
+      webhook: {
+        url: webhookUrl,
+        webhook_by_events: false,
+        webhook_base64: false,
+        events: [
+          'MESSAGES_UPSERT',
+          'MESSAGES_UPDATE',
+          'CONNECTION_UPDATE',
+          'QRCODE_UPDATED',
+        ],
+      },
+    });
+
+    // Obter QR Code
+    let qrCodeData;
+    try {
+      qrCodeData = await getQRCode(instanceName);
+    } catch (error) {
+      console.log('QR Code will be generated when connecting');
+    }
+
+    // Salvar instância no tenant
+    const currentInstances = tenant.evolution_instances || [];
+    const newInstance = {
+      instance_name: instanceName,
+      display_name: body.displayName || instanceName,
+      qr_code: qrCodeData?.base64 || null,
+      status: 'disconnected',
+      created_at: new Date().toISOString(),
+      webhook_url: webhookUrl,
+      settings: {
+        reject_call: body.reject_call ?? false,
+        groups_ignore: body.groups_ignore ?? true,
+        always_online: body.always_online ?? false,
+        read_messages: body.read_messages ?? false,
+      },
+    };
+
+    await updateTenant(tenantId, {
+      evolution_instances: [...currentInstances, newInstance] as any[],
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          instance: newInstance,
+          qr_code: qrCodeData?.base64,
+          pairing_code: qrCodeData?.pairingCode,
+        },
+      },
+      { status: 201 }
+    );
+  } catch (error: any) {
+    console.error('Error creating WhatsApp instance:', error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}

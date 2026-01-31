@@ -3,6 +3,8 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { SimulacaoTemplate } from '@/components/pdf-templates';
 import { getUserById } from '@/lib/supabase';
 import { createElement } from 'react';
+import { applyRateLimit } from '@/lib/rate-limit-helper';
+import { validateRequest, PdfSimulacaoSchema } from '@/lib/validation-schemas';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -19,35 +21,16 @@ interface SimulacaoData {
   totalJuros: number;
 }
 
-interface RequestBody {
-  userId: string;
-  empreendimentoNome: string;
-  unidade?: {
-    numero: string;
-    tipo: string;
-  };
-  simulacao: SimulacaoData;
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const body: RequestBody = await request.json();
-    const { userId, empreendimentoNome, unidade, simulacao } = body;
+    const rateLimited = await applyRateLimit(request, 'PDF_GENERATE');
+    if (rateLimited) return rateLimited;
 
-    if (!userId || !simulacao) {
-      return NextResponse.json(
-        { success: false, error: 'userId e simulacao são obrigatórios' },
-        { status: 400 }
-      );
+    const validation = await validateRequest(request, PdfSimulacaoSchema);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error, details: validation.details }, { status: 400 });
     }
-
-    // Validar dados da simulação
-    if (!simulacao.valorImovel || simulacao.valorImovel <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Valor do imóvel inválido' },
-        { status: 400 }
-      );
-    }
+    const { userId, empreendimentoNome, unidade, simulacao } = validation.data;
 
     // Buscar usuário
     const user = await getUserById(userId);
@@ -104,7 +87,7 @@ export async function POST(request: NextRequest) {
         empreendimento: {
           nome: empreendimentoNome || 'Simulação de Financiamento',
         },
-        unidade,
+        unidade: unidade as any,
         simulacao: simulacaoCompleta,
         corretor: {
           nome: user.nome,

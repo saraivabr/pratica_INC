@@ -8,21 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
-import { z } from "zod";
-
-// Schema de validacao
-const parcelaManualSchema = z.object({
-  beneficiario_id: z.string().uuid(),
-  valor: z.number().positive(),
-  data_vencimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-});
-
-const parcelamentoSchema = z.object({
-  tipo: z.enum(['automatico', 'manual']),
-  num_parcelas: z.number().int().min(1).max(120).optional(),
-  data_primeira_parcela: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  parcelas: z.array(parcelaManualSchema).optional(),
-});
+import { validateRequest, VendaParcelarSchema } from "@/lib/validation-schemas";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -223,22 +209,15 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
-
-    // Validar dados de entrada
-    const parseResult = parcelamentoSchema.safeParse(body);
-    if (!parseResult.success) {
+    const validation = await validateRequest(request, VendaParcelarSchema);
+    if (!validation.success) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Dados invalidos",
-          details: parseResult.error.errors
-        },
+        { success: false, error: validation.error, details: validation.details },
         { status: 400 }
       );
     }
 
-    const data = parseResult.data;
+    const data = validation.data;
 
     // Validar campos obrigatorios por tipo
     if (data.tipo === 'automatico' && !data.num_parcelas) {

@@ -5,10 +5,10 @@
 
 set -e
 
-DB_HOST="db.uwuwahlmykfkfxshnlbv.supabase.co"
-DB_USER="postgres"
-DB_NAME="postgres"
-DB_PASSWORD="57fMaSlXw2cvpmH2"
+DB_HOST="${SUPABASE_DB_HOST:-}"
+DB_USER="${SUPABASE_DB_USER:-postgres}"
+DB_NAME="${SUPABASE_DB_NAME:-postgres}"
+DB_PASSWORD="${SUPABASE_DB_PASSWORD:-}"
 MIGRATION_DIR="/Users/saraiva/_Projetos/appnovo_pratica/supabase/migrations/full_migration"
 
 export PGPASSWORD=$DB_PASSWORD

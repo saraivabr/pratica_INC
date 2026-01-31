@@ -9,12 +9,12 @@ function getBaseUrl(request: NextRequest): string {
 
 // Routes that require authentication
 const protectedRoutes = [
+  '/',
   '/empreendimentos',
   '/calculadora',
   '/chat',
   '/perfil',
   '/corretor',
-  '/dashboard',
   '/leads',
   '/onboarding/whatsapp',
 ]
@@ -23,13 +23,10 @@ const protectedRoutes = [
 const protectedPrefixes = [
   '/empreendimentos/',
   '/admin/',
-  '/gerente/',
-  '/corretor/',
 ]
 
 // Routes that are always public (no auth required)
 const publicRoutes = [
-  '/',               // Landing page is public
   '/login',
   '/auth/callback',
 ]
@@ -79,11 +76,6 @@ function isPublicRoute(pathname: string): boolean {
 }
 
 function isProtectedRoute(pathname: string): boolean {
-  // Homepage is NOT protected (public landing page)
-  if (pathname === '/') {
-    return false
-  }
-
   // Check exact protected routes
   if (protectedRoutes.includes(pathname)) {
     return true
@@ -138,16 +130,6 @@ export function middleware(request: NextRequest) {
   const session = getSessionData(request)
   const baseUrl = getBaseUrl(request)
 
-  // DEBUG: Log homepage access
-  if (pathname === '/') {
-    console.log('[middleware] Homepage accessed:', {
-      pathname,
-      hasSession: !!session,
-      isPublic: isPublicRoute(pathname),
-      isProtected: isProtectedRoute(pathname),
-    })
-  }
-
   // Handle admin secret key authentication
   if (pathname.startsWith('/admin')) {
     const secretKey = searchParams.get('key')
@@ -167,7 +149,7 @@ export function middleware(request: NextRequest) {
         return NextResponse.next()
       } else {
         // Corretores cannot access admin area
-        return NextResponse.redirect(new URL('/dashboard', baseUrl))
+        return NextResponse.redirect(new URL('/corretor', baseUrl))
       }
     }
 
@@ -175,19 +157,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=admin_required', baseUrl))
   }
 
+  // Redirect /gerente/* routes to /corretor
+  if (pathname.startsWith('/gerente')) {
+    return NextResponse.redirect(new URL('/corretor', baseUrl))
+  }
+
   // Always allow public routes
   if (isPublicRoute(pathname)) {
     return NextResponse.next()
-  }
-
-  // Role-based redirects for homepage (quando autenticado)
-  if (pathname === '/' && session) {
-    const isAdminOrGerente = session.role === 'admin' || session.role === 'gerente'
-    if (isAdminOrGerente) {
-      return NextResponse.redirect(new URL('/admin', baseUrl))
-    } else {
-      return NextResponse.redirect(new URL('/dashboard', baseUrl))
-    }
   }
 
   // Check if it's a protected route
@@ -207,6 +184,16 @@ export function middleware(request: NextRequest) {
       // Redirect to workspace setup (will be created automatically)
       // For now, just log and continue - workspace will be auto-created by API
       // return NextResponse.redirect(new URL('/onboarding/workspace', baseUrl))
+    }
+
+    // Role-based redirects for homepage
+    if (pathname === '/') {
+      const isAdminOrGerente = session.role === 'admin' || session.role === 'gerente'
+      if (isAdminOrGerente) {
+        return NextResponse.redirect(new URL('/admin', baseUrl))
+      } else {
+        return NextResponse.redirect(new URL('/corretor', baseUrl))
+      }
     }
   }
 

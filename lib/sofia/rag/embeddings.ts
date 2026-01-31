@@ -38,6 +38,7 @@ function getOpenAI(): OpenAI {
   if (!_openai) {
     _openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      timeout: 30000,
     });
   }
   return _openai;

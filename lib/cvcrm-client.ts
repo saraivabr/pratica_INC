@@ -12,6 +12,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const BASE_URL = process.env.CVCRM_BASE_URL || 'https://pratica.cvcrm.com.br';
 const EMAIL = process.env.CVCRM_EMAIL || '';
+const CVCRM_TIMEOUT_MS = 15_000;
 
 interface CVCRMResponse<T> {
     codigo?: number;
@@ -27,24 +28,32 @@ async function fetchCVCRM<T>(
 ): Promise<CVCRMResponse<T>> {
     const url = `${BASE_URL}${endpoint}`;
     console.log(`[CVCRM] Fetching ${url} with email ${EMAIL} and token ${token ? '[REDACTED]' : 'MISSING'}`);
-    
-    const response = await fetch(url, {
-        ...init,
-        headers: {
-            'accept': 'application/json',
-            'email': EMAIL,
-            'token': token,
-            ...init?.headers,
-        },
-    });
 
-    if (!response.ok) {
-        const text = await response.text();
-        console.error(`[CVCRM] Error ${response.status} on ${endpoint}: ${text.slice(0, 200)}`);
-        throw new Error(`CV CRM API error: ${response.status}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CVCRM_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(url, {
+            ...init,
+            signal: controller.signal,
+            headers: {
+                'accept': 'application/json',
+                'email': EMAIL,
+                'token': token,
+                ...init?.headers,
+            },
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            console.error(`[CVCRM] Error ${response.status} on ${endpoint}: ${text.slice(0, 200)}`);
+            throw new Error(`CV CRM API error: ${response.status}`);
+        }
+
+        return response.json();
+    } finally {
+        clearTimeout(timeoutId);
     }
-
-    return response.json();
 }
 
 /**

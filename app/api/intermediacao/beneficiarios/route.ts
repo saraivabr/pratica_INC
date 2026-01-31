@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { validateRequest, BeneficiarioCreateSchema } from "@/lib/validation-schemas";
 
 // ============================================================================
 // Validação de CPF (Algoritmo Oficial Brasileiro)
@@ -286,7 +287,13 @@ export async function POST(request: NextRequest) {
     const ctx = await requireWorkspaceContext(request);
     if (ctx.error) return ctx.error;
 
-    const body = await request.json();
+    const validation = await validateRequest(request, BeneficiarioCreateSchema);
+    if (!validation.success) {
+      return NextResponse.json(
+        { success: false, error: validation.error, details: validation.details },
+        { status: 400 }
+      );
+    }
     const {
       nome,
       tipo_documento,
@@ -300,18 +307,7 @@ export async function POST(request: NextRequest) {
       tipo_conta,
       pix,
       observacoes,
-    } = body;
-
-    // Validações obrigatórias
-    if (!nome || !tipo_documento || !documento || !cargo || !email) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Campos obrigatórios: nome, tipo_documento, documento, cargo, email",
-        },
-        { status: 400 }
-      );
-    }
+    } = validation.data;
 
     // Limpar documento (remover formatação)
     const documentoLimpo = documento.replace(/\D/g, "");

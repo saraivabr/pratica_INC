@@ -1,93 +1,80 @@
-/**
- * API de Notificação Individual
- * 
- * PATCH /api/notificacoes/[id] - Marca como lida/não lida
- * DELETE /api/notificacoes/[id] - Remove notificação
- */
-
 import { NextRequest, NextResponse } from 'next/server';
+import { dbQuery } from '@/lib/db';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
 
-// PATCH /api/notificacoes/[id] - Marca como lida
-export async function PATCH(
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+/**
+ * PUT /api/notificacoes/[id]
+ * Atualiza notificação (marcar como lida/não lida)
+ */
+export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
     const ctx = await requireWorkspaceContext(request);
     if (ctx.error) return ctx.error;
 
-    const { user, workspaceId } = ctx;
-    const { id } = params;
+    const { id } = await context.params;
     const body = await request.json();
     const { lida } = body;
 
     if (typeof lida !== 'boolean') {
       return NextResponse.json(
-        { error: 'Campo lida deve ser boolean' },
+        { error: 'Campo obrigatório: lida (boolean)' },
         { status: 400 }
       );
     }
 
-    const result = await pool.query(
-      `UPDATE notificacoes 
-       SET lida = $1, lida_em = CASE WHEN $1 = true THEN NOW() ELSE NULL END
-       WHERE id = $2 AND user_id = $3 AND workspace_id = $4
-       RETURNING *`,
-      [lida, id, user.id, workspaceId]
+    const { rows } = await dbQuery(
+      `UPDATE notificacoes SET lida = $1, updated_at = NOW() WHERE id = $2 AND workspace_id = $3 RETURNING *`,
+      [lida, id, ctx.workspaceId]
     );
 
-    if (result.rowCount === 0) {
-      return NextResponse.json(
-        { error: 'Notificação não encontrada' },
-        { status: 404 }
-      );
+    if (rows.length === 0) {
+      return NextResponse.json({ error: 'Notificação não encontrada' }, { status: 404 });
     }
 
-    return NextResponse.json(result.rows[0]);
-
+    return NextResponse.json({ success: true, notificacao: rows[0] });
   } catch (error: any) {
-    console.error('[Notificações] PATCH error:', error);
+    console.error('[PUT /api/notificacoes/[id]] Error:', error);
     return NextResponse.json(
-      { error: 'Erro ao atualizar notificação' },
+      { error: 'Erro ao atualizar notificação', details: error.message },
       { status: 500 }
     );
   }
 }
 
-// DELETE /api/notificacoes/[id] - Remove notificação
+/**
+ * DELETE /api/notificacoes/[id]
+ */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
     const ctx = await requireWorkspaceContext(request);
     if (ctx.error) return ctx.error;
 
-    const { user, workspaceId } = ctx;
-    const { id } = params;
+    const { id } = await context.params;
 
-    const result = await pool.query(
-      `DELETE FROM notificacoes 
-       WHERE id = $1 AND user_id = $2 AND workspace_id = $3
-       RETURNING id`,
-      [id, user.id, workspaceId]
+    const { rows } = await dbQuery(
+      `DELETE FROM notificacoes WHERE id = $1 AND workspace_id = $2 RETURNING id`,
+      [id, ctx.workspaceId]
     );
 
-    if (result.rowCount === 0) {
-      return NextResponse.json(
-        { error: 'Notificação não encontrada' },
-        { status: 404 }
-      );
+    if (rows.length === 0) {
+      return NextResponse.json({ error: 'Notificação não encontrada' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true });
-
+    return NextResponse.json({ success: true, message: 'Notificação deletada' });
   } catch (error: any) {
-    console.error('[Notificações] DELETE error:', error);
+    console.error('[DELETE /api/notificacoes/[id]] Error:', error);
     return NextResponse.json(
-      { error: 'Erro ao remover notificação' },
+      { error: 'Erro ao deletar notificação', details: error.message },
       { status: 500 }
     );
   }

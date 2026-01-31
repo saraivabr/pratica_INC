@@ -2,7 +2,7 @@ const https = require('https');
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  connectionString: 'postgres://postgres:356d20e7786bbbe6f375@84.247.128.56:3005/pratica?sslmode=disable'
+  connectionString: '${process.env.DATABASE_URL}'
 });
 
 // Função para normalizar telefone

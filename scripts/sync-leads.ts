@@ -12,10 +12,10 @@ const CONFIG = {
   cvcrm: {
     baseUrl: 'https://pratica.cvcrm.com.br',
     email: 'orcioli@pratica-inc.com.br',
-    token: process.env.CVCRM_TOKEN_LEAD || '8899fff8925165bcfb20d35cdc2443a80744692d'
+    token: process.env.CVCRM_TOKEN_LEAD || ''
   },
   db: {
-    connectionString: process.env.DATABASE_URL || 'postgres://postgres:356d20e7786bbbe6f375@84.247.128.56:3005/pratica?sslmode=disable'
+    connectionString: process.env.DATABASE_URL || ''
   },
   rateLimit: {
     delayMs: 350

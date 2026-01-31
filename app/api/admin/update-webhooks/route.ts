@@ -1,7 +1,8 @@
 /**
  * Endpoint temporário para atualizar webhooks das instâncias Evolution
  *
- * GET /api/admin/update-webhooks?secret=xxx
+ * GET /api/admin/update-webhooks
+ * Authorization: Bearer {CRON_SECRET}
  *
  * IMPORTANTE: Remover após uso ou proteger adequadamente
  */
@@ -13,14 +14,13 @@ import pool from '@/lib/db';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const ADMIN_SECRET = process.env.CRON_SECRET; // Reutilizando o CRON_SECRET para autenticação
 
 export async function GET(request: NextRequest) {
-  // Validar autenticação
-  const { searchParams } = new URL(request.url);
-  const secret = searchParams.get('secret');
+  // Validar autenticação via Authorization header
+  const authHeader = request.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
 
-  if (!ADMIN_SECRET || secret !== ADMIN_SECRET) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -97,12 +97,15 @@ export async function GET(request: NextRequest) {
           workspaceId = 1;
         }
 
-        const webhookUrl = `${WEBHOOK_BASE_URL}/api/webhook/evolution/${workspaceId}`;
+        const webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET;
+        const webhookUrl = webhookSecret
+          ? `${WEBHOOK_BASE_URL}/api/webhook/evolution/${workspaceId}?secret=${webhookSecret}`
+          : `${WEBHOOK_BASE_URL}/api/webhook/evolution/${workspaceId}`;
 
-        console.log(`[Update Webhooks] ${instanceName}: atualizando webhook para ${webhookUrl}`);
+        console.log(`[Update Webhooks] ${instanceName}: atualizando webhook para ${WEBHOOK_BASE_URL}/api/webhook/evolution/${workspaceId}`);
 
         // Evolution API v2 não suporta headers customizados em webhooks
-        // A autenticação é feita via workspace_id na URL
+        // A autenticação é feita via secret no query parameter da URL
         await setWebhook(instanceName, {
           url: webhookUrl,
           webhook_by_events: false,

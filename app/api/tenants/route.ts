@@ -1,15 +1,32 @@
 /**
  * API: Gerenciar Tenants (Empresas/Clientes)
  *
- * GET /api/tenants - Listar todos os tenants
- * POST /api/tenants - Criar novo tenant
+ * GET /api/tenants - Listar todos os tenants (admin only)
+ * POST /api/tenants - Criar novo tenant (admin only)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { listTenants, createTenant } from '@/lib/tenant-context';
+import { getAuthenticatedUser } from '@/lib/api-auth';
+
+async function requireAdmin(request: NextRequest) {
+  const user = await getAuthenticatedUser(request);
+  if (!user || (user.role !== 'admin' && user.role !== 'gerente')) {
+    return null;
+  }
+  return user;
+}
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireAdmin(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'active';
 
@@ -23,7 +40,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error listing tenants:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -31,6 +48,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAdmin(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
 
     // Validate required fields
@@ -39,38 +64,6 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'Missing required fields: slug, name, cvcrm_config'
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validar formato do slug (apenas letras minúsculas, números e hífens)
-    if (!/^[a-z0-9-]+$/.test(body.slug)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Slug deve conter apenas letras minúsculas, números e hífens'
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validar comprimento
-    if (body.slug.length < 3 || body.slug.length > 50) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Slug deve ter entre 3 e 50 caracteres'
-        },
-        { status: 400 }
-      );
-    }
-
-    if (body.name.trim().length < 2) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Nome deve ter pelo menos 2 caracteres'
         },
         { status: 400 }
       );
@@ -100,7 +93,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -1,118 +1,85 @@
 import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
 import { dbQuery } from "@/lib/db";
+import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { applyRateLimit } from '@/lib/rate-limit-helper';
+
+// Lazy initialization to avoid build-time errors
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: 30000,
+    });
+  }
+  return _openai;
+}
 
 export async function POST(req: NextRequest) {
   try {
+    const rateLimited = await applyRateLimit(req, 'AI_ENDPOINT');
+    if (rateLimited) return rateLimited;
+
+    // Autenticação e contexto do tenant
+    const ctx = await requireWorkspaceContext(req);
+    if (ctx.error) return ctx.error;
+
+    const { workspaceId } = ctx;
+
     const { conversationId } = await req.json();
 
     if (!conversationId) {
-      return NextResponse.json({ suggestions: [] });
+      return NextResponse.json({ error: "Missing conversationId" }, { status: 400 });
     }
 
-    // conversationId = phone_number
-    const phone = conversationId;
+    // 1. Get Conversation Data (with tenant isolation)
+    const convRes = await dbQuery(
+      `SELECT c.*, u.nome, u.role
+       FROM conversations c
+       JOIN users u ON c.user_id = u.id
+       WHERE c.id = $1 AND c.workspace_id = $2`,
+      [conversationId, workspaceId]
+    );
+    const conv = convRes.rows[0];
 
-    // Buscar últimas 10 mensagens da conversa
-    const res = await dbQuery(`
-      SELECT message_text, is_from_me, contact_name, timestamp
-      FROM whatsapp_messages
-      WHERE phone_number = $1
-        AND message_text IS NOT NULL AND message_text != ''
-      ORDER BY timestamp DESC
-      LIMIT 10
-    `, [phone]);
-
-    if (res.rows.length === 0) {
-      return NextResponse.json({ suggestions: [] });
+    if (!conv) {
+      return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
     }
 
-    const messages = res.rows.reverse(); // Oldest first
-    const lastUserMsg = [...messages].reverse().find(m => !m.is_from_me);
-    const contactName = lastUserMsg?.contact_name || phone;
+    // 2. Prepare AI Prompt for 3 suggestions
+    const messages = conv.messages || [];
+    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')?.content || "";
+    
+    const systemPrompt = `Você é Sofia, a IA da Pratica Incorporadora. 
+Analise o histórico da conversa e a última mensagem do usuário.
+Gere 3 sugestões de resposta diferentes:
+1. Uma resposta direta e profissional.
+2. Uma resposta mais empática e pessoal.
+3. Uma resposta com um forte Call to Action (CTA).
 
-    // Usar Gemini Flash (gratuito) ou GPT-4o-mini como fallback
-    const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
-    const openaiKey = process.env.OPENAI_API_KEY;
+Responda APENAS em formato JSON:
+{
+  "suggestions": [
+    { "type": "profissional", "text": "..." },
+    { "type": "pessoal", "text": "..." },
+    { "type": "cta", "text": "..." }
+  ]
+}`;
 
-    const systemPrompt = `Você é assistente de vendas imobiliárias. Analise a conversa e gere 3 sugestões de resposta curtas e diretas para o corretor responder ao cliente "${contactName}".
-1. Profissional e direta
-2. Empática e pessoal  
-3. Com Call to Action forte
+    const completion = await getOpenAI().chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content })),
+      ],
+      response_format: { type: "json_object" }
+    });
 
-Responda APENAS em JSON: {"suggestions":[{"type":"profissional","text":"..."},{"type":"pessoal","text":"..."},{"type":"cta","text":"..."}]}`;
-
-    const chatHistory = messages.map(m => 
-      `${m.is_from_me ? 'Corretor' : contactName}: ${m.message_text}`
-    ).join('\n');
-
-    let suggestions = [];
-
-    // Try Gemini Flash first (free)
-    if (geminiKey) {
-      try {
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [{ text: `${systemPrompt}\n\nHistórico:\n${chatHistory}` }]
-              }],
-              generationConfig: {
-                responseMimeType: "application/json",
-                temperature: 0.7,
-                maxOutputTokens: 500,
-              }
-            }),
-          }
-        );
-
-        if (geminiRes.ok) {
-          const geminiData = await geminiRes.json();
-          const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          const parsed = JSON.parse(text);
-          suggestions = parsed.suggestions || [];
-        }
-      } catch (e) {
-        console.error("[AI Suggestions] Gemini error:", e);
-      }
-    }
-
-    // Fallback to GPT-4o-mini
-    if (suggestions.length === 0 && openaiKey) {
-      try {
-        const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${openaiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: chatHistory },
-            ],
-            response_format: { type: "json_object" },
-            max_tokens: 500,
-          }),
-        });
-
-        if (openaiRes.ok) {
-          const openaiData = await openaiRes.json();
-          const content = openaiData.choices?.[0]?.message?.content || '{}';
-          const parsed = JSON.parse(content);
-          suggestions = parsed.suggestions || [];
-        }
-      } catch (e) {
-        console.error("[AI Suggestions] OpenAI error:", e);
-      }
-    }
-
-    return NextResponse.json({ suggestions });
+    const content = completion.choices[0]?.message?.content || "{}";
+    return NextResponse.json(JSON.parse(content));
   } catch (error) {
     console.error("AI Suggestions Error:", error);
-    return NextResponse.json({ suggestions: [] });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

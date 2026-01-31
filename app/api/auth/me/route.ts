@@ -19,28 +19,13 @@ export async function GET(request: NextRequest) {
       sessionId = cookieStore.get('session')?.value ?? null;
     }
 
-    // Also check for pratica-session cookie (JSON with sessionId inside)
+    // Also check for session cookie in request header
     if (!sessionId) {
       const cookieHeader = request.headers.get('cookie');
       if (cookieHeader) {
-        // Try pratica-session first (the actual cookie used by the app)
-        const praticaMatch = cookieHeader.match(/pratica-session=([^;]+)/);
-        if (praticaMatch) {
-          try {
-            const decoded = decodeURIComponent(praticaMatch[1]);
-            const parsed = JSON.parse(decoded);
-            sessionId = parsed.sessionId || null;
-          } catch {
-            // Not JSON, use as-is
-            sessionId = praticaMatch[1];
-          }
-        }
-        // Fallback to plain session cookie
-        if (!sessionId) {
-          const match = cookieHeader.match(/(?:^|;\s*)session=([^;]+)/);
-          if (match) {
-            sessionId = match[1];
-          }
+        const match = cookieHeader.match(/session=([^;]+)/);
+        if (match) {
+          sessionId = match[1];
         }
       }
     }

@@ -85,8 +85,11 @@ async function main() {
           continue;
         }
 
-        // Montar URL do webhook
-        const webhookUrl = `${WEBHOOK_BASE_URL}/api/webhook/evolution/${finalTenantId}`;
+        // Montar URL do webhook (com secret se configurado)
+        const webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET;
+        const webhookUrl = webhookSecret
+          ? `${WEBHOOK_BASE_URL}/api/webhook/evolution/${finalTenantId}?secret=${webhookSecret}`
+          : `${WEBHOOK_BASE_URL}/api/webhook/evolution/${finalTenantId}`;
 
         // Atualizar webhook
         console.log(`📌 ${instanceName}: Atualizando webhook...`);

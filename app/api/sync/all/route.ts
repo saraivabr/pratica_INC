@@ -8,22 +8,23 @@
  *   Open browser: http://localhost:3000/api/sync/all
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { syncAllDomains } from '@/lib/sync/agents';
+import { getAuthenticatedUser } from '@/lib/api-auth';
+import { applyRateLimit } from '@/lib/rate-limit-helper';
 
 export const maxDuration = 300; // 5 minutes
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  // ❌ CV CRM SYNC ALL DESABILITADO - Erro 405 constantemente
-  return NextResponse.json({
-    success: false,
-    message: "CV CRM sync completo desabilitado por Fellipe - erro 405 constante",
-    timestamp: new Date().toISOString(),
-    note: "Para reativar, descomentar código em app/api/sync/all/route.ts"
-  }, { status: 503 });
+export async function GET(request: NextRequest) {
+  const rateLimited = await applyRateLimit(request, 'SYNC');
+  if (rateLimited) return rateLimited;
 
-  /* CÓDIGO ORIGINAL COMENTADO
+  const user = await getAuthenticatedUser(request);
+  if (!user || (user.role !== 'admin' && user.role !== 'gerente')) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  }
+
   const startTime = Date.now();
 
   try {
@@ -162,5 +163,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-  */ // FIM DO CÓDIGO COMENTADO
 }

@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
-import { createSessionCookie } from '@/lib/session-utils';
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://corretorparceria.com.br';
+function getBaseUrl(request: Request): string {
+  const headers = new Headers(request.headers);
+  const host = headers.get('x-forwarded-host') || headers.get('host') || 'localhost:3000';
+  const protocol = headers.get('x-forwarded-proto') || 'https';
+  return `${protocol}://${host}`;
+}
 
 export async function GET(request: Request) {
+  const BASE_URL = getBaseUrl(request);
   try {
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
@@ -15,7 +20,7 @@ export async function GET(request: Request) {
 
     // Find session by magic token
     const { rows } = await dbQuery(
-      `select s.*, u.id as user_id, u.telefone, u.nome, u.role, u.gerente_id, u.is_active, u.workspace_id
+      `select s.*, u.id as user_id, u.telefone, u.nome, u.role, u.gerente_id, u.is_active
        from sessions s
        join users u on u.id = s.user_id
        where s.otp_code = $1 and s.is_verified = false and s.otp_expires_at > now()
@@ -53,26 +58,14 @@ export async function GET(request: Request) {
         nome: session.nome,
         role: session.role,
         gerente_id: session.gerente_id,
-        workspace_id: session.workspace_id,
       },
     };
-
-    // Criar cookie seguro (httpOnly, secure em prod, 30 dias)
-    const sessionCookie = createSessionCookie({
-      userId: session.user_id,
-      phone: session.telefone,
-      sessionId: session.id,
-      role: session.role,
-      workspaceId: session.workspace_id,
-    });
 
     // Redirect to a page that will set the auth state
     const authUrl = new URL('/auth/callback', BASE_URL);
     authUrl.searchParams.set('data', Buffer.from(JSON.stringify(authData)).toString('base64'));
 
-    const response = NextResponse.redirect(authUrl);
-    response.headers.set('Set-Cookie', sessionCookie);
-    return response;
+    return NextResponse.redirect(authUrl);
   } catch (error) {
     console.error('Error in magic link:', error);
     return NextResponse.redirect(new URL('/login?error=server_error', BASE_URL));

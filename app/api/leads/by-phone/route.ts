@@ -162,11 +162,10 @@ export async function GET(request: NextRequest) {
     // Buscar contato WhatsApp
     const whatsappQuery = `
       SELECT
-        id, phone_number, contact_name as name, profile_picture_url,
-        false as is_business, false as is_group, lead_id,
-        COALESCE(total_messages, 0) as total_messages_received,
-        0 as total_messages_sent,
-        last_message_at, last_message_at as last_interaction_at
+        id, phone_number, name, profile_picture_url,
+        is_business, is_group, lead_id,
+        total_messages_received, total_messages_sent,
+        last_message_at, last_interaction_at
       FROM whatsapp_contacts
       WHERE workspace_id = $1
         AND REGEXP_REPLACE(phone_number, '[^0-9]', '', 'g') = ANY($2::text[])

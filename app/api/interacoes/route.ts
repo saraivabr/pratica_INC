@@ -1,46 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createInteracao, getInteracoesByEmpreendimento, getInteracoesCountByEmpreendimento, getUserById } from '@/lib/supabase';
-import { cookies } from 'next/headers';
+import { dbQuery } from '@/lib/db';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
-// Helper para pegar usuário autenticado
-async function getAuthenticatedUserId(): Promise<string | null> {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('pratica-session')?.value;
-
-    if (!sessionCookie) return null;
-
-    try {
-        const session = JSON.parse(decodeURIComponent(sessionCookie));
-        if (session?.userId) {
-            return session.userId;
-        }
-    } catch {
-        // Ignora erro de parse
-    }
-    return null;
-}
-
 /**
  * GET /api/interacoes?empreendimento_id=XXX
- * Busca histórico de compartilhamentos de um empreendimento
+ * Busca histórico de compartilhamentos de um empreendimento (isolado por workspace)
  */
-export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const empreendimentoId = searchParams.get('empreendimento_id');
-
-    if (!empreendimentoId) {
-        return NextResponse.json({ error: 'empreendimento_id é obrigatório' }, { status: 400 });
-    }
-
+export async function GET(request: NextRequest) {
     try {
-        const interacoes = await getInteracoesByEmpreendimento(empreendimentoId, 20);
-        const count = await getInteracoesCountByEmpreendimento(empreendimentoId);
+        const ctx = await requireWorkspaceContext(request);
+        if (ctx.error) return ctx.error;
+
+        const { searchParams } = new URL(request.url);
+        const empreendimentoId = searchParams.get('empreendimento_id');
+
+        if (!empreendimentoId) {
+            return NextResponse.json({ error: 'empreendimento_id é obrigatório' }, { status: 400 });
+        }
+
+        const { rows } = await dbQuery(
+            `SELECT i.*, u.nome as corretor_nome
+             FROM cvcrm_lead_interacoes i
+             LEFT JOIN users u ON u.cvcrm_id = i.usuario_id
+             WHERE i.workspace_id = $1
+             ORDER BY i.created_at DESC
+             LIMIT 20`,
+            [ctx.workspaceId]
+        );
+
+        const countRes = await dbQuery(
+            `SELECT count(*) as total FROM cvcrm_lead_interacoes WHERE workspace_id = $1`,
+            [ctx.workspaceId]
+        );
 
         return NextResponse.json({
-            interacoes,
-            total: count,
+            interacoes: rows,
+            total: parseInt(countRes.rows[0]?.total || '0', 10),
             success: true
         });
     } catch (error: any) {
@@ -56,10 +53,12 @@ export async function GET(request: Request) {
  * POST /api/interacoes
  * Registra um novo compartilhamento
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
+        const ctx = await requireWorkspaceContext(request);
+        if (ctx.error) return ctx.error;
 
+        const body = await request.json();
         const {
             empreendimento_id,
             empreendimento_nome,
@@ -73,7 +72,6 @@ export async function POST(request: Request) {
             mensagem_enviada
         } = body;
 
-        // Validações
         if (!empreendimento_id) {
             return NextResponse.json({ error: 'empreendimento_id é obrigatório' }, { status: 400 });
         }
@@ -82,38 +80,26 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'tipo_material é obrigatório' }, { status: 400 });
         }
 
-        // Pegar ID do corretor autenticado (da sessão)
-        const userId = await getAuthenticatedUserId();
-
-        if (!userId) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-        }
-
-        const corretorId = userId;
-
-        const interacao = await createInteracao({
-            corretor_id: corretorId,
-            empreendimento_id,
-            empreendimento_nome,
-            tipo_material,
-            lead_nome,
-            lead_telefone,
-            lead_id,
-            unidade_id,
-            simulacao_data,
-            notas_internas,
-            mensagem_enviada
-        });
-
-        if (!interacao) {
-            throw new Error('Falha ao criar interação');
-        }
+        const { rows } = await dbQuery(
+            `INSERT INTO cvcrm_lead_interacoes (
+                usuario_id, usuario_nome, tipo, descricao, workspace_id, data_cadastro
+            ) VALUES (
+                (SELECT cvcrm_id FROM users WHERE id = $1),
+                $2, $3, $4, $5, NOW()
+            ) RETURNING *`,
+            [
+                ctx.user.id,
+                ctx.user.nome || '',
+                tipo_material,
+                notas_internas || mensagem_enviada || '',
+                ctx.workspaceId
+            ]
+        );
 
         return NextResponse.json({
             success: true,
-            interacao
+            interacao: rows[0]
         });
-
     } catch (error: any) {
         console.error('Erro ao criar interação:', error);
         return NextResponse.json({

@@ -7,13 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
-import { z } from "zod";
-
-// Schema de validacao
-const statusSchema = z.object({
-  status: z.enum(['rascunho', 'em_processamento', 'concluida', 'paga', 'cancelada']),
-  motivo: z.string().optional(),
-});
+import { validateRequest, VendaStatusSchema } from "@/lib/validation-schemas";
 
 type StatusVenda = 'rascunho' | 'em_processamento' | 'concluida' | 'paga' | 'cancelada';
 
@@ -50,22 +44,15 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json();
-
-    // Validar dados de entrada
-    const parseResult = statusSchema.safeParse(body);
-    if (!parseResult.success) {
+    const validation = await validateRequest(request, VendaStatusSchema);
+    if (!validation.success) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Dados invalidos",
-          details: parseResult.error.errors
-        },
+        { success: false, error: validation.error, details: validation.details },
         { status: 400 }
       );
     }
 
-    const { status: novoStatus, motivo } = parseResult.data;
+    const { status: novoStatus, motivo } = validation.data;
 
     // Buscar venda atual
     const { rows: vendaRows } = await dbQuery(

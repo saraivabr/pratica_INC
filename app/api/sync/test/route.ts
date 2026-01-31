@@ -2,12 +2,17 @@
  * Test API Route - Simple agent import test
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuthenticatedUser } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(request);
+    if (!user || (user.role !== 'admin' && user.role !== 'gerente')) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
     console.log('Attempting to import and test sync...');
 
     const { syncLeadsDomain } = await import('@/lib/sync/agents');

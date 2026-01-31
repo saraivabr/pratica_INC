@@ -5,15 +5,11 @@
 import { Pool } from 'pg';
 
 const SOURCE_DB = {
-  host: '84.247.128.56',
-  port: 3005,
-  user: 'postgres',
-  password: '356d20e7786bbbe6f375',
-  database: 'pratica',
+  connectionString: process.env.SOURCE_DATABASE_URL || '',
 };
 
 const TARGET_DB = {
-  connectionString: 'postgresql://postgres:57fMaSlXw2cvpmH2@db.uwuwahlmykfkfxshnlbv.supabase.co:5432/postgres',
+  connectionString: process.env.TARGET_DATABASE_URL || '',
   ssl: { rejectUnauthorized: false }
 };
 

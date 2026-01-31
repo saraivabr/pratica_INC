@@ -1,7 +1,12 @@
 /**
  * Z-API WhatsApp Integration
  * Docs: https://developer.z-api.io/
+ *
+ * Todas as chamadas passam pelo wrapper com retry inteligente,
+ * timeout de 15s e erros mapeados em PT-BR (lib/zapi-client.ts).
  */
+
+import { zapiRequestWithRetry, type ZapiSendResult } from './zapi-client';
 
 const INSTANCE_ID = process.env.ZAPI_INSTANCE_ID!;
 const TOKEN = process.env.ZAPI_TOKEN!;
@@ -42,6 +47,9 @@ export interface ActionButton {
   label: string;
 }
 
+// Re-export types from zapi-client for consumers that need them
+export type { ZapiSendResult, ZapiSendError, ZapiErrorCode } from './zapi-client';
+
 // ============================================
 // HELPERS
 // ============================================
@@ -50,16 +58,43 @@ function cleanPhone(phone: string): string {
   return phone.replace(/^\+/, '');
 }
 
+/**
+ * Converte ZapiSendResult para o formato legado ZAPIResponse,
+ * mantendo compatibilidade com todo o codigo existente.
+ */
+function toZAPIResponse(result: ZapiSendResult): ZAPIResponse {
+  if (result.ok) {
+    return {
+      zapiMessageId: result.messageId,
+      messageId: result.messageId,
+      ...(result.raw as Record<string, unknown>),
+    } as ZAPIResponse;
+  }
+  return {
+    error: result.error?.message || 'Erro ao enviar mensagem.',
+    ...(result.raw as Record<string, unknown>),
+  } as ZAPIResponse;
+}
+
 async function zapiRequest(endpoint: string, body: object): Promise<ZAPIResponse> {
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Client-Token': CLIENT_TOKEN,
-    },
-    body: JSON.stringify(body),
-  });
-  return response.json();
+  const result = await zapiRequestWithRetry(
+    `${BASE_URL}${endpoint}`,
+    { 'Client-Token': CLIENT_TOKEN },
+    body,
+  );
+  return toZAPIResponse(result);
+}
+
+/**
+ * Versao tipada que retorna ZapiSendResult diretamente.
+ * Usar quando precisar de detalhes do erro (code, retryable).
+ */
+export async function zapiSend(endpoint: string, body: object): Promise<ZapiSendResult> {
+  return zapiRequestWithRetry(
+    `${BASE_URL}${endpoint}`,
+    { 'Client-Token': CLIENT_TOKEN },
+    body,
+  );
 }
 
 // ============================================
@@ -434,7 +469,7 @@ export async function sendButtonActions(
  */
 export async function sendMagicLink(phone: string, magicToken: string, userName?: string): Promise<ZAPIResponse> {
   const greeting = userName ? `Olá, ${userName}!` : 'Olá!';
-  const baseUrl = 'https://corretorparceria.com.br';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.escreve.ai';
   const loginUrl = `${baseUrl}/api/auth/magic?token=${magicToken}`;
 
   const message = `${greeting}

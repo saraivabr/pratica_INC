@@ -3,9 +3,10 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { TabelaTemplate, SimulacaoTemplate, BookTemplate } from '@/components/pdf-templates';
 import { dbQuery } from '@/lib/db';
 import { getUserById } from '@/lib/supabase';
-import { sendTextMessage, sendDocument, sendActionButtons } from '@/lib/zapi';
+import { sendTextMessage, sendDocument, sendActionButtons, withProvider } from '@/lib/whatsapp-sender';
 import { createElement } from 'react';
 import { randomBytes } from 'crypto';
+import { validateRequest, WhatsAppSendMaterialSchema } from '@/lib/validation-schemas';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -72,16 +73,11 @@ function formatCurrency(value?: number): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: RequestBody = await request.json();
-    const { userId, type, empreendimento, unidades, simulacao, unidade } = body;
-
-    // Validação
-    if (!userId || !type || !empreendimento) {
-      return NextResponse.json(
-        { success: false, error: 'userId, type e empreendimento são obrigatórios' },
-        { status: 400 }
-      );
+    const validation = await validateRequest(request, WhatsAppSendMaterialSchema);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error, details: validation.details }, { status: 400 });
     }
+    const { userId, type, empreendimento, unidades, simulacao, unidade } = validation.data;
 
     if (type === 'simulacao' && !simulacao) {
       return NextResponse.json(
@@ -241,45 +237,64 @@ Veja todas as fotos, diferenciais e tabela de unidades!`;
     // Gerar link da landing page
     const landingUrl = `${baseUrl}/share/${empreendimento.id}?ref=${userId}`;
 
-    // Enviar mensagem de texto
-    const textResult = await sendTextMessage(user.telefone, messageText);
-    if (textResult.error) {
-      console.error('Erro ao enviar texto:', textResult.error);
-    }
-
-    // Enviar PDF
-    const typeLabels: Record<MaterialType, string> = {
-      tabela: 'Tabela de Unidades',
-      simulacao: 'Simulação de Financiamento',
-      book: 'Book Completo',
-    };
-    const docResult = await sendDocument(
-      user.telefone,
-      pdfUrl,
-      fileName,
-      `${empreendimento.nome} - ${typeLabels[type]}`
+    // Check if user has Evolution connected (corretor's own WhatsApp)
+    const { rows: evoRows } = await dbQuery(
+      `SELECT evolution_instance_name, evolution_connected FROM users WHERE id = $1`,
+      [userId]
     );
-    if (docResult.error) {
-      console.error('Erro ao enviar documento:', docResult.error);
-    }
+    const evoInstance = evoRows[0]?.evolution_connected && evoRows[0]?.evolution_instance_name
+      ? evoRows[0].evolution_instance_name as string
+      : null;
 
-    // Enviar botão com link da landing page
-    const buttonResult = await sendActionButtons(
-      user.telefone,
-      'Veja todas as fotos e detalhes online:',
-      [
-        {
-          type: 'URL',
-          url: landingUrl,
-          label: '🏠 Ver Online',
-        },
-      ],
-      {
-        footer: 'Pratica Incorporadora',
+    // Send function — routes to Evolution or Z-API
+    const sendAll = async () => {
+      // Enviar mensagem de texto
+      const textResult = await sendTextMessage(user!.telefone, messageText);
+      if (textResult.error) {
+        console.error('Erro ao enviar texto:', textResult.error);
       }
-    );
-    if (buttonResult.error) {
-      console.error('Erro ao enviar botão:', buttonResult.error);
+
+      // Enviar PDF
+      const typeLabels: Record<MaterialType, string> = {
+        tabela: 'Tabela de Unidades',
+        simulacao: 'Simulação de Financiamento',
+        book: 'Book Completo',
+      };
+      const docResult = await sendDocument(
+        user!.telefone,
+        pdfUrl,
+        fileName,
+        `${empreendimento.nome} - ${typeLabels[type]}`
+      );
+      if (docResult.error) {
+        console.error('Erro ao enviar documento:', docResult.error);
+      }
+
+      // Enviar botão com link da landing page
+      const buttonResult = await sendActionButtons(
+        user!.telefone,
+        'Veja todas as fotos e detalhes online:',
+        [
+          {
+            type: 'URL',
+            url: landingUrl,
+            label: '🏠 Ver Online',
+          },
+        ],
+        {
+          footer: 'Pratica Incorporadora',
+        }
+      );
+      if (buttonResult.error) {
+        console.error('Erro ao enviar botão:', buttonResult.error);
+      }
+    };
+
+    // Route through Evolution if corretor is connected, otherwise Z-API (default)
+    if (evoInstance) {
+      await withProvider('evolution', evoInstance, sendAll);
+    } else {
+      await sendAll();
     }
 
     // Registrar envio (silently fail if table doesn't exist)

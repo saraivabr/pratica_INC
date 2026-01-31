@@ -7,8 +7,7 @@
 import { Pool, QueryResultRow } from 'pg';
 
 // Configuracao
-const SUPABASE_DB_URL = process.env.SUPABASE_DB_URL ||
-  'postgresql://postgres:57fMaSlXw2cvpmH2@db.uwuwahlmykfkfxshnlbv.supabase.co:5432/postgres';
+const SUPABASE_DB_URL = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || '';
 
 const pool = new Pool({
   connectionString: SUPABASE_DB_URL,

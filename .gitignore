@@ -51,10 +51,12 @@ public/materiais/
 supabase/migrations/full_migration/
 .gemini-clipboard/
 playwright-report/
+test-results/
 *.json
 !package.json
 !tsconfig.json
 !tsconfig.server.json
+!scalingo.json
 !next.config.json
 !.swcrc
 !components.json
@@ -75,8 +77,3 @@ dados_sistema_orulo/
 
 # backups
 /backups/
-/_backups_ignore/
-
-# logs
-logs/
-tunnel.log

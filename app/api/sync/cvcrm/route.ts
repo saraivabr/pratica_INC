@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { applyRateLimit } from '@/lib/rate-limit-helper';
 import {
   getEmpreendimentosCVCRM,
   getUnidadesCVCRM,
@@ -12,14 +13,9 @@ import { saveSnapshot } from "./save";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  // ❌ CV CRM SYNC DESABILITADO - Erro 405 constantemente
-  return NextResponse.json({
-    success: false,
-    message: "CV CRM sync desabilitado por Fellipe - erro 405 constante",
-    timestamp: new Date().toISOString()
-  }, { status: 503 });
+  const rateLimited = await applyRateLimit(request as NextRequest, 'SYNC');
+  if (rateLimited) return rateLimited;
 
-  /* CÓDIGO ORIGINAL COMENTADO
   const { searchParams } = new URL(request.url);
   const leadsLimit = Number(searchParams.get("leadsLimit") || 200);
 
@@ -70,5 +66,4 @@ export async function GET(request: Request) {
   await saveSnapshot(result);
 
   return NextResponse.json(result);
-  */ // FIM DO CÓDIGO COMENTADO
 }
