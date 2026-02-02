@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { dbQuery } from '@/lib/db';
-import { requireWorkspaceContext, hasWorkspace } from '@/lib/api-guards';
+import { requireWorkspaceContext, hasError } from '@/lib/api-helpers';
 import { applyRateLimit } from '@/lib/rate-limit-helper';
 
 export const dynamic = 'force-dynamic';
@@ -502,7 +502,40 @@ IMPORTANTE sobre preços e dados:
 - Sugira argumentos de venda baseados nas características reais dos imóveis (localização, metragem, proximidade do metrô, etc.)`;
 
 // ============================================================================
-// Main handler
+// GET - List conversations or load messages
+// ============================================================================
+
+export async function GET(request: NextRequest) {
+  const rateLimited = await applyRateLimit(request, 'AI_ENDPOINT');
+  if (rateLimited) return rateLimited;
+
+  const ctx = await requireWorkspaceContext(request);
+  if (hasError(ctx)) return ctx.error;
+
+  const { searchParams } = new URL(request.url);
+  const conversaId = searchParams.get('conversaId');
+
+  if (conversaId) {
+    // Load messages for a specific conversation
+    const { rows: msgs } = await dbQuery(
+      `SELECT id, role, content, created_at FROM assistente_mensagens
+       WHERE conversa_id = $1 ORDER BY created_at ASC`,
+      [conversaId]
+    );
+    return NextResponse.json({ mensagens: msgs });
+  }
+
+  // List conversations
+  const { rows: conversas } = await dbQuery(
+    `SELECT id, titulo, updated_at FROM assistente_conversas
+     WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 50`,
+    [ctx.user.id]
+  );
+  return NextResponse.json({ conversas });
+}
+
+// ============================================================================
+// POST - Send message
 // ============================================================================
 
 export async function POST(request: NextRequest) {
@@ -510,7 +543,7 @@ export async function POST(request: NextRequest) {
   if (rateLimited) return rateLimited;
 
   const ctx = await requireWorkspaceContext(request);
-  if (!hasWorkspace(ctx)) return ctx;
+  if (hasError(ctx)) return ctx.error;
 
   try {
     const body = await request.json();

@@ -36,6 +36,7 @@ import {
   GraduationCap,
   Briefcase,
   Shield,
+  Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -80,6 +81,7 @@ const adminGroups = {
     title: "Inteligência",
     defaultOpen: true,
     items: [
+      { href: "/corretor/assistente", icon: Sparkles, label: "Prática IA" },
       { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads" },
       { href: "/admin/score", icon: ShieldCheck, label: "Consulta Score" },
     ],
@@ -128,6 +130,7 @@ const adminItems = Object.values(adminGroups).flatMap(g => g.items)
 // Corretor navigation (for real estate agents)
 const corretorNavItems = [
   { href: "/corretor", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/corretor/assistente", icon: Sparkles, label: "Prática IA", highlight: true },
   { href: "/corretor/clientes", icon: Users, label: "Meus Clientes" },
   { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads" },
   { href: "/corretor/imoveis", icon: Building2, label: "Imóveis" },
@@ -201,24 +204,31 @@ function NavItem({
   isActive,
   isCollapsed,
 }: {
-  item: { href: string; icon: React.ElementType; label: string }
+  item: { href: string; icon: React.ElementType; label: string; highlight?: boolean }
   isActive: boolean
   isCollapsed: boolean
 }) {
+  const isHighlight = (item as any).highlight
   const content = (
     <Link
       href={item.href}
       className={cn(
         "flex w-full items-center gap-3 px-3 py-2 rounded-lg transition-colors",
-        isActive
-          ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
-          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+        isHighlight && !isActive
+          ? "bg-gradient-to-r from-violet-500/10 to-indigo-500/10 text-violet-700 dark:text-violet-300 hover:from-violet-500/20 hover:to-indigo-500/20 font-medium"
+          : isActive
+            ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
+            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+        isHighlight && isActive && "bg-gradient-to-r from-violet-500/20 to-indigo-500/20 text-violet-700 dark:text-violet-300",
         isCollapsed && "justify-center px-2"
       )}
     >
-      <item.icon className="h-[18px] w-[18px] shrink-0" />
+      <item.icon className={cn("h-[18px] w-[18px] shrink-0", isHighlight && "text-violet-500 dark:text-violet-400")} />
       {!isCollapsed && (
         <span className="text-sm truncate min-w-0">{item.label}</span>
+      )}
+      {!isCollapsed && isHighlight && (
+        <span className="ml-auto text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-1.5 py-0.5 rounded-full">IA</span>
       )}
     </Link>
   )
@@ -684,6 +694,22 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
             {children}
           </main>
         </div>
+
+        {/* Floating Prática IA Button - shown for corretores when not on assistente page */}
+        {(isCorretor || currentView === "corretor") && !pathname.startsWith("/corretor/assistente") && (
+          <Link
+            href="/corretor/assistente"
+            className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 group"
+          >
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-indigo-600 rounded-full blur-lg opacity-40 group-hover:opacity-60 transition-opacity" />
+              <div className="relative flex items-center gap-2 bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white rounded-full shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all px-4 py-3 md:px-5 md:py-3.5">
+                <Sparkles className="h-5 w-5" />
+                <span className="text-sm font-medium hidden sm:inline">Prática IA</span>
+              </div>
+            </div>
+          </Link>
+        )}
 
         {/* Mobile Bottom Nav */}
         <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 px-2 pb-safe">
