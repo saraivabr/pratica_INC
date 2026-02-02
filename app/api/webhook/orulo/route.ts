@@ -6,8 +6,30 @@ import { normalizePhone } from "@/lib/supabase";
  * Órulo Webhook Handler (Simulated)
  * In a real scenario, this would be registered in Órulo's dashboard.
  */
+/**
+ * SECURITY: Validar token do webhook Orulo
+ */
+function validateWebhookToken(req: Request): boolean {
+  const webhookToken = process.env.ORULO_WEBHOOK_TOKEN;
+  if (!webhookToken) {
+    console.error('[Orulo] ORULO_WEBHOOK_TOKEN não configurado. Rejeitando request.');
+    return false;
+  }
+  const authHeader = req.headers.get('authorization');
+  if (authHeader === `Bearer ${webhookToken}`) return true;
+  const tokenHeader = req.headers.get('x-webhook-token');
+  if (tokenHeader === webhookToken) return true;
+  return false;
+}
+
 export async function POST(req: Request) {
   try {
+    // SECURITY: Validar token antes de processar
+    if (!validateWebhookToken(req)) {
+      console.error('[Orulo] Unauthorized webhook request');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const payload = await req.json();
     
     // Órulo payload structure from PRD

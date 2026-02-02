@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { empreendimentos } from "@/lib/empreendimentos-data";
 import type { Empreendimento } from "@/lib/data";
+import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 
 function transformEmpreendimento(emp: typeof empreendimentos[0]): Empreendimento & { unidadesDisponiveis: number; latitude?: number; longitude?: number } {
   return {
@@ -39,8 +40,18 @@ function transformEmpreendimento(emp: typeof empreendimentos[0]): Empreendimento
   } as Empreendimento & { unidadesDisponiveis: number; latitude?: number; longitude?: number };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Rate limiting
+    const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
+    const rateLimit = await rateLimiter.check(`public:${clientIp}`, RateLimitConfigs.PUBLIC_API);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
+    }
+
     const transformedEmpreendimentos = empreendimentos.map(transformEmpreendimento);
 
     return NextResponse.json({

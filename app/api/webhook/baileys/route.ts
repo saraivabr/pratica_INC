@@ -31,8 +31,30 @@ async function shouldProcessInbound(
   return rows.length > 0;
 }
 
+/**
+ * SECURITY: Validar token do webhook
+ */
+function validateWebhookToken(request: Request): boolean {
+  const webhookToken = process.env.BAILEYS_WEBHOOK_TOKEN;
+  if (!webhookToken) {
+    console.error('[Baileys] BAILEYS_WEBHOOK_TOKEN não configurado. Rejeitando request.');
+    return false;
+  }
+  const authHeader = request.headers.get('authorization');
+  if (authHeader === `Bearer ${webhookToken}`) return true;
+  const tokenHeader = request.headers.get('x-webhook-token');
+  if (tokenHeader === webhookToken) return true;
+  return false;
+}
+
 export async function POST(request: Request) {
   try {
+    // SECURITY: Validar token antes de processar
+    if (!validateWebhookToken(request)) {
+      console.error('[Baileys] Unauthorized webhook request');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body: IncomingPayload = await request.json();
     if (!body?.userId || !body?.from || !body?.text) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });

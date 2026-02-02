@@ -36,6 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useAuth, usePageTracking } from "@/lib/auth-context"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import {
   BarChart,
@@ -198,133 +199,37 @@ export default function IntermediacaoPage() {
         const data = await consolidadoRes.json()
         setConsolidado(data)
       } else {
-        // Mock data for development
+        // API failed - show zeros instead of mock data
         setConsolidado({
-          totalVendas: 45,
-          valorTotalVendas: 5200000,
-          comissoesGeradas: 260000,
-          comissoesPagas: 180000,
-          comissoesPendentes: 80000,
-          variacaoMensal: 12,
-          percentualPago: 69,
-          percentualPendente: 31,
-          evolucaoMensal: [
-            { mes: "Jan", vendas: 5, comissoes: 35000 },
-            { mes: "Fev", vendas: 8, comissoes: 56000 },
-            { mes: "Mar", vendas: 6, comissoes: 42000 },
-            { mes: "Abr", vendas: 10, comissoes: 70000 },
-            { mes: "Mai", vendas: 7, comissoes: 49000 },
-            { mes: "Jun", vendas: 9, comissoes: 63000 },
-          ],
+          totalVendas: 0,
+          valorTotalVendas: 0,
+          comissoesGeradas: 0,
+          comissoesPagas: 0,
+          comissoesPendentes: 0,
+          variacaoMensal: 0,
+          percentualPago: 0,
+          percentualPendente: 0,
+          evolucaoMensal: [],
         })
+        toast.error("Erro ao carregar dados consolidados")
       }
 
       if (parcelasRes.ok) {
         const data = await parcelasRes.json()
         setParcelasVencidas(data.parcelas || [])
       } else {
-        // Mock data
-        setParcelasVencidas([
-          {
-            id: "1",
-            beneficiarioNome: "Joao Silva",
-            vendaCodigo: "VND-202601-001",
-            valor: 5000,
-            dataVencimento: "2026-01-15",
-            diasAtraso: 11,
-          },
-          {
-            id: "2",
-            beneficiarioNome: "Maria Oliveira",
-            vendaCodigo: "VND-202601-002",
-            valor: 3000,
-            dataVencimento: "2026-01-18",
-            diasAtraso: 8,
-          },
-          {
-            id: "3",
-            beneficiarioNome: "Carlos Santos",
-            vendaCodigo: "VND-202512-045",
-            valor: 7500,
-            dataVencimento: "2026-01-10",
-            diasAtraso: 16,
-          },
-          {
-            id: "4",
-            beneficiarioNome: "Ana Costa",
-            vendaCodigo: "VND-202601-003",
-            valor: 2500,
-            dataVencimento: "2026-01-20",
-            diasAtraso: 6,
-          },
-          {
-            id: "5",
-            beneficiarioNome: "Pedro Almeida",
-            vendaCodigo: "VND-202512-048",
-            valor: 4000,
-            dataVencimento: "2026-01-12",
-            diasAtraso: 14,
-          },
-        ])
+        // API failed - show empty list instead of mock data
+        setParcelasVencidas([])
+        toast.error("Erro ao carregar parcelas vencidas")
       }
 
       if (vendasRes.ok) {
         const data = await vendasRes.json()
         setVendasRecentes(data.vendas || [])
       } else {
-        // Mock data
-        setVendasRecentes([
-          {
-            id: "1",
-            codigo: "VND-202601-012",
-            clienteNome: "Joao Silva",
-            empreendimento: "Residencial Jardins",
-            valorVenda: 500000,
-            comissaoTotal: 25000,
-            status: "aprovada",
-            createdAt: "2026-01-24T10:30:00Z",
-          },
-          {
-            id: "2",
-            codigo: "VND-202601-011",
-            clienteNome: "Maria Oliveira",
-            empreendimento: "Edif. Central Park",
-            valorVenda: 350000,
-            comissaoTotal: 17500,
-            status: "pendente",
-            createdAt: "2026-01-23T15:45:00Z",
-          },
-          {
-            id: "3",
-            codigo: "VND-202601-010",
-            clienteNome: "Carlos Santos",
-            empreendimento: "Cond. Vista Mar",
-            valorVenda: 780000,
-            comissaoTotal: 39000,
-            status: "em_analise",
-            createdAt: "2026-01-22T09:15:00Z",
-          },
-          {
-            id: "4",
-            codigo: "VND-202601-009",
-            clienteNome: "Ana Costa",
-            empreendimento: "Residencial Jardins",
-            valorVenda: 420000,
-            comissaoTotal: 21000,
-            status: "aprovada",
-            createdAt: "2026-01-21T14:20:00Z",
-          },
-          {
-            id: "5",
-            codigo: "VND-202601-008",
-            clienteNome: "Pedro Almeida",
-            empreendimento: "Edif. Central Park",
-            valorVenda: 290000,
-            comissaoTotal: 14500,
-            status: "aprovada",
-            createdAt: "2026-01-20T11:00:00Z",
-          },
-        ])
+        // API failed - show empty list instead of mock data
+        setVendasRecentes([])
+        toast.error("Erro ao carregar vendas recentes")
       }
     } catch (error) {
       console.error("Error fetching intermediacao data:", error)

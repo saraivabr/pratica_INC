@@ -52,12 +52,8 @@ export const runtime = 'nodejs';
 function validateWebhookAuth(request: NextRequest): boolean {
   const webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET;
 
-  // Em desenvolvimento sem secret configurado, aceitar todos
-  if (process.env.NODE_ENV === 'development' && !webhookSecret) {
-    return true;
-  }
-
-  // Se secret não está configurado em produção, rejeitar
+  // SECURITY: Sempre exigir secret, mesmo em dev.
+  // Se secret não está configurado, rejeitar.
   if (!webhookSecret) {
     console.error('[Webhook Evolution] EVOLUTION_WEBHOOK_SECRET não configurado. Rejeitando request.');
     return false;

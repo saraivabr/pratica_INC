@@ -703,6 +703,25 @@ async function handleTextMessage(
 // WEBHOOK HANDLERS
 // ============================================
 
+/**
+ * SECURITY: Valida token do webhook Z-API
+ */
+function validateWebhookToken(request: Request): boolean {
+  const webhookToken = process.env.ZAPI_WEBHOOK_TOKEN;
+  if (!webhookToken) {
+    console.error('[ZAPI] ZAPI_WEBHOOK_TOKEN não configurado. Rejeitando request.');
+    return false;
+  }
+  const authHeader = request.headers.get('authorization');
+  if (authHeader === `Bearer ${webhookToken}`) return true;
+  const tokenHeader = request.headers.get('x-webhook-token');
+  if (tokenHeader === webhookToken) return true;
+  // Z-API pode enviar no header customizado
+  const zapiToken = request.headers.get('x-token');
+  if (zapiToken === webhookToken) return true;
+  return false;
+}
+
 export async function POST(request: Request) {
   const cid = crypto.randomUUID();
   const dryRun: DryRunContext = {
@@ -711,6 +730,12 @@ export async function POST(request: Request) {
   };
 
   try {
+    // SECURITY: Validar token antes de processar
+    if (!validateWebhookToken(request)) {
+      zapiLog('error', cid, 'Unauthorized webhook request - invalid or missing token');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body: ZAPIWebhook = await request.json();
 
     // Parse normalized payload for logging context

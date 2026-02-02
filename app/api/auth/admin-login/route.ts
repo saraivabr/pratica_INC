@@ -15,10 +15,17 @@ export async function GET(request: Request) {
     const redirect = searchParams.get('redirect') || '/admin'
     const baseUrl = await getBaseUrl()
 
-    // Double-check admin key is valid (middleware already validated, but extra security)
+    // SECURITY: Validate admin key from httpOnly cookie (not URL)
     const adminSecretKey = process.env.ADMIN_SECRET_KEY
     if (!adminSecretKey) {
       return NextResponse.redirect(new URL('/login?error=config_error', baseUrl))
+    }
+
+    const cookieStore = await cookies()
+    const adminToken = cookieStore.get('admin-auth-token')?.value
+    if (!adminToken || adminToken !== adminSecretKey) {
+      console.error('[admin-login] Invalid or missing admin-auth-token cookie');
+      return NextResponse.redirect(new URL('/login?error=admin_required', baseUrl))
     }
 
     // Find or create admin user
@@ -51,8 +58,7 @@ export async function GET(request: Request) {
       nome: adminUser.nome,
     }
 
-    // Set session cookie
-    const cookieStore = await cookies()
+    // Set session cookie (reuse cookieStore from above)
     cookieStore.set('pratica-session', JSON.stringify(sessionData), {
       httpOnly: true, // Security: Prevent XSS attacks by making cookie inaccessible to JavaScript
       secure: process.env.NODE_ENV === 'production',
@@ -60,6 +66,9 @@ export async function GET(request: Request) {
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: '/',
     })
+
+    // SECURITY: Clean up the one-time admin auth token
+    cookieStore.delete('admin-auth-token')
 
     // Update last login
     await dbQuery(

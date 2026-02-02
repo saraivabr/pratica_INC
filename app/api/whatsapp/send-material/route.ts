@@ -7,6 +7,7 @@ import { sendTextMessage, sendDocument, sendActionButtons, withProvider } from '
 import { createElement } from 'react';
 import { randomBytes } from 'crypto';
 import { validateRequest, WhatsAppSendMaterialSchema } from '@/lib/validation-schemas';
+import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -73,6 +74,16 @@ function formatCurrency(value?: number): string {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
+    const rateLimit = await rateLimiter.check(`whatsapp:${clientIp}`, RateLimitConfigs.WHATSAPP_SEND);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
+    }
+
     const validation = await validateRequest(request, WhatsAppSendMaterialSchema);
     if (!validation.success) {
       return NextResponse.json({ success: false, error: validation.error, details: validation.details }, { status: 400 });
@@ -247,11 +258,16 @@ Veja todas as fotos, diferenciais e tabela de unidades!`;
       : null;
 
     // Send function — routes to Evolution or Z-API
+    // Each step is wrapped in try/catch so a failure in one doesn't block the others
     const sendAll = async () => {
       // Enviar mensagem de texto
-      const textResult = await sendTextMessage(user!.telefone, messageText);
-      if (textResult.error) {
-        console.error('Erro ao enviar texto:', textResult.error);
+      try {
+        const textResult = await sendTextMessage(user!.telefone, messageText);
+        if (textResult.error) {
+          console.error('Erro ao enviar texto:', textResult.error);
+        }
+      } catch (err: any) {
+        console.warn('[send-material] sendTextMessage failed, skipping:', err.message);
       }
 
       // Enviar PDF
@@ -260,33 +276,53 @@ Veja todas as fotos, diferenciais e tabela de unidades!`;
         simulacao: 'Simulação de Financiamento',
         book: 'Book Completo',
       };
-      const docResult = await sendDocument(
-        user!.telefone,
-        pdfUrl,
-        fileName,
-        `${empreendimento.nome} - ${typeLabels[type]}`
-      );
-      if (docResult.error) {
-        console.error('Erro ao enviar documento:', docResult.error);
+      try {
+        const docResult = await sendDocument(
+          user!.telefone,
+          pdfUrl,
+          fileName,
+          `${empreendimento.nome} - ${typeLabels[type]}`
+        );
+        if (docResult.error) {
+          console.error('Erro ao enviar documento:', docResult.error);
+        }
+      } catch (err: any) {
+        // Fallback: send PDF link as text message
+        console.warn('[send-material] sendDocument failed, falling back to text link:', err.message);
+        try {
+          await sendTextMessage(user!.telefone, `📄 ${empreendimento.nome} - ${typeLabels[type]}\n\nBaixe aqui: ${pdfUrl}`);
+        } catch (fallbackErr: any) {
+          console.error('[send-material] Document text fallback also failed:', fallbackErr.message);
+        }
       }
 
       // Enviar botão com link da landing page
-      const buttonResult = await sendActionButtons(
-        user!.telefone,
-        'Veja todas as fotos e detalhes online:',
-        [
+      try {
+        const buttonResult = await sendActionButtons(
+          user!.telefone,
+          'Veja todas as fotos e detalhes online:',
+          [
+            {
+              type: 'URL',
+              url: landingUrl,
+              label: '🏠 Ver Online',
+            },
+          ],
           {
-            type: 'URL',
-            url: landingUrl,
-            label: '🏠 Ver Online',
-          },
-        ],
-        {
-          footer: 'Pratica Incorporadora',
+            footer: 'Pratica Incorporadora',
+          }
+        );
+        if (buttonResult.error) {
+          console.error('Erro ao enviar botão:', buttonResult.error);
         }
-      );
-      if (buttonResult.error) {
-        console.error('Erro ao enviar botão:', buttonResult.error);
+      } catch (err: any) {
+        // Fallback: send landing link as plain text
+        console.warn('[send-material] sendActionButtons failed, falling back to text link:', err.message);
+        try {
+          await sendTextMessage(user!.telefone, `🏠 Ver Online: ${landingUrl}`);
+        } catch (fallbackErr: any) {
+          console.error('[send-material] Button text fallback also failed:', fallbackErr.message);
+        }
       }
     };
 

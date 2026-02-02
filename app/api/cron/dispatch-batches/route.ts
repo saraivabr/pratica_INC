@@ -75,8 +75,10 @@ function validateCronAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
-  if (process.env.NODE_ENV === 'development') {
-    return true;
+  // SECURITY: Sempre exigir CRON_SECRET, mesmo em dev.
+  if (!cronSecret) {
+    console.error('[Cron Auth] CRON_SECRET não configurado. Rejeitando request.');
+    return false;
   }
 
   if (authHeader === `Bearer ${cronSecret}`) {

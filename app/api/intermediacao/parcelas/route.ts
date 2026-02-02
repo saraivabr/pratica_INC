@@ -13,6 +13,15 @@ export async function GET(request: NextRequest) {
     const ctx = await requireWorkspaceContext(request);
     if (ctx.error) return ctx.error;
 
+    // SECURITY: Operações financeiras requerem role admin ou gerente
+    const allowedRoles = ['admin', 'gerente'];
+    if (!allowedRoles.includes((ctx.user as any).role || '')) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado. Apenas admin e gerentes podem acessar operações financeiras.' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Query params
@@ -97,7 +106,7 @@ export async function GET(request: NextRequest) {
     // Count total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM parcelas_intermediacao p
+      FROM im_parcelas p
       WHERE ${whereClause}
     `;
     const countResult = await dbQuery(countQuery, params);
@@ -126,10 +135,10 @@ export async function GET(request: NextRequest) {
           THEN CURRENT_DATE - p.data_vencimento
           ELSE 0
         END as dias_atraso
-      FROM parcelas_intermediacao p
-      LEFT JOIN vendas_intermediacao v ON v.id = p.venda_id
-      LEFT JOIN beneficiarios_intermediacao b ON b.id = p.beneficiario_id
-      LEFT JOIN pagamentos_intermediacao pg ON pg.parcela_id = p.id
+      FROM im_parcelas p
+      LEFT JOIN im_vendas v ON v.id = p.venda_id
+      LEFT JOIN im_beneficiarios b ON b.id = p.beneficiario_id
+      LEFT JOIN im_pagamentos pg ON pg.parcela_id = p.id
       WHERE ${whereClause}
       ORDER BY p.data_vencimento ASC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}

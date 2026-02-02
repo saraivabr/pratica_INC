@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 
 export interface Material {
   tipo: "tabela" | "ficha_tecnica" | "book" | "apresentacao" | "outro";
@@ -41,6 +42,16 @@ function loadMateriais(): Record<string, EmpreendimentoMateriais> {
 }
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
+  const rateLimit = await rateLimiter.check(`public:${clientIp}`, RateLimitConfigs.PUBLIC_API);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfter: rateLimit.retryAfter },
+      { status: 429 }
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const empreendimentoId = searchParams.get("empreendimentoId");
 

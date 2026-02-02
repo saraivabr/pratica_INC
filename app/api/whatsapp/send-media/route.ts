@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendMediaMessage, formatPhoneNumber } from '@/lib/evolution-api';
 import { tenantQuery, findUserWorkspace } from '@/lib/tenant-context';
 import { getAuthenticatedUser } from '@/lib/api-auth';
+import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 
 // Tipos de mídia suportados
 const MEDIA_TYPES = {
@@ -39,6 +40,16 @@ export async function POST(request: NextRequest) {
     const user = await getAuthenticatedUser(request);
     if (!user) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
+    }
+
+    // Rate limiting
+    const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
+    const rateLimit = await rateLimiter.check(`whatsapp:${clientIp}`, RateLimitConfigs.WHATSAPP_SEND);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
     }
 
     const tenant = await findUserWorkspace(user);

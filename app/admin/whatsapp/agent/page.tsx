@@ -167,6 +167,7 @@ export default function SofiaAgentOnboarding() {
   const [testLoading, setTestLoading] = useState(false);
 
   const hasAccess = user && (user.role === 'admin' || user.role === 'gerente');
+  const workspaceId = (user as any)?.workspace_id || 1;
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -180,7 +181,7 @@ export default function SofiaAgentOnboarding() {
       setLoading(true);
       try {
         // Load WhatsApp instances
-        const instancesRes = await fetch('/api/tenants/1/whatsapp');
+        const instancesRes = await fetch(`/api/tenants/${workspaceId}/whatsapp`);
         const instancesData = await instancesRes.json();
         if (instancesData.success) {
           setInstances(instancesData.data || []);
@@ -208,7 +209,7 @@ export default function SofiaAgentOnboarding() {
   // Load agent config when instance changes
   const loadAgentConfig = async (instanceName: string) => {
     try {
-      const configRes = await fetch(`/api/agents/${encodeURIComponent(instanceName)}?tenantId=1`);
+      const configRes = await fetch(`/api/agents/${encodeURIComponent(instanceName)}?tenantId=${workspaceId}`);
       const configData = await configRes.json();
       if (configData.success && configData.data) {
         // Merge with defaults preserving structure
@@ -259,7 +260,7 @@ export default function SofiaAgentOnboarding() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tenantId: 1,
+          tenantId: workspaceId,
           instanceName: selectedInstance,
           isActive: config.isActive,
           agentName: config.agentName,
@@ -319,7 +320,7 @@ export default function SofiaAgentOnboarding() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message,
-          tenantId: 1,
+          tenantId: workspaceId,
           instanceName: selectedInstance,
         }),
       });

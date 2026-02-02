@@ -135,11 +135,19 @@ export function middleware(request: NextRequest) {
     const secretKey = searchParams.get('key')
     const adminSecretKey = process.env.ADMIN_SECRET_KEY
 
-    // If secret key is provided, redirect to auth endpoint
+    // SECURITY: If secret key is in URL, transfer to httpOnly cookie and redirect without key
     if (secretKey && adminSecretKey && secretKey === adminSecretKey) {
-      const authUrl = new URL('/api/auth/admin-login', baseUrl)
-      authUrl.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(authUrl)
+      // Strip key from URL to prevent exposure in logs/referrer
+      const response = NextResponse.redirect(new URL(`/api/auth/admin-login?redirect=${encodeURIComponent(pathname)}`, baseUrl))
+      // Transfer secret to short-lived httpOnly cookie (30 seconds)
+      response.cookies.set('admin-auth-token', secretKey, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 30,
+        path: '/api/auth/admin-login',
+      })
+      return response
     }
 
     // If already authenticated as admin/gerente, allow access

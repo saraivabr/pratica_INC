@@ -165,6 +165,7 @@ export const RateLimitConfigs = {
   PDF_GENERATE: { windowMs: 60 * 1000, maxRequests: 10 },
   ADMIN_ACTION: { windowMs: 60 * 1000, maxRequests: 30 },
   NOTIFICATION: { windowMs: 60 * 1000, maxRequests: 50 },
+  PUBLIC_API: { windowMs: 60 * 1000, maxRequests: 50 },
 };
 
 export default rateLimiter;

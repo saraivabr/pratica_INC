@@ -90,9 +90,10 @@ function validateCronAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
-  // Allow in development mode for testing
-  if (process.env.NODE_ENV === 'development') {
-    return true;
+  // SECURITY: Sempre exigir CRON_SECRET, mesmo em dev.
+  if (!cronSecret) {
+    console.error('[Cron Auth] CRON_SECRET não configurado. Rejeitando request.');
+    return false;
   }
 
   // Vercel Cron sends the secret in the Authorization header

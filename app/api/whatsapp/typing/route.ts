@@ -10,12 +10,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendTyping, sendPresence } from '@/lib/evolution-api';
 import { getAuthenticatedUser } from '@/lib/api-auth';
 import { validateRequest, WhatsAppTypingSchema } from '@/lib/validation-schemas';
+import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthenticatedUser(request);
     if (!user) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
+    }
+
+    // Rate limiting
+    const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
+    const rateLimit = await rateLimiter.check(`whatsapp:${clientIp}`, RateLimitConfigs.WHATSAPP_SEND);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
     }
 
     // Nota: Esta API não requer tenant pois apenas envia comando para Evolution API

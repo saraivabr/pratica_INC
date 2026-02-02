@@ -67,6 +67,15 @@ export async function GET(request: NextRequest) {
     const ctx = await requireWorkspaceContext(request);
     if (ctx.error) return ctx.error;
 
+    // SECURITY: Operações financeiras requerem role admin ou gerente
+    const allowedRoles = ['admin', 'gerente'];
+    if (!allowedRoles.includes((ctx.user as any).role || '')) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado. Apenas admin e gerentes podem acessar operações financeiras.' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Parametros de filtro
@@ -194,6 +203,15 @@ export async function POST(request: NextRequest) {
   try {
     const ctx = await requireWorkspaceContext(request);
     if (ctx.error) return ctx.error;
+
+    // SECURITY: Operações financeiras requerem role admin ou gerente
+    const allowedRoles = ['admin', 'gerente'];
+    if (!allowedRoles.includes((ctx.user as any).role || '')) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado. Apenas admin e gerentes podem acessar operações financeiras.' },
+        { status: 403 }
+      );
+    }
 
     const body = await request.json();
 

@@ -94,7 +94,7 @@ function validarEmail(email: string): boolean {
 async function gerarCodigoBeneficiario(workspaceId: number): Promise<string> {
   const result = await dbQuery<{ max_codigo: string | null }>(
     `SELECT MAX(codigo) as max_codigo
-     FROM intermediacao_beneficiarios
+     FROM im_beneficiarios
      WHERE codigo LIKE 'BEN%' AND workspace_id = $1`,
     [workspaceId]
   );
@@ -121,7 +121,7 @@ async function registrarAuditoria(
   dados_novos: object | null
 ): Promise<void> {
   await dbQuery(
-    `INSERT INTO intermediacao_auditoria
+    `INSERT INTO im_auditoria
      (workspace_id, entidade, entidade_id, operacao, usuario_id, dados_anteriores, dados_novos, created_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
     [
@@ -143,6 +143,15 @@ export async function GET(request: NextRequest) {
   try {
     const ctx = await requireWorkspaceContext(request);
     if (ctx.error) return ctx.error;
+
+    // SECURITY: Operações financeiras requerem role admin ou gerente
+    const allowedRoles = ['admin', 'gerente'];
+    if (!allowedRoles.includes((ctx.user as any).role || '')) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado. Apenas admin e gerentes podem acessar operações financeiras.' },
+        { status: 403 }
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const cargo = searchParams.get("cargo");
@@ -181,7 +190,7 @@ export async function GET(request: NextRequest) {
     // Buscar total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM intermediacao_beneficiarios b
+      FROM im_beneficiarios b
       ${whereClause}
     `;
     const countResult = await dbQuery<{ total: string }>(countQuery, params);
@@ -209,8 +218,8 @@ export async function GET(request: NextRequest) {
         b.updated_at,
         COALESCE(
           (SELECT SUM(p.valor)
-           FROM intermediacao_parcelas p
-           JOIN intermediacao_comissoes c ON p.comissao_id = c.id
+           FROM im_parcelas p
+           JOIN im_distribuicao c ON p.comissao_id = c.id
            WHERE c.beneficiario_id = b.id
            AND p.status = 'pendente'
            AND p.data_vencimento < CURRENT_DATE),
@@ -218,8 +227,8 @@ export async function GET(request: NextRequest) {
         ) as total_a_receber,
         COALESCE(
           (SELECT SUM(p.valor)
-           FROM intermediacao_parcelas p
-           JOIN intermediacao_comissoes c ON p.comissao_id = c.id
+           FROM im_parcelas p
+           JOIN im_distribuicao c ON p.comissao_id = c.id
            WHERE c.beneficiario_id = b.id
            AND p.status = 'pendente'
            AND p.data_vencimento >= CURRENT_DATE),
@@ -227,13 +236,13 @@ export async function GET(request: NextRequest) {
         ) as total_pendente,
         COALESCE(
           (SELECT SUM(p.valor)
-           FROM intermediacao_parcelas p
-           JOIN intermediacao_comissoes c ON p.comissao_id = c.id
+           FROM im_parcelas p
+           JOIN im_distribuicao c ON p.comissao_id = c.id
            WHERE c.beneficiario_id = b.id
            AND p.status = 'pago'),
           0
         ) as total_pago
-      FROM intermediacao_beneficiarios b
+      FROM im_beneficiarios b
       ${whereClause}
       ORDER BY b.nome ASC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -248,9 +257,9 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(CASE WHEN p.status = 'pendente' AND p.data_vencimento < CURRENT_DATE THEN p.valor ELSE 0 END), 0) as total_geral_a_receber,
         COALESCE(SUM(CASE WHEN p.status = 'pendente' AND p.data_vencimento >= CURRENT_DATE THEN p.valor ELSE 0 END), 0) as total_geral_pendente,
         COALESCE(SUM(CASE WHEN p.status = 'pago' THEN p.valor ELSE 0 END), 0) as total_geral_pago
-      FROM intermediacao_parcelas p
-      JOIN intermediacao_comissoes c ON p.comissao_id = c.id
-      JOIN intermediacao_beneficiarios b ON c.beneficiario_id = b.id
+      FROM im_parcelas p
+      JOIN im_distribuicao c ON p.comissao_id = c.id
+      JOIN im_beneficiarios b ON c.beneficiario_id = b.id
       ${whereClause.replace(/b\./g, 'b.')}
     `;
     const totaisResult = await dbQuery(totaisQuery, params.slice(0, -2));
@@ -286,6 +295,15 @@ export async function POST(request: NextRequest) {
   try {
     const ctx = await requireWorkspaceContext(request);
     if (ctx.error) return ctx.error;
+
+    // SECURITY: Operações financeiras requerem role admin ou gerente
+    const allowedRoles = ['admin', 'gerente'];
+    if (!allowedRoles.includes((ctx.user as any).role || '')) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado. Apenas admin e gerentes podem acessar operações financeiras.' },
+        { status: 403 }
+      );
+    }
 
     const validation = await validateRequest(request, BeneficiarioCreateSchema);
     if (!validation.success) {
@@ -344,7 +362,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar se documento já existe no mesmo tenant
     const existeDoc = await dbQuery<{ id: number }>(
-      `SELECT id FROM intermediacao_beneficiarios WHERE documento = $1 AND workspace_id = $2`,
+      `SELECT id FROM im_beneficiarios WHERE documento = $1 AND workspace_id = $2`,
       [documentoLimpo, ctx.workspaceId]
     );
 
@@ -363,7 +381,7 @@ export async function POST(request: NextRequest) {
 
     // Inserir beneficiário
     const insertQuery = `
-      INSERT INTO intermediacao_beneficiarios (
+      INSERT INTO im_beneficiarios (
         workspace_id, codigo, nome, tipo_documento, documento, cargo, email, telefone,
         banco, agencia, conta, tipo_conta, pix, observacoes, ativo, created_at, updated_at
       ) VALUES (

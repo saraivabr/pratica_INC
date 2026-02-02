@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import { getEmpreendimentoById, getUnidadesByEmpreendimentoId } from "@/lib/empreendimentos-data";
+import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 
 export async function GET(request: Request) {
   try {
+    // Rate limiting
+    const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
+    const rateLimit = await rateLimiter.check(`public:${clientIp}`, RateLimitConfigs.PUBLIC_API);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', retryAfter: rateLimit.retryAfter },
+        { status: 429 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const empreendimentoId = searchParams.get("empreendimento_id");
 

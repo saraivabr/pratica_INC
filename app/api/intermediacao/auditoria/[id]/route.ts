@@ -11,11 +11,11 @@ import { getAuthenticatedUser } from "@/lib/api-auth";
 
 // Mapeamento de tabelas para consulta da entidade atual
 const TABELA_QUERIES: Record<string, string> = {
-  vendas: "SELECT * FROM vendas WHERE id = $1",
-  beneficiarios: "SELECT * FROM beneficiarios WHERE id = $1",
-  distribuicao_comissao: "SELECT * FROM distribuicao_comissao WHERE id = $1",
-  parcelas: "SELECT * FROM parcelas WHERE id = $1",
-  pagamentos: "SELECT * FROM pagamentos WHERE id = $1",
+  vendas: "SELECT * FROM im_vendas WHERE id = $1",
+  beneficiarios: "SELECT * FROM im_beneficiarios WHERE id = $1",
+  distribuicao_comissao: "SELECT * FROM im_distribuicao WHERE id = $1",
+  parcelas: "SELECT * FROM im_parcelas WHERE id = $1",
+  pagamentos: "SELECT * FROM im_pagamentos WHERE id = $1",
 };
 
 export async function GET(
@@ -48,7 +48,7 @@ export async function GET(
         u.nome as usuario_nome,
         u.email as usuario_email,
         u.role as usuario_role
-      FROM log_auditoria la
+      FROM im_auditoria la
       LEFT JOIN users u ON u.id = la.usuario_id
       WHERE la.id = $1
     `;

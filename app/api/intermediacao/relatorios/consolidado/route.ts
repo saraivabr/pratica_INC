@@ -21,6 +21,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const workspaceId = (user as any).workspace_id;
+    if (!workspaceId) {
+      return NextResponse.json(
+        { success: false, error: "Workspace não identificado." },
+        { status: 400 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const periodo = searchParams.get("periodo") || "30d";
     let dataInicio = searchParams.get("data_inicio");
@@ -59,10 +67,10 @@ export async function GET(request: NextRequest) {
         COUNT(*) as total_vendas,
         COALESCE(SUM(valor_total), 0) as valor_total_vendas,
         COALESCE(SUM(valor_comissao), 0) as total_comissoes
-      FROM vendas
-      WHERE data_venda >= $1 AND data_venda <= $2
+      FROM im_vendas
+      WHERE data_venda >= $1 AND data_venda <= $2 AND workspace_id = $3
     `;
-    const vendasResult = await dbQuery(vendasQuery, [dataInicio, dataFim]);
+    const vendasResult = await dbQuery(vendasQuery, [dataInicio, dataFim, workspaceId]);
     const vendasData = vendasResult.rows[0];
 
     // 2. Total pago, pendente e em atraso (parcelas)
@@ -74,12 +82,12 @@ export async function GET(request: NextRequest) {
         COUNT(CASE WHEN p.status = 'pago' THEN 1 END) as parcelas_pagas,
         COUNT(CASE WHEN p.status = 'pendente' AND p.data_vencimento >= CURRENT_DATE THEN 1 END) as parcelas_pendentes,
         COUNT(CASE WHEN p.status != 'pago' AND p.data_vencimento < CURRENT_DATE THEN 1 END) as parcelas_atrasadas
-      FROM parcelas p
-      INNER JOIN distribuicao_comissao dc ON dc.id = p.distribuicao_id
-      INNER JOIN vendas v ON v.id = dc.venda_id
-      WHERE v.data_venda >= $1 AND v.data_venda <= $2
+      FROM im_parcelas p
+      INNER JOIN im_distribuicao dc ON dc.id = p.distribuicao_id
+      INNER JOIN im_vendas v ON v.id = dc.venda_id
+      WHERE v.data_venda >= $1 AND v.data_venda <= $2 AND v.workspace_id = $3
     `;
-    const parcelasResult = await dbQuery(parcelasQuery, [dataInicio, dataFim]);
+    const parcelasResult = await dbQuery(parcelasQuery, [dataInicio, dataFim, workspaceId]);
     const parcelasData = parcelasResult.rows[0];
 
     // 3. Evolução mensal (últimos 12 meses ou período selecionado)
@@ -90,14 +98,14 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(v.valor_total), 0) as valor_vendas,
         COALESCE(SUM(v.valor_comissao), 0) as valor_comissoes,
         COALESCE(SUM(CASE WHEN p.status = 'pago' THEN p.valor ELSE 0 END), 0) as valor_pago
-      FROM vendas v
-      LEFT JOIN distribuicao_comissao dc ON dc.venda_id = v.id
-      LEFT JOIN parcelas p ON p.distribuicao_id = dc.id
-      WHERE v.data_venda >= $1 AND v.data_venda <= $2
+      FROM im_vendas v
+      LEFT JOIN im_distribuicao dc ON dc.venda_id = v.id
+      LEFT JOIN im_parcelas p ON p.distribuicao_id = dc.id
+      WHERE v.data_venda >= $1 AND v.data_venda <= $2 AND v.workspace_id = $3
       GROUP BY DATE_TRUNC('month', v.data_venda)
       ORDER BY mes ASC
     `;
-    const evolucaoResult = await dbQuery(evolucaoQuery, [dataInicio, dataFim]);
+    const evolucaoResult = await dbQuery(evolucaoQuery, [dataInicio, dataFim, workspaceId]);
 
     // 4. Por empreendimento
     const empreendimentoQuery = `
@@ -106,14 +114,14 @@ export async function GET(request: NextRequest) {
         COUNT(v.id) as vendas,
         COALESCE(SUM(v.valor_total), 0) as valor_total,
         COALESCE(SUM(v.valor_comissao), 0) as valor_comissao
-      FROM vendas v
+      FROM im_vendas v
       LEFT JOIN empreendimentos e ON e.id = v.empreendimento_id
-      WHERE v.data_venda >= $1 AND v.data_venda <= $2
+      WHERE v.data_venda >= $1 AND v.data_venda <= $2 AND v.workspace_id = $3
       GROUP BY e.nome
       ORDER BY valor_total DESC
       LIMIT 10
     `;
-    const empreendimentoResult = await dbQuery(empreendimentoQuery, [dataInicio, dataFim]);
+    const empreendimentoResult = await dbQuery(empreendimentoQuery, [dataInicio, dataFim, workspaceId]);
 
     // 5. Por beneficiário (top 10)
     const beneficiarioQuery = `
@@ -122,19 +130,19 @@ export async function GET(request: NextRequest) {
         b.nome,
         b.cargo,
         COUNT(DISTINCT v.id) as vendas,
-        COALESCE(SUM(dc.valor_comissao), 0) as valor_comissao,
+        COALESCE(SUM(dc.valor), 0) as valor_comissao,
         COALESCE(SUM(CASE WHEN p.status = 'pago' THEN p.valor ELSE 0 END), 0) as valor_pago,
         COALESCE(SUM(CASE WHEN p.status != 'pago' THEN p.valor ELSE 0 END), 0) as valor_pendente
-      FROM beneficiarios b
-      INNER JOIN distribuicao_comissao dc ON dc.beneficiario_id = b.id
-      INNER JOIN vendas v ON v.id = dc.venda_id
-      LEFT JOIN parcelas p ON p.distribuicao_id = dc.id
-      WHERE v.data_venda >= $1 AND v.data_venda <= $2
+      FROM im_beneficiarios b
+      INNER JOIN im_distribuicao dc ON dc.beneficiario_id = b.id
+      INNER JOIN im_vendas v ON v.id = dc.venda_id
+      LEFT JOIN im_parcelas p ON p.distribuicao_id = dc.id
+      WHERE v.data_venda >= $1 AND v.data_venda <= $2 AND v.workspace_id = $3
       GROUP BY b.id, b.nome, b.cargo
       ORDER BY valor_comissao DESC
       LIMIT 10
     `;
-    const beneficiarioResult = await dbQuery(beneficiarioQuery, [dataInicio, dataFim]);
+    const beneficiarioResult = await dbQuery(beneficiarioQuery, [dataInicio, dataFim, workspaceId]);
 
     // 6. Vendas por status
     const statusVendasQuery = `
@@ -142,11 +150,11 @@ export async function GET(request: NextRequest) {
         status,
         COUNT(*) as quantidade,
         COALESCE(SUM(valor_total), 0) as valor
-      FROM vendas
-      WHERE data_venda >= $1 AND data_venda <= $2
+      FROM im_vendas
+      WHERE data_venda >= $1 AND data_venda <= $2 AND workspace_id = $3
       GROUP BY status
     `;
-    const statusVendasResult = await dbQuery(statusVendasQuery, [dataInicio, dataFim]);
+    const statusVendasResult = await dbQuery(statusVendasQuery, [dataInicio, dataFim, workspaceId]);
 
     // 7. Comparativo com período anterior
     const diasPeriodo = Math.ceil((new Date(dataFim).getTime() - new Date(dataInicio).getTime()) / (1000 * 60 * 60 * 24));
@@ -158,10 +166,10 @@ export async function GET(request: NextRequest) {
         COUNT(*) as total_vendas,
         COALESCE(SUM(valor_total), 0) as valor_total_vendas,
         COALESCE(SUM(valor_comissao), 0) as total_comissoes
-      FROM vendas
-      WHERE data_venda >= $1 AND data_venda <= $2
+      FROM im_vendas
+      WHERE data_venda >= $1 AND data_venda <= $2 AND workspace_id = $3
     `;
-    const comparativoResult = await dbQuery(comparativoQuery, [dataInicioAnterior, dataFimAnterior]);
+    const comparativoResult = await dbQuery(comparativoQuery, [dataInicioAnterior, dataFimAnterior, workspaceId]);
     const comparativoData = comparativoResult.rows[0];
 
     // Calcular variações percentuais

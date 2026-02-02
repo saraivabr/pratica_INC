@@ -13,6 +13,15 @@ export async function GET(request: NextRequest) {
     const ctx = await requireWorkspaceContext(request);
     if (ctx.error) return ctx.error;
 
+    // SECURITY: Operações financeiras requerem role admin ou gerente
+    const allowedRoles = ['admin', 'gerente'];
+    if (!allowedRoles.includes((ctx.user as any).role || '')) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado. Apenas admin e gerentes podem acessar operações financeiras.' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Query params
@@ -61,7 +70,7 @@ export async function GET(request: NextRequest) {
     // Count total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM pagamentos_intermediacao pg
+      FROM im_pagamentos pg
       WHERE ${whereClause}
     `;
     const countResult = await dbQuery(countQuery, params);
@@ -85,10 +94,10 @@ export async function GET(request: NextRequest) {
         b.cpf_cnpj as beneficiario_documento,
         b.cargo as beneficiario_cargo,
         u.nome as registrado_por_nome
-      FROM pagamentos_intermediacao pg
-      LEFT JOIN parcelas_intermediacao p ON p.id = pg.parcela_id
-      LEFT JOIN vendas_intermediacao v ON v.id = p.venda_id
-      LEFT JOIN beneficiarios_intermediacao b ON b.id = pg.beneficiario_id
+      FROM im_pagamentos pg
+      LEFT JOIN im_parcelas p ON p.id = pg.parcela_id
+      LEFT JOIN im_vendas v ON v.id = p.venda_id
+      LEFT JOIN im_beneficiarios b ON b.id = pg.beneficiario_id
       LEFT JOIN users u ON u.id = pg.registrado_por
       WHERE ${whereClause}
       ORDER BY pg.data_pagamento DESC, pg.created_at DESC
