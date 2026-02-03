@@ -212,7 +212,6 @@ function LoginContent() {
   // Registration form fields
   const [regNome, setRegNome] = useState("");
   const [regImobiliaria, setRegImobiliaria] = useState("");
-  const [regGerente, setRegGerente] = useState("");
 
   // Track if this is a new registration (to redirect to onboarding)
   const [isNewRegistration, setIsNewRegistration] = useState(false);
@@ -372,7 +371,6 @@ function LoginContent() {
           telefone: phone,
           nome: regNome.trim(),
           imobiliaria: regImobiliaria.trim() || "autonomo",
-          gerente: regGerente.trim() || "nao tenho",
         }),
       });
 
@@ -644,7 +642,6 @@ function LoginContent() {
                         setError(null);
                         setRegNome("");
                         setRegImobiliaria("");
-                        setRegGerente("");
                       }}
                       className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors animate-fadeInLeft"
                     >
@@ -713,23 +710,9 @@ function LoginContent() {
                             <div className="relative">
                               <Input
                                 type="text"
-                                placeholder="Imobiliária (ou 'autonomo')"
+                                placeholder="Imobiliária (deixe vazio se autônomo)"
                                 value={regImobiliaria}
                                 onChange={(e) => setRegImobiliaria(e.target.value)}
-                                className="h-14 text-base bg-white/80 border-gray-200 rounded-xl focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Gerente */}
-                          <div className="relative group">
-                            <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-green-400 rounded-xl opacity-0 group-focus-within:opacity-50 blur transition-opacity duration-300" />
-                            <div className="relative">
-                              <Input
-                                type="text"
-                                placeholder="Nome do gerente (opcional)"
-                                value={regGerente}
-                                onChange={(e) => setRegGerente(e.target.value)}
                                 className="h-14 text-base bg-white/80 border-gray-200 rounded-xl focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all"
                               />
                             </div>
@@ -758,7 +741,7 @@ function LoginContent() {
                         </div>
 
                         <p className="text-xs text-gray-400 text-center animate-fadeInUp" style={{ animationDelay: "300ms" }}>
-                          * Campo obrigatório
+                          Apenas o nome é obrigatório
                         </p>
                       </>
                     )}
