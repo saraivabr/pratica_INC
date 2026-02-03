@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import { RulesCard } from "@/components/recepcao/RulesCard"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
@@ -535,6 +536,9 @@ export default function CorretorRecepcaoPage() {
             </CardContent>
           </Card>
         ) : null}
+
+        {/* Regras do Atendimento */}
+        <RulesCard defaultOpen={!minhaPresenca} />
 
         {/* Quick Actions */}
         {minhaPresenca && (
