@@ -9,20 +9,15 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   Building2,
   Calculator,
-  Home,
-  User,
   Menu,
   X,
   ChevronLeft,
-  ChevronDown,
   Moon,
   Sun,
   Search,
-  LayoutDashboard,
   Users,
   Settings,
   LogOut,
-  Workflow,
   Megaphone,
   MessageSquare,
   Zap,
@@ -33,10 +28,24 @@ import {
   Merge,
   Bot,
   Smartphone,
-  GraduationCap,
   Briefcase,
   Shield,
   Sparkles,
+  Target,
+  Send,
+  CircleDollarSign,
+  ClipboardList,
+  ClipboardCheck,
+  PartyPopper,
+  Gauge,
+  Handshake,
+  PanelLeft,
+  FileText,
+  Activity,
+  Layers,
+  Contact,
+  Grid3X3,
+  Table,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -51,119 +60,121 @@ import {
 } from "@/components/ui/tooltip"
 import { NavGroup } from "@/components/ui/nav-group"
 
-const navItems = [
-  { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
-  { href: "/calculadora/juncao", icon: Merge, label: "Junção" },
-  { href: "/calculadora", icon: Calculator, label: "Calculadora" },
+// ────────────────────────────────────────────────────────
+// Corretor Navigation - Primary (core) + Secondary (bonificados)
+// Prioridade: Empreendimentos > Espelho > Tabela > Leads
+// ────────────────────────────────────────────────────────
+const corretorPrimaryItems = [
+  { href: "/corretor", icon: Gauge, label: "Painel", description: "Visão geral e métricas" },
+  { href: "/corretor/imoveis", icon: Building2, label: "Empreendimentos", description: "Catálogo de imóveis" },
+  { href: "/corretor/espelho", icon: Grid3X3, label: "Espelho", description: "Disponibilidade de unidades" },
+  { href: "/corretor/tabela", icon: Table, label: "Tabela", description: "Tabela de preços" },
+  { href: "/corretor/clientes", icon: Contact, label: "Leads", description: "Gestão de clientes" },
 ]
 
-// Grouped admin navigation
+const corretorSecondaryItems = [
+  { href: "/corretor/assistente", icon: Sparkles, label: "Assistente IA", highlight: true, description: "Tire dúvidas com a IA" },
+  { href: "/corretor/recepcao", icon: ClipboardCheck, label: "Roleta", description: "Check-in e fila de plantão" },
+  { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads", description: "Follow-up automático" },
+  { href: "/corretor/disparador", icon: Send, label: "Disparador", description: "Envios em massa" },
+  { href: "/corretor/chat", icon: MessageSquare, label: "Conversas", description: "Chat com leads" },
+  { href: "/corretor/agenda", icon: Calendar, label: "Agenda", description: "Visitas e compromissos" },
+  { href: "/corretor/propostas", icon: FileText, label: "Propostas", description: "Propostas enviadas" },
+  { href: "/corretor/configuracoes", icon: Settings, label: "Configurações", description: "Perfil e preferências" },
+]
+
+// Combined for mobile sidebar
+const corretorNavItems = [...corretorPrimaryItems, ...corretorSecondaryItems]
+
+// ────────────────────────────────────────────────────────
+// Admin Navigation - grouped with better naming
+// ────────────────────────────────────────────────────────
 const adminGroups = {
-  principal: {
-    title: "Principal",
+  visaoGeral: {
+    title: "Visão Geral",
+    icon: Layers,
     defaultOpen: true,
     items: [
-      { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
-      { href: "/admin/pipeline", icon: Workflow, label: "Pipeline" },
-      { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
+      { href: "/admin", icon: Gauge, label: "Painel", description: "Dashboard geral" },
+      { href: "/admin/pipeline", icon: Target, label: "Funil de Vendas", description: "Pipeline de conversão" },
+      { href: "/admin/leads", icon: UserCircle, label: "Leads", description: "Todos os leads" },
     ],
   },
   comunicacao: {
     title: "Comunicação",
+    icon: MessageSquare,
     defaultOpen: true,
     items: [
-      { href: "/admin/chat", icon: MessageSquare, label: "Chat" },
-      { href: "/admin/whatsapp", icon: Smartphone, label: "WhatsApp" },
-      { href: "/admin/campaigns", icon: Megaphone, label: "Campanhas" },
+      { href: "/admin/whatsapp", icon: Smartphone, label: "WhatsApp", description: "Instâncias e conexões" },
+      { href: "/admin/campaigns", icon: Megaphone, label: "Campanhas", description: "Disparos em massa" },
     ],
   },
   inteligencia: {
     title: "Inteligência",
+    icon: Sparkles,
     defaultOpen: true,
     items: [
-      { href: "/corretor/assistente", icon: Sparkles, label: "Prática IA" },
-      { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads" },
-      { href: "/admin/score", icon: ShieldCheck, label: "Consulta Score" },
+      { href: "/corretor/assistente", icon: Sparkles, label: "Assistente IA", highlight: true, description: "Pergunte à IA" },
+      { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads", description: "Recuperação automática" },
+      { href: "/admin/score", icon: ShieldCheck, label: "Consulta Score", description: "Análise de crédito" },
     ],
   },
   gestao: {
     title: "Gestão",
+    icon: ClipboardList,
     defaultOpen: false,
     items: [
-      { href: "/admin/leads", icon: UserCircle, label: "Leads" },
-      { href: "/admin/agenda", icon: Calendar, label: "Agenda" },
-      { href: "/admin/equipe", icon: Users, label: "Equipe" },
-      { href: "/admin/eventos", icon: Calendar, label: "Eventos" },
-      { href: "/admin/intermediacao/vendas", icon: Briefcase, label: "Intermediação" },
+      { href: "/admin/equipe", icon: Users, label: "Equipe", description: "Corretores e ranking" },
+      { href: "/admin/eventos", icon: PartyPopper, label: "Eventos", description: "Criar e gerenciar eventos" },
+      { href: "/admin/recepcao", icon: ClipboardCheck, label: "Roleta", description: "Controle de plantão e fila" },
+      { href: "/admin/intermediacao/vendas", icon: Handshake, label: "Intermediação", description: "Comissões e vendas" },
     ],
   },
-  ferramentas: {
-    title: "Ferramentas",
+  mais: {
+    title: "Mais",
+    icon: Settings,
     defaultOpen: false,
     items: [
-      { href: "/calculadora/juncao", icon: Merge, label: "Calculadora Junção" },
-      { href: "/calculadora", icon: Calculator, label: "Simulador" },
-    ],
-  },
-  treinamento: {
-    title: "Treinamento",
-    defaultOpen: false,
-    items: [
-      { href: "/academy", icon: GraduationCap, label: "Academy" },
-    ],
-  },
-  config: {
-    title: "Configurações",
-    defaultOpen: false,
-    items: [
-      { href: "/admin/permissoes", icon: Shield, label: "Permissões" },
-      { href: "/admin/automations", icon: Zap, label: "Automações" },
-      { href: "/admin/reports", icon: BarChart3, label: "Relatórios" },
-      { href: "/admin/status", icon: Settings, label: "Status API" },
+      { href: "/empreendimentos", icon: Building2, label: "Empreendimentos", description: "Imóveis e unidades" },
+      { href: "/admin/chat", icon: MessageSquare, label: "Chat", description: "Conversas com leads" },
+      { href: "/admin/agenda", icon: Calendar, label: "Agenda", description: "Visitas da equipe" },
+      { href: "/calculadora/juncao", icon: Merge, label: "Junção de Lotes", description: "Calculadora de junção" },
+      { href: "/calculadora", icon: CircleDollarSign, label: "Simulador", description: "Simular financiamento" },
+      { href: "/admin/permissoes", icon: Shield, label: "Permissões", description: "Controle de acesso" },
+      { href: "/admin/automations", icon: Zap, label: "Automações", description: "Regras automáticas" },
+      { href: "/admin/reports", icon: BarChart3, label: "Relatórios", description: "Exportação e análises" },
+      { href: "/admin/status", icon: Activity, label: "Status do Sistema", description: "Status das integrações" },
     ],
   },
 }
 
-// Flat list for mobile and collapsed mode
+// Flat list for collapsed mode
 const adminItems = Object.values(adminGroups).flatMap(g => g.items)
 
-// Corretor navigation (for real estate agents)
-const corretorNavItems = [
-  { href: "/corretor", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/corretor/assistente", icon: Sparkles, label: "Prática IA", highlight: true },
-  { href: "/corretor/clientes", icon: Users, label: "Meus Clientes" },
-  { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads" },
-  { href: "/corretor/imoveis", icon: Building2, label: "Imóveis" },
-  { href: "/corretor/agenda", icon: Calendar, label: "Agenda" },
-  { href: "/corretor/chat", icon: MessageSquare, label: "Chat CRM" },
-  { href: "/corretor/propostas", icon: Workflow, label: "Propostas" },
-  { href: "/corretor/relatorios", icon: BarChart3, label: "Relatórios" },
-  { href: "/academy", icon: GraduationCap, label: "Academy" },
-  { href: "/corretor/configuracoes", icon: Settings, label: "Configurações" },
-]
-
-// Mobile bottom nav for corretor (5 main items)
+// Mobile bottom nav for corretor (5 main items - core priority)
 const corretorMobileNavItems = [
-  { href: "/corretor", icon: LayoutDashboard, label: "Home" },
-  { href: "/corretor/clientes", icon: Users, label: "Clientes" },
+  { href: "/corretor", icon: Gauge, label: "Painel" },
   { href: "/corretor/imoveis", icon: Building2, label: "Imóveis" },
-  { href: "/corretor/chat", icon: MessageSquare, label: "Chat" },
-  { href: "/corretor/agenda", icon: Calendar, label: "Agenda" },
+  { href: "/corretor/espelho", icon: Grid3X3, label: "Espelho" },
+  { href: "/corretor/clientes", icon: Contact, label: "Leads" },
+  { href: "/corretor/assistente", icon: Sparkles, label: "IA", highlight: true },
 ]
 
 // Mobile bottom nav for admin (5 main items)
 const adminMobileNavItems = [
-  { href: "/admin", icon: LayoutDashboard, label: "Home" },
-  { href: "/admin/pipeline", icon: Workflow, label: "Pipeline" },
-  { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
-  { href: "/admin/chat", icon: MessageSquare, label: "Chat" },
+  { href: "/admin", icon: Gauge, label: "Painel" },
+  { href: "/admin/pipeline", icon: Target, label: "Funil" },
+  { href: "/admin/whatsapp", icon: Smartphone, label: "WhatsApp" },
+  { href: "/corretor/assistente", icon: Sparkles, label: "IA", highlight: true },
   { href: "/admin/leads", icon: UserCircle, label: "Leads" },
 ]
 
+// ────────────────────────────────────────────────────────
 // Role Switch Component
+// ────────────────────────────────────────────────────────
 function RoleSwitch({ currentView, onSwitch }: { currentView: "admin" | "corretor"; onSwitch: (view: "admin" | "corretor") => void }) {
   return (
-    <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 gap-1">
+    <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5 gap-0.5">
       <button
         onClick={() => onSwitch("admin")}
         className={cn(
@@ -192,6 +203,9 @@ function RoleSwitch({ currentView, onSwitch }: { currentView: "admin" | "correto
   )
 }
 
+// ────────────────────────────────────────────────────────
+// Nav Item Component (redesigned)
+// ────────────────────────────────────────────────────────
 interface AppShellProps {
   children: React.ReactNode
   title?: string
@@ -204,31 +218,51 @@ function NavItem({
   isActive,
   isCollapsed,
 }: {
-  item: { href: string; icon: React.ElementType; label: string; highlight?: boolean }
+  item: { href: string; icon: React.ElementType; label: string; highlight?: boolean; badge?: string; description?: string }
   isActive: boolean
   isCollapsed: boolean
 }) {
-  const isHighlight = (item as any).highlight
+  const isHighlight = item.highlight
+  const hasBadge = item.badge
+
   const content = (
     <Link
       href={item.href}
       className={cn(
-        "flex w-full items-center gap-3 px-3 py-2 rounded-lg transition-colors",
+        "group/item flex w-full items-center gap-3 px-3 py-2 rounded-xl transition-all duration-150 relative",
         isHighlight && !isActive
-          ? "bg-gradient-to-r from-violet-500/10 to-indigo-500/10 text-violet-700 dark:text-violet-300 hover:from-violet-500/20 hover:to-indigo-500/20 font-medium"
+          ? "bg-gradient-to-r from-violet-500/8 to-indigo-500/8 text-violet-700 dark:text-violet-300 hover:from-violet-500/15 hover:to-indigo-500/15 font-medium"
           : isActive
-            ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
-            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
-        isHighlight && isActive && "bg-gradient-to-r from-violet-500/20 to-indigo-500/20 text-violet-700 dark:text-violet-300",
-        isCollapsed && "justify-center px-2"
+            ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium shadow-sm shadow-zinc-900/10 dark:shadow-white/10"
+            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
+        isHighlight && isActive && "bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-500 dark:to-indigo-500 text-white dark:text-white shadow-md shadow-violet-500/20",
+        isCollapsed && "justify-center px-2 py-2.5"
       )}
     >
-      <item.icon className={cn("h-[18px] w-[18px] shrink-0", isHighlight && "text-violet-500 dark:text-violet-400")} />
+      <item.icon className={cn(
+        "h-[18px] w-[18px] shrink-0 transition-transform duration-150",
+        isHighlight && !isActive && "text-violet-500 dark:text-violet-400",
+        isActive && !isHighlight && "text-white dark:text-zinc-900",
+        isActive && isHighlight && "text-white",
+        !isActive && !isHighlight && "text-zinc-400 dark:text-zinc-500 group-hover/item:text-zinc-600 dark:group-hover/item:text-zinc-300",
+      )} />
       {!isCollapsed && (
-        <span className="text-sm truncate min-w-0">{item.label}</span>
-      )}
-      {!isCollapsed && isHighlight && (
-        <span className="ml-auto text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-1.5 py-0.5 rounded-full">IA</span>
+        <>
+          <span className="text-[13px] truncate min-w-0 flex-1">{item.label}</span>
+          {isHighlight && (
+            <span className={cn(
+              "ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full",
+              isActive
+                ? "bg-white/20 text-white"
+                : "bg-gradient-to-r from-violet-500 to-indigo-600 text-white"
+            )}>IA</span>
+          )}
+          {hasBadge && !isHighlight && (
+            <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">
+              {item.badge}
+            </span>
+          )}
+        </>
       )}
     </Link>
   )
@@ -237,8 +271,11 @@ function NavItem({
     return (
       <Tooltip delayDuration={0}>
         <TooltipTrigger asChild>{content}</TooltipTrigger>
-        <TooltipContent side="right" className="text-xs">
-          {item.label}
+        <TooltipContent side="right" sideOffset={8} className="text-xs font-medium">
+          <span>{item.label}</span>
+          {item.description && (
+            <span className="block text-[10px] text-zinc-400 dark:text-zinc-500 font-normal mt-0.5">{item.description}</span>
+          )}
         </TooltipContent>
       </Tooltip>
     )
@@ -246,6 +283,74 @@ function NavItem({
 
   return content
 }
+
+// ────────────────────────────────────────────────────────
+// Secondary Nav Item (smaller, softer for less-used items)
+// ────────────────────────────────────────────────────────
+function NavItemSecondary({
+  item,
+  isActive,
+  isCollapsed,
+}: {
+  item: { href: string; icon: React.ElementType; label: string; description?: string }
+  isActive: boolean
+  isCollapsed: boolean
+}) {
+  const content = (
+    <Link
+      href={item.href}
+      className={cn(
+        "group/item flex w-full items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 relative",
+        isActive
+          ? "bg-zinc-900/8 dark:bg-white/8 text-zinc-900 dark:text-zinc-100 font-medium"
+          : "text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40",
+        isCollapsed && "justify-center px-2 py-2"
+      )}
+    >
+      <item.icon className={cn(
+        "h-4 w-4 shrink-0",
+        isActive
+          ? "text-zinc-700 dark:text-zinc-300"
+          : "text-zinc-400 dark:text-zinc-600 group-hover/item:text-zinc-500 dark:group-hover/item:text-zinc-400",
+      )} />
+      {!isCollapsed && (
+        <span className="text-[12px] truncate min-w-0 flex-1">{item.label}</span>
+      )}
+    </Link>
+  )
+
+  if (isCollapsed) {
+    return (
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8} className="text-xs font-medium">
+          <span>{item.label}</span>
+          {item.description && (
+            <span className="block text-[10px] text-zinc-400 dark:text-zinc-500 font-normal mt-0.5">{item.description}</span>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  return content
+}
+
+// ────────────────────────────────────────────────────────
+// Separator for sidebar sections
+// ────────────────────────────────────────────────────────
+function SidebarDivider() {
+  return <div className="mx-3 my-2 h-px bg-zinc-200/60 dark:bg-zinc-800/60" />
+}
+
+// ────────────────────────────────────────────────────────
+// Main AppShell
+// ────────────────────────────────────────────────────────
+const navItems = [
+  { href: "/empreendimentos", icon: Building2, label: "Imóveis" },
+  { href: "/calculadora/juncao", icon: Merge, label: "Junção" },
+  { href: "/calculadora", icon: Calculator, label: "Calculadora" },
+]
 
 export function AppShell({ children, title, showBackButton, backHref }: AppShellProps) {
   const pathname = usePathname()
@@ -292,6 +397,71 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
   )
   const pageTitle = title || currentNav?.label || "Pratica"
 
+  // ──── Render Navigation Items ────
+  const renderCorretorNav = (collapsed: boolean) => {
+    return (
+      <>
+        {/* Primary items - larger, more prominent */}
+        {corretorPrimaryItems.map((item) => {
+          const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
+          return (
+            <NavItem
+              key={item.href}
+              item={item}
+              isActive={isActive}
+              isCollapsed={collapsed}
+            />
+          )
+        })}
+        <SidebarDivider />
+        {/* Secondary items - smaller, softer */}
+        {corretorSecondaryItems.map((item) => {
+          const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
+          return (
+            <NavItemSecondary
+              key={item.href}
+              item={item}
+              isActive={isActive}
+              isCollapsed={collapsed}
+            />
+          )
+        })}
+      </>
+    )
+  }
+
+  const renderAdminNav = (collapsed: boolean) => {
+    if (collapsed) {
+      return adminItems.map((item) => {
+        const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
+        return (
+          <NavItem
+            key={item.href}
+            item={item}
+            isActive={isActive}
+            isCollapsed={true}
+          />
+        )
+      })
+    }
+
+    return Object.entries(adminGroups).map(([key, group]) => (
+      <NavGroup key={key} title={group.title} icon={group.icon} defaultOpen={group.defaultOpen}>
+        {group.items.map((item) => {
+          const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
+          return (
+            <NavItem
+              key={item.href}
+              item={item}
+              isActive={isActive}
+              isCollapsed={false}
+            />
+          )
+        })}
+      </NavGroup>
+    ))
+  }
+
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -302,22 +472,22 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/20 dark:bg-black/40 md:hidden"
+              className="fixed inset-0 z-40 bg-black/30 dark:bg-black/50 backdrop-blur-[2px] md:hidden"
               onClick={() => setSidebarOpen(false)}
             />
           )}
         </AnimatePresence>
 
-        {/* Sidebar Desktop */}
+        {/* ──────────── Sidebar Desktop ──────────── */}
         <motion.aside
           initial={false}
-          animate={{ width: sidebarCollapsed ? 64 : 240 }}
+          animate={{ width: sidebarCollapsed ? 68 : 260 }}
           transition={{ duration: 0.2, ease: "easeInOut" }}
-          className="fixed top-0 left-0 z-50 h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 hidden md:flex md:flex-col"
+          className="fixed top-0 left-0 z-50 h-full bg-white dark:bg-zinc-900 border-r border-zinc-200/80 dark:border-zinc-800/80 hidden md:flex md:flex-col"
         >
           {/* Logo */}
           <div className={cn(
-            "flex items-center h-14 px-4 border-b border-zinc-200 dark:border-zinc-800",
+            "flex items-center h-14 px-4 border-b border-zinc-200/80 dark:border-zinc-800/80",
             sidebarCollapsed ? "justify-center" : "gap-2"
           )}>
             {sidebarCollapsed ? (
@@ -343,179 +513,120 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
           <AnimatePresence>
             {!sidebarCollapsed && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="px-3 py-3"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="px-3 pt-3 pb-1 overflow-hidden"
               >
                 <button
                   onClick={() => router.push("/empreendimentos")}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-sm hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-zinc-100/80 dark:bg-zinc-800/60 text-zinc-400 dark:text-zinc-500 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors ring-1 ring-zinc-200/50 dark:ring-zinc-700/50"
                 >
                   <Search className="h-4 w-4" />
-                  <span>Buscar...</span>
-                  <kbd className="ml-auto text-[10px] text-zinc-400 dark:text-zinc-500">⌘K</kbd>
+                  <span className="text-[13px]">Buscar...</span>
+                  <kbd className="ml-auto text-[10px] font-mono text-zinc-300 dark:text-zinc-600 bg-zinc-200/60 dark:bg-zinc-800 px-1.5 py-0.5 rounded">⌘K</kbd>
                 </button>
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto overflow-x-hidden w-full">
-            {/* Show nav based on current view (for admin/gerente who can switch) or role (for corretor) */}
-            {(isCorretor || currentView === "corretor") ? (
-              corretorNavItems.map((item) => {
-                const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
-                return (
-                  <NavItem
-                    key={item.href}
-                    item={item}
-                    isActive={isActive}
-                    isCollapsed={sidebarCollapsed}
-                  />
-                )
-              })
-            ) : (
-              /* Admin & Manager Navigation */
-              sidebarCollapsed ? (
-                // Collapsed mode: flat list
-                adminItems.map((item) => {
-                  const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
-                  return (
-                    <NavItem
-                      key={item.href}
-                      item={item}
-                      isActive={isActive}
-                      isCollapsed={sidebarCollapsed}
-                    />
-                  )
-                })
-              ) : (
-                // Expanded mode: grouped navigation
-                Object.entries(adminGroups).map(([key, group]) => (
-                  <NavGroup key={key} title={group.title} defaultOpen={group.defaultOpen}>
-                    {group.items.map((item) => {
-                      const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
-                      return (
-                        <NavItem
-                          key={item.href}
-                          item={item}
-                          isActive={isActive}
-                          isCollapsed={false}
-                        />
-                      )
-                    })}
-                  </NavGroup>
-                ))
-              )
-            )}
+          <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto overflow-x-hidden w-full scrollbar-thin">
+            {(isCorretor || currentView === "corretor")
+              ? renderCorretorNav(sidebarCollapsed)
+              : renderAdminNav(sidebarCollapsed)
+            }
           </nav>
 
           {/* Footer */}
           <div className={cn(
-            "p-3 border-t border-zinc-200 dark:border-zinc-800",
-            sidebarCollapsed && "px-2"
+            "border-t border-zinc-200/80 dark:border-zinc-800/80",
+            sidebarCollapsed ? "p-2" : "p-3"
           )}>
+            {/* User info */}
             {!sidebarCollapsed && (
-              <div className="flex items-center gap-2 px-2 py-2 mb-2">
-                <Avatar className="h-8 w-8">
+              <Link href="/perfil" className="flex items-center gap-2.5 px-2 py-2 mb-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors group">
+                <Avatar className="h-9 w-9 ring-2 ring-zinc-200/60 dark:ring-zinc-700/60">
                   <AvatarImage src={user?.avatar_url} />
-                  <AvatarFallback className="bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 text-xs font-medium">
+                  <AvatarFallback className="bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-600 text-zinc-600 dark:text-zinc-300 text-xs font-semibold">
                     {user?.nome ? user.nome.substring(0, 2).toUpperCase() : "??"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{user?.nome || "Usuário"}</p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                    {user?.role === "admin" ? "Admin" : user?.role === "gerente" ? "Gerente" : "Corretor"}
+                  <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate group-hover:text-zinc-700 dark:group-hover:text-white">{user?.nome || "Usuário"}</p>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate">
+                    {user?.role === "admin" ? "Administrador" : user?.role === "gerente" ? "Gerente" : "Corretor"}
                   </p>
                 </div>
-              </div>
+              </Link>
             )}
 
-            <div className="space-y-1">
+            <div className={cn("flex gap-1", sidebarCollapsed ? "flex-col" : "")}>
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    size={sidebarCollapsed ? "icon" : "sm"}
+                    size="icon"
                     onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                    className={cn(
-                      "w-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                      !sidebarCollapsed && "justify-start gap-2"
-                    )}
+                    className="h-8 w-8 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   >
                     {mounted && (theme === "dark" ? (
                       <Sun className="h-4 w-4" />
                     ) : (
                       <Moon className="h-4 w-4" />
                     ))}
-                    {!sidebarCollapsed && (
-                      <span className="text-sm">{mounted && (theme === "dark" ? "Claro" : "Escuro")}</span>
-                    )}
                   </Button>
                 </TooltipTrigger>
-                {sidebarCollapsed && (
-                  <TooltipContent side="right" className="text-xs">
-                    {theme === "dark" ? "Modo Claro" : "Modo Escuro"}
-                  </TooltipContent>
-                )}
+                <TooltipContent side={sidebarCollapsed ? "right" : "top"} className="text-xs">
+                  {mounted && (theme === "dark" ? "Modo Claro" : "Modo Escuro")}
+                </TooltipContent>
               </Tooltip>
 
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    size={sidebarCollapsed ? "icon" : "sm"}
+                    size="icon"
                     onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                    className={cn(
-                      "w-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                      !sidebarCollapsed && "justify-start gap-2"
-                    )}
+                    className="h-8 w-8 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   >
-                    <ChevronLeft className={cn("h-4 w-4 transition-transform", sidebarCollapsed && "rotate-180")} />
-                    {!sidebarCollapsed && <span className="text-sm">Recolher</span>}
+                    <PanelLeft className={cn("h-4 w-4 transition-transform", sidebarCollapsed && "rotate-180")} />
                   </Button>
                 </TooltipTrigger>
-                {sidebarCollapsed && (
-                  <TooltipContent side="right" className="text-xs">Expandir</TooltipContent>
-                )}
+                <TooltipContent side={sidebarCollapsed ? "right" : "top"} className="text-xs">
+                  {sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+                </TooltipContent>
               </Tooltip>
 
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    size={sidebarCollapsed ? "icon" : "sm"}
+                    size="icon"
                     onClick={handleLogout}
-                    className={cn(
-                      "w-full text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20",
-                      !sidebarCollapsed && "justify-start gap-2"
-                    )}
+                    className="h-8 w-8 text-zinc-400 dark:text-zinc-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                   >
                     <LogOut className="h-4 w-4" />
-                    {!sidebarCollapsed && <span className="text-sm">Sair</span>}
                   </Button>
                 </TooltipTrigger>
-                {sidebarCollapsed && (
-                  <TooltipContent side="right" className="text-xs">Sair</TooltipContent>
-                )}
+                <TooltipContent side={sidebarCollapsed ? "right" : "top"} className="text-xs">Sair</TooltipContent>
               </Tooltip>
             </div>
           </div>
         </motion.aside>
 
-        {/* Sidebar Mobile */}
+        {/* ──────────── Sidebar Mobile ──────────── */}
         <AnimatePresence>
           {sidebarOpen && (
             <motion.aside
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ duration: 0.2, ease: "easeInOut" }}
-              className="fixed top-0 left-0 z-50 h-full w-72 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col md:hidden"
+              transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+              className="fixed top-0 left-0 z-50 h-full w-[280px] bg-white dark:bg-zinc-900 border-r border-zinc-200/80 dark:border-zinc-800/80 flex flex-col md:hidden"
             >
-              <div className="flex items-center justify-between h-14 px-4 border-b border-zinc-200 dark:border-zinc-800">
+              {/* Header */}
+              <div className="flex items-center justify-between h-14 px-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
                 <Image
                   src="/logo-pratica.svg"
                   alt="Pratica Incorporadora"
@@ -523,66 +634,105 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
                   height={28}
                   className="shrink-0"
                 />
-                <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} className="text-zinc-500">
+                <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} className="h-8 w-8 text-zinc-400 hover:text-zinc-600">
                   <X className="h-5 w-5" />
                 </Button>
               </div>
 
-              <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
+              {/* User profile */}
+              <div className="p-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
+                <Link href="/perfil" className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
+                  <Avatar className="h-10 w-10 ring-2 ring-zinc-200/60 dark:ring-zinc-700/60">
                     <AvatarImage src={user?.avatar_url} />
-                    <AvatarFallback className="bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-medium">
+                    <AvatarFallback className="bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-600 text-zinc-600 dark:text-zinc-300 font-semibold">
                       {user?.nome ? user.nome.substring(0, 2).toUpperCase() : "??"}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-100 truncate">{user?.nome || "Usuário"}</p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
+                    <p className="font-medium text-zinc-900 dark:text-zinc-100 truncate text-[14px]">{user?.nome || "Usuário"}</p>
+                    <p className="text-[12px] text-zinc-400 dark:text-zinc-500 truncate">
                       {user?.role === "admin" ? "Administrador" : user?.role === "gerente" ? "Gerente" : "Corretor"}
                     </p>
                   </div>
-                </div>
+                </Link>
               </div>
 
+              {/* Search */}
               <div className="px-3 py-3">
                 <button
                   onClick={() => {
                     router.push("/empreendimentos")
                     setSidebarOpen(false)
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-sm"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-zinc-100/80 dark:bg-zinc-800/60 text-zinc-400 dark:text-zinc-500 text-sm ring-1 ring-zinc-200/50 dark:ring-zinc-700/50"
                 >
                   <Search className="h-4 w-4" />
-                  <span>Buscar imóveis...</span>
+                  <span className="text-[13px]">Buscar imóveis...</span>
                 </button>
               </div>
 
-              <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-                {/* Mobile Navigation based on current view */}
+              {/* Navigation */}
+              <nav className="flex-1 px-2 py-1 space-y-0.5 overflow-y-auto">
                 {(isCorretor || currentView === "corretor") ? (
-                  corretorNavItems.map((item) => {
-                    const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-                          isActive
-                            ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
-                            : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                        )}
-                      >
-                        <item.icon className="h-5 w-5" />
-                        <span>{item.label}</span>
-                      </Link>
-                    )
-                  })
+                  <>
+                    {corretorPrimaryItems.map((item) => {
+                      const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150",
+                            item.highlight && !isActive
+                              ? "bg-gradient-to-r from-violet-500/8 to-indigo-500/8 text-violet-700 dark:text-violet-300 font-medium"
+                              : isActive
+                                ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium shadow-sm"
+                                : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
+                            item.highlight && isActive && "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/20"
+                          )}
+                        >
+                          <item.icon className={cn(
+                            "h-[18px] w-[18px] shrink-0",
+                            item.highlight && !isActive && "text-violet-500 dark:text-violet-400",
+                            isActive && "text-current",
+                            !isActive && !item.highlight && "text-zinc-400 dark:text-zinc-500",
+                          )} />
+                          <span className="text-[13px]">{item.label}</span>
+                          {item.highlight && (
+                            <span className={cn(
+                              "ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full",
+                              isActive ? "bg-white/20 text-white" : "bg-gradient-to-r from-violet-500 to-indigo-600 text-white"
+                            )}>IA</span>
+                          )}
+                        </Link>
+                      )
+                    })}
+                    <SidebarDivider />
+                    {corretorSecondaryItems.map((item) => {
+                      const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={cn(
+                            "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150",
+                            isActive
+                              ? "bg-zinc-900/8 dark:bg-white/8 text-zinc-900 dark:text-zinc-100 font-medium"
+                              : "text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40"
+                          )}
+                        >
+                          <item.icon className={cn(
+                            "h-4 w-4 shrink-0",
+                            isActive ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-400 dark:text-zinc-600",
+                          )} />
+                          <span className="text-[12px]">{item.label}</span>
+                        </Link>
+                      )
+                    })}
+                  </>
                 ) : (
-                  /* Admin & Manager Mobile Navigation */
                   Object.entries(adminGroups).map(([key, group]) => (
-                    <NavGroup key={key} title={group.title} defaultOpen={group.defaultOpen}>
+                    <NavGroup key={key} title={group.title} icon={group.icon} defaultOpen={group.defaultOpen}>
                       {group.items.map((item) => {
                         const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
                         return (
@@ -590,14 +740,27 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
                             key={item.href}
                             href={item.href}
                             className={cn(
-                              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-                              isActive
-                                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
-                                : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                              "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150",
+                              (item as any).highlight && !isActive
+                                ? "bg-gradient-to-r from-violet-500/8 to-indigo-500/8 text-violet-700 dark:text-violet-300 font-medium"
+                                : isActive
+                                  ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium shadow-sm"
+                                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                             )}
                           >
-                            <item.icon className="h-5 w-5" />
-                            <span>{item.label}</span>
+                            <item.icon className={cn(
+                              "h-[18px] w-[18px] shrink-0",
+                              (item as any).highlight && !isActive && "text-violet-500",
+                              isActive && "text-current",
+                              !isActive && !(item as any).highlight && "text-zinc-400 dark:text-zinc-500",
+                            )} />
+                            <span className="text-[13px]">{item.label}</span>
+                            {(item as any).highlight && (
+                              <span className={cn(
+                                "ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full",
+                                isActive ? "bg-white/20 text-white" : "bg-gradient-to-r from-violet-500 to-indigo-600 text-white"
+                              )}>IA</span>
+                            )}
                           </Link>
                         )
                       })}
@@ -606,60 +769,59 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
                 )}
               </nav>
 
-              <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 space-y-1">
+              {/* Footer */}
+              <div className="p-3 border-t border-zinc-200/80 dark:border-zinc-800/80 flex items-center gap-1">
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="w-full justify-start gap-2 text-zinc-600 dark:text-zinc-400"
+                  size="icon"
+                  className="h-9 w-9 text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 >
                   {mounted && (theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />)}
-                  <span>{mounted && (theme === "dark" ? "Modo Claro" : "Modo Escuro")}</span>
                 </Button>
 
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="w-full justify-start gap-2 text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
+                  size="icon"
+                  className="h-9 w-9 text-zinc-400 dark:text-zinc-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4" />
-                  <span>Sair</span>
                 </Button>
               </div>
             </motion.aside>
           )}
         </AnimatePresence>
 
-        {/* Main content */}
+        {/* ──────────── Main content ──────────── */}
         <div
           className={cn(
             "flex flex-col min-h-screen transition-all duration-200 ease-in-out",
-            sidebarCollapsed ? "md:pl-16" : "md:pl-60"
+            sidebarCollapsed ? "md:pl-[68px]" : "md:pl-[260px]"
           )}
         >
           {/* Header */}
-          <header className="sticky top-0 z-30 h-14 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b border-zinc-200 dark:border-zinc-800">
+          <header className="sticky top-0 z-30 h-14 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-800/80">
             <div className="flex items-center justify-between h-full px-4">
               <div className="flex items-center gap-3">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden text-zinc-600 dark:text-zinc-400"
+                  className="md:hidden text-zinc-500 dark:text-zinc-400 h-9 w-9"
                   onClick={() => setSidebarOpen(true)}
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
 
                 {showBackButton && backHref && (
-                  <Button variant="ghost" size="icon" asChild className="hidden md:flex text-zinc-600 dark:text-zinc-400">
+                  <Button variant="ghost" size="icon" asChild className="hidden md:flex text-zinc-500 dark:text-zinc-400 h-8 w-8">
                     <Link href={backHref}>
                       <ChevronLeft className="h-5 w-5" />
                     </Link>
                   </Button>
                 )}
 
-                <h1 className="font-medium text-zinc-900 dark:text-zinc-100">{pageTitle}</h1>
+                <h1 className="font-semibold text-[15px] text-zinc-900 dark:text-zinc-100">{pageTitle}</h1>
               </div>
 
               <div className="flex items-center gap-3">
@@ -671,16 +833,16 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden text-zinc-500"
+                  className="md:hidden text-zinc-400 h-9 w-9"
                   onClick={() => router.push("/empreendimentos")}
                 >
                   <Search className="h-5 w-5" />
                 </Button>
 
                 <Link href="/perfil" className="hidden md:block">
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-8 w-8 ring-2 ring-zinc-200/60 dark:ring-zinc-700/60 hover:ring-zinc-300 dark:hover:ring-zinc-600 transition-all">
                     <AvatarImage src={user?.avatar_url} />
-                    <AvatarFallback className="bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 text-xs font-medium">
+                    <AvatarFallback className="bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-600 text-zinc-600 dark:text-zinc-300 text-xs font-semibold">
                       {user?.nome ? user.nome.substring(0, 2).toUpperCase() : "??"}
                     </AvatarFallback>
                   </Avatar>
@@ -695,41 +857,51 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
           </main>
         </div>
 
-        {/* Floating Prática IA Button - shown for corretores when not on assistente page */}
+        {/* Floating Prática IA Button */}
         {(isCorretor || currentView === "corretor") && !pathname.startsWith("/corretor/assistente") && (
           <Link
             href="/corretor/assistente"
             className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 group"
           >
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-indigo-600 rounded-full blur-lg opacity-40 group-hover:opacity-60 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-indigo-600 rounded-full blur-lg opacity-30 group-hover:opacity-50 transition-opacity" />
               <div className="relative flex items-center gap-2 bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white rounded-full shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all px-4 py-3 md:px-5 md:py-3.5">
                 <Sparkles className="h-5 w-5" />
-                <span className="text-sm font-medium hidden sm:inline">Prática IA</span>
+                <span className="text-sm font-medium hidden sm:inline">Assistente IA</span>
               </div>
             </div>
           </Link>
         )}
 
         {/* Mobile Bottom Nav */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 px-2 pb-safe">
+        <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-t border-zinc-200/80 dark:border-zinc-800/80 px-2 pb-safe">
           <div className="flex items-center justify-around h-16">
             {((isCorretor || currentView === "corretor") ? corretorMobileNavItems : adminMobileNavItems).map((item) => {
               const baseHref = (isCorretor || currentView === "corretor") ? "/corretor" : "/admin"
               const isActive = pathname === item.href || (item.href !== baseHref && item.href !== "/" && pathname.startsWith(item.href))
+              const isHighlight = (item as any).highlight
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex flex-col items-center justify-center w-16 h-full gap-1 transition-colors",
-                    isActive
-                      ? "text-zinc-900 dark:text-zinc-100"
-                      : "text-zinc-400 dark:text-zinc-500"
+                    "flex flex-col items-center justify-center w-16 h-full gap-0.5 transition-all duration-150",
+                    isHighlight && !isActive
+                      ? "text-violet-600 dark:text-violet-400"
+                      : isActive
+                        ? "text-zinc-900 dark:text-zinc-100"
+                        : "text-zinc-400 dark:text-zinc-500"
                   )}
                 >
-                  <item.icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} />
-                  <span className="text-[10px] font-medium">{item.label}</span>
+                  <div className={cn(
+                    "flex items-center justify-center h-7 w-7 rounded-lg transition-colors",
+                    isHighlight && !isActive && "bg-violet-500/10 dark:bg-violet-500/15",
+                    isHighlight && isActive && "bg-violet-600/15 dark:bg-violet-400/15",
+                    !isHighlight && isActive && "bg-zinc-900/10 dark:bg-white/10"
+                  )}>
+                    <item.icon className={cn("h-[18px] w-[18px]", isActive && "stroke-[2.5]")} />
+                  </div>
+                  <span className={cn("text-[10px] font-medium", isHighlight && "font-semibold")}>{item.label}</span>
                 </Link>
               )
             })}
