@@ -231,32 +231,35 @@ export interface ParcelaFormItem {
 // ============================================================================
 
 export interface UnidadeBusca {
-  id: number;
+  id: string; // UUID
+  cvcrm_id: number;
   codigo?: string;
   bloco?: string;
   andar?: string;
   area?: number;
   tipologia?: string;
   valor_tabela?: number;
-  empreendimento_id: number;
+  empreendimento_id: number; // cvcrm_id do empreendimento
   empreendimento_nome: string;
   status?: string;
 }
 
 export interface CorretorBusca {
-  id: number;
+  id: string; // UUID
+  cvcrm_id?: number;
   nome: string;
   cpf?: string;
   creci?: string;
   imobiliaria_nome?: string;
-  imobiliaria_id?: number;
+  imobiliaria_id?: string; // UUID
   email?: string;
   telefone?: string;
   fonte: 'cvcrm' | 'beneficiario' | 'user';
 }
 
 export interface EmpreendimentoBusca {
-  id: number;
+  id: string; // UUID
+  cvcrm_id: number; // ID do CV CRM (usado para referenciar unidades)
   nome: string;
   cidade?: string;
   uf?: string;
@@ -265,7 +268,8 @@ export interface EmpreendimentoBusca {
 }
 
 export interface ImobiliariaBusca {
-  id: number;
+  id: string; // UUID
+  cvcrm_id: number;
   nome: string;
   cnpj?: string;
 }
@@ -338,3 +342,121 @@ export const PARCELAS_PADRAO = [
   { descricao: 'Mensal 1', percentual: 25 },
   { descricao: 'Mensal 2', percentual: 25 },
 ];
+
+// ============================================================================
+// TIPOS PARA IMPORTACAO CV CRM
+// ============================================================================
+
+export interface ReservaBusca {
+  reserva_id: number;
+  codigo: string;
+  empreendimento_id: number;
+  empreendimento_nome: string;
+  unidade_id: number;
+  unidade_codigo: string;
+  cliente_id: number;
+  cliente_nome: string;
+  cliente_cpf: string;
+  valor_total: number;
+  data_reserva: string;
+  corretor_id: number;
+  corretor_nome: string;
+  situacao: string;
+}
+
+export interface ClienteBusca {
+  encontrado: boolean;
+  pessoa_id?: number;
+  nome?: string;
+  cpf?: string;
+  email?: string;
+  telefone?: string;
+}
+
+// ============================================================================
+// TEMPLATES DE PARCELAS
+// ============================================================================
+
+export type TipoParcelaProposta = 'ato' | 'mensal' | 'anual' | 'financiamento' | 'entrada';
+
+export interface TemplateParcelaItem {
+  tipo: TipoParcelaProposta;
+  percentual?: number; // Se for único (ex: ato 10%)
+  quantidade?: number; // Se for múltiplo (ex: 12 mensais)
+  percentualTotal?: number; // % total do grupo (ex: 90% dividido em 12)
+}
+
+export interface TemplateParcelas {
+  id: string;
+  nome: string;
+  descricao: string;
+  parcelas: TemplateParcelaItem[];
+}
+
+// Templates pré-definidos
+export const TEMPLATES_PARCELAS: TemplateParcelas[] = [
+  {
+    id: 'ato_financiamento',
+    nome: 'Ato + Financiamento',
+    descricao: '20% de ato, 80% financiamento',
+    parcelas: [
+      { tipo: 'ato', percentual: 20 },
+      { tipo: 'financiamento', percentual: 80 },
+    ],
+  },
+  {
+    id: 'ato_12_mensais',
+    nome: 'Ato + 12 Mensais',
+    descricao: '10% de ato, 90% em 12 mensais',
+    parcelas: [
+      { tipo: 'ato', percentual: 10 },
+      { tipo: 'mensal', quantidade: 12, percentualTotal: 90 },
+    ],
+  },
+  {
+    id: 'ato_entrada_24x',
+    nome: 'Ato + 24 Mensais',
+    descricao: '10% de ato, 90% em 24 mensais',
+    parcelas: [
+      { tipo: 'ato', percentual: 10 },
+      { tipo: 'mensal', quantidade: 24, percentualTotal: 90 },
+    ],
+  },
+  {
+    id: 'ato_2_anuais_financ',
+    nome: 'Ato + 2 Anuais + Financiamento',
+    descricao: '10% ato, 20% em 2 anuais, 70% financiamento',
+    parcelas: [
+      { tipo: 'ato', percentual: 10 },
+      { tipo: 'anual', quantidade: 2, percentualTotal: 20 },
+      { tipo: 'financiamento', percentual: 70 },
+    ],
+  },
+  {
+    id: 'ato_entrada_financ',
+    nome: 'Ato + Entrada + Financiamento',
+    descricao: '5% ato, 15% entrada, 80% financiamento',
+    parcelas: [
+      { tipo: 'ato', percentual: 5 },
+      { tipo: 'entrada', percentual: 15 },
+      { tipo: 'financiamento', percentual: 80 },
+    ],
+  },
+];
+
+// ============================================================================
+// VALIDACOES INTELIGENTES
+// ============================================================================
+
+export interface ValidacaoInteligente {
+  tipo: 'info' | 'warning' | 'error' | 'success';
+  mensagem: string;
+  campo?: string;
+}
+
+export const LIMITES_VALIDACAO = {
+  comissao_minima: 3, // % mínimo de comissão (aviso abaixo)
+  comissao_maxima: 8, // % máximo de comissão (aviso acima)
+  valor_minimo_corretor: 500, // R$ mínimo para cada corretor (aviso abaixo)
+  percentual_ato_minimo: 5, // % mínimo do ato em relação ao total (aviso abaixo)
+};

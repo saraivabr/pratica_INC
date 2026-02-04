@@ -21,6 +21,8 @@ import type {
   CorretorBusca,
   EmpreendimentoBusca,
   ImobiliariaBusca,
+  ReservaBusca,
+  ClienteBusca,
 } from "./types";
 
 // ============================================
@@ -48,6 +50,10 @@ export const comissaoKeys = {
     [...comissaoKeys.busca(), "corretores", busca] as const,
   imobiliarias: (busca?: string) =>
     [...comissaoKeys.busca(), "imobiliarias", busca] as const,
+  reservas: (busca: string, tipo?: string) =>
+    [...comissaoKeys.busca(), "reservas", busca, tipo] as const,
+  clientePorCpf: (cpf: string) =>
+    [...comissaoKeys.busca(), "cliente", cpf] as const,
 };
 
 // ============================================
@@ -411,5 +417,42 @@ export function useBuscarImobiliarias(busca?: string, enabled: boolean = true) {
     imobiliarias: data || [],
     loading: isLoading,
     error: error as Error | null,
+  };
+}
+
+export function useBuscarReservas(
+  busca: string,
+  tipo?: 'cliente' | 'codigo' | 'unidade' | 'cpf',
+  enabled: boolean = true
+) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: comissaoKeys.reservas(busca, tipo),
+    queryFn: () => comissaoApi.busca.reservas(busca, tipo),
+    enabled: enabled && busca.length >= 2,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  return {
+    reservas: data || [],
+    loading: isLoading,
+    error: error as Error | null,
+  };
+}
+
+export function useBuscarClientePorCpf(cpf: string, enabled: boolean = true) {
+  const cpfLimpo = cpf.replace(/\D/g, "");
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: comissaoKeys.clientePorCpf(cpfLimpo),
+    queryFn: () => comissaoApi.busca.clientePorCpf(cpfLimpo),
+    enabled: enabled && cpfLimpo.length >= 11,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  return {
+    cliente: data || { encontrado: false },
+    loading: isLoading,
+    error: error as Error | null,
+    refetch,
   };
 }

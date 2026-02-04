@@ -22,6 +22,8 @@ import type {
   ComissaoParcelaInput,
   CorretorEqualizadorItem,
   ParcelaFormItem,
+  ReservaBusca,
+  ClienteBusca,
 } from './types';
 
 // ============================================
@@ -261,6 +263,22 @@ export const buscaApi = {
   imobiliarias: async (busca?: string, limit: number = 20): Promise<ImobiliariaBusca[]> => {
     const query = buildQueryString({ busca, limit });
     return fetchApi<ImobiliariaBusca[]>(`${BASE_URL}/buscar/imobiliarias${query}`);
+  },
+
+  // Buscar reservas do CV CRM para importar comissão
+  reservas: async (
+    busca: string,
+    tipo?: 'cliente' | 'codigo' | 'unidade' | 'cpf',
+    limit: number = 20
+  ): Promise<ReservaBusca[]> => {
+    const query = buildQueryString({ busca, tipo, limit });
+    return fetchApi<ReservaBusca[]>(`${BASE_URL}/buscar/reservas${query}`);
+  },
+
+  // Buscar cliente por CPF
+  clientePorCpf: async (cpf: string): Promise<ClienteBusca> => {
+    const query = buildQueryString({ cpf });
+    return fetchApi<ClienteBusca>(`${BASE_URL}/buscar/cliente${query}`);
   },
 };
 
