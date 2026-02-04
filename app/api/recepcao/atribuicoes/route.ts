@@ -46,8 +46,11 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('user_id');
     const meus = searchParams.get('meus') === 'true';
     const pendentes = searchParams.get('pendentes') === 'true';
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
-    const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0);
+    const rawLimit = parseInt(searchParams.get('limit') || '50');
+    const rawOffset = parseInt(searchParams.get('offset') || '0');
+    // Sanitize inputs to prevent NaN and enforce bounds
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
+    const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
     let whereClause = 'WHERE a.workspace_id = $1';
     const params: any[] = [workspaceId];

@@ -30,24 +30,28 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const periodo = searchParams.get('periodo') || 'semana'; // dia, semana, mes, total
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const limitParam = parseInt(searchParams.get('limit') || '10');
+    // Sanitize limit to prevent issues
+    const limit = Math.min(Math.max(1, isNaN(limitParam) ? 10 : limitParam), 100);
 
-    // Definir filtro de data
-    let dateFilter = '';
+    // Calculate date filter using parameterized interval
+    // Instead of string concatenation, use a parameter for days offset
+    let daysOffset: number | null = null;
     switch (periodo) {
       case 'dia':
-        dateFilter = `AND g.created_at >= CURRENT_DATE`;
+        daysOffset = 0;
         break;
       case 'semana':
-        dateFilter = `AND g.created_at >= CURRENT_DATE - INTERVAL '7 days'`;
+        daysOffset = 7;
         break;
       case 'mes':
-        dateFilter = `AND g.created_at >= CURRENT_DATE - INTERVAL '30 days'`;
+        daysOffset = 30;
         break;
       default:
-        dateFilter = '';
+        daysOffset = null; // No date filter for 'total'
     }
 
+    // Use parameterized queries - if daysOffset is null, don't filter by date
     const result = await pool.query<RankingItem>(
       `SELECT
         u.id AS user_id,
@@ -57,28 +61,32 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(CASE WHEN g.tipo LIKE 'estrela_%' AND g.created_at >= CURRENT_DATE THEN 1 ELSE 0 END), 0)::int AS estrelas_hoje,
         COALESCE(SUM(CASE WHEN g.tipo = 'bonus_pix' AND g.resgatado THEN g.valor ELSE 0 END), 0)::int AS total_pix
       FROM users u
-      LEFT JOIN roleta_gamificacao g ON g.user_id = u.id AND g.workspace_id = $1 ${dateFilter}
+      LEFT JOIN roleta_gamificacao g ON g.user_id = u.id
+        AND g.workspace_id = $1
+        AND ($3::int IS NULL OR g.created_at >= CURRENT_DATE - ($3::int || ' days')::interval)
       WHERE u.workspace_id = $1
         AND u.hierarquia_id = (SELECT id FROM hierarquias WHERE slug = 'corretor')
       GROUP BY u.id, u.nome, u.avatar_url
       HAVING COALESCE(SUM(CASE WHEN g.tipo LIKE 'estrela_%' THEN 1 ELSE 0 END), 0) > 0
       ORDER BY total_estrelas DESC
       LIMIT $2`,
-      [workspaceId, limit]
+      [workspaceId, limit, daysOffset]
     );
 
-    // Verificar posicao do usuario atual
+    // Verificar posicao do usuario atual - fully parameterized
     const userRankResult = await pool.query<{ posicao: number }>(
       `WITH ranking AS (
         SELECT
           user_id,
           ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS posicao
         FROM roleta_gamificacao
-        WHERE workspace_id = $1 AND tipo LIKE 'estrela_%' ${dateFilter}
+        WHERE workspace_id = $1
+          AND tipo LIKE 'estrela_%'
+          AND ($3::int IS NULL OR created_at >= CURRENT_DATE - ($3::int || ' days')::interval)
         GROUP BY user_id
       )
       SELECT posicao::int FROM ranking WHERE user_id = $2`,
-      [workspaceId, (user as any).id]
+      [workspaceId, (user as any).id, daysOffset]
     );
 
     const userPosicao = userRankResult.rows[0]?.posicao || null;

@@ -153,8 +153,11 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const plantao_id = searchParams.get('plantao_id');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const rawLimit = parseInt(searchParams.get('limit') || '50');
+    const rawOffset = parseInt(searchParams.get('offset') || '0');
+    // Sanitize inputs to prevent NaN and enforce bounds
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
+    const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
     // Construir query
     let query = `

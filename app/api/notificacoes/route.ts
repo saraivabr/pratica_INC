@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('[GET /api/notificacoes] Error:', error);
     return NextResponse.json(
-      { error: 'Erro ao buscar notificações', details: error.message },
+      { error: 'Erro ao buscar notificações' },
       { status: 500 }
     );
   }
@@ -56,6 +56,18 @@ export async function POST(request: NextRequest) {
     }
     const { corretor_id, lead_id, tipo, mensagem, link_acao, metadata } = validation.data;
 
+    // Authorization: Verify corretor_id belongs to authenticated user or user is admin
+    const userId = (ctx.user as any)?.id;
+    const userRole = (ctx.user as any)?.hierarquia_slug;
+    const isAdmin = ['master', 'diretor', 'gerente'].includes(userRole);
+
+    if (corretor_id !== userId && !isAdmin) {
+      return NextResponse.json(
+        { error: 'Não autorizado a criar notificações para outros usuários' },
+        { status: 403 }
+      );
+    }
+
     const { rows } = await dbQuery(
       `
       INSERT INTO notificacoes (corretor_id, lead_id, tipo, mensagem, link_acao, metadata, workspace_id)
@@ -69,7 +81,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[POST /api/notificacoes] Error:', error);
     return NextResponse.json(
-      { error: 'Erro ao criar notificação', details: error.message },
+      { error: 'Erro ao criar notificação' },
       { status: 500 }
     );
   }

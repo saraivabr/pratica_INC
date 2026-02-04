@@ -44,7 +44,8 @@ const DELAYS = {
 interface BatchDB {
   id: string;
   evento_id: string;
-  workspace_id: number;
+  workspace_id: number | null;
+  tenant_id: number;
   instance_name: string;
   total_count: number;
   processed_count: number;
@@ -272,8 +273,10 @@ async function processBatch(batch: BatchDB): Promise<{
   failed: number;
   errors: any[];
 }> {
-  const { id: batchId, evento_id, workspace_id, instance_name } = batch;
-  const query = tenantQuery(workspace_id);
+  const { id: batchId, evento_id, workspace_id, tenant_id, instance_name } = batch;
+  // Usar workspace_id se disponível, senão fallback para tenant_id
+  const effectiveWorkspaceId = workspace_id ?? tenant_id;
+  const query = tenantQuery(effectiveWorkspaceId);
 
   // Verificar se instância ainda está conectada
   const connected = await isInstanceConnected(instance_name);
@@ -376,34 +379,50 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Buscar batches pendentes ou em processamento (apenas 1 por vez com delays humanizados)
-    const batchesResult = await pool.query<BatchDB>(
-      `SELECT * FROM dispatch_batches
-       WHERE status IN ('pending', 'processing')
-       ORDER BY created_at ASC
-       LIMIT 1`,
-      []
-    );
-
-    if (batchesResult.rows.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'Nenhum batch pendente',
-        duration: Date.now() - startTime,
-      });
-    }
-
+    // Use SELECT FOR UPDATE SKIP LOCKED to prevent multiple cron instances
+    // from processing the same batch simultaneously
+    const client = await pool.connect();
     const results: any[] = [];
 
-    for (const batch of batchesResult.rows) {
+    try {
+      await client.query('BEGIN');
+
+      // Buscar e lock batch pendente atomicamente
+      const batchesResult = await client.query<BatchDB>(
+        `SELECT * FROM dispatch_batches
+         WHERE status IN ('pending', 'processing')
+         ORDER BY created_at ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED`,
+        []
+      );
+
+      if (batchesResult.rows.length === 0) {
+        await client.query('COMMIT');
+        client.release();
+        return NextResponse.json({
+          success: true,
+          message: 'Nenhum batch pendente',
+          duration: Date.now() - startTime,
+        });
+      }
+
+      const batch = batchesResult.rows[0];
+
+      // Marcar como processing dentro da transação
+      if (batch.status === 'pending') {
+        await client.query(
+          `UPDATE dispatch_batches SET status = 'processing', started_at = NOW() WHERE id = $1`,
+          [batch.id]
+        );
+      }
+
+      // Commit para liberar o lock mas manter o status processing
+      await client.query('COMMIT');
+      client.release();
+
+      // Agora processar fora da transação (já estamos seguros pelo status)
       try {
-        // Marcar como processing
-        if (batch.status === 'pending') {
-          await pool.query(
-            `UPDATE dispatch_batches SET status = 'processing', started_at = NOW() WHERE id = $1`,
-            [batch.id]
-          );
-        }
 
         // Processar batch
         const batchResult = await processBatch(batch);
@@ -475,15 +494,23 @@ export async function GET(request: NextRequest) {
           status: 'failed',
         });
       }
+
+      return NextResponse.json({
+        success: true,
+        duration: Date.now() - startTime,
+        batches_processed: results.length,
+        results,
+      });
+    } catch (txError: any) {
+      // Release client if still held due to transaction error
+      try {
+        await client.query('ROLLBACK');
+      } catch { /* ignore */ }
+      try {
+        client.release();
+      } catch { /* ignore */ }
+      throw txError;
     }
-
-    return NextResponse.json({
-      success: true,
-      duration: Date.now() - startTime,
-      batches_processed: results.length,
-      results,
-    });
-
   } catch (error: any) {
     console.error('[Dispatch Batches] Erro geral:', error);
     return NextResponse.json(

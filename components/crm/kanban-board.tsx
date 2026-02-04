@@ -71,29 +71,39 @@ export function KanbanBoard({ initialStages, initialLeads, onRefresh }: KanbanBo
 
     // Dragging a lead over another lead
     if (isActiveALead && isOverALead) {
-      setLeads((leads) => {
-        const activeIndex = leads.findIndex((l) => l.id === activeId);
-        const overIndex = leads.findIndex((l) => l.id === overId);
+      setLeads((prevLeads) => {
+        const activeIndex = prevLeads.findIndex((l) => l.id === activeId);
+        const overIndex = prevLeads.findIndex((l) => l.id === overId);
 
         // If in different stages, update stage immediately for visual feedback
-        if (leads[activeIndex].stage_id !== leads[overIndex].stage_id) {
-            leads[activeIndex].stage_id = leads[overIndex].stage_id;
-            return arrayMove(leads, activeIndex, overIndex - 1);
+        if (prevLeads[activeIndex].stage_id !== prevLeads[overIndex].stage_id) {
+            // Create immutable update - never mutate state directly
+            const updatedLeads = prevLeads.map((lead, idx) =>
+              idx === activeIndex
+                ? { ...lead, stage_id: prevLeads[overIndex].stage_id }
+                : lead
+            );
+            return arrayMove(updatedLeads, activeIndex, overIndex - 1);
         }
-        
-        return arrayMove(leads, activeIndex, overIndex);
+
+        return arrayMove(prevLeads, activeIndex, overIndex);
       });
     }
 
     // Dragging a lead over a column
     if (isActiveALead && isOverAColumn) {
-      setLeads((leads) => {
-        const activeIndex = leads.findIndex((l) => l.id === activeId);
-        if (leads[activeIndex].stage_id !== overId) {
-            leads[activeIndex].stage_id = String(overId);
-            return arrayMove(leads, activeIndex, activeIndex); // Force re-render
+      setLeads((prevLeads) => {
+        const activeIndex = prevLeads.findIndex((l) => l.id === activeId);
+        if (prevLeads[activeIndex].stage_id !== overId) {
+            // Create immutable update - never mutate state directly
+            const updatedLeads = prevLeads.map((lead, idx) =>
+              idx === activeIndex
+                ? { ...lead, stage_id: String(overId) }
+                : lead
+            );
+            return arrayMove(updatedLeads, activeIndex, activeIndex); // Force re-render
         }
-        return leads;
+        return prevLeads;
       });
     }
   };

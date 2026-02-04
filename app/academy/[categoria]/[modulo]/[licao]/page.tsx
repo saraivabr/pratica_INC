@@ -57,11 +57,41 @@ interface PageProps {
   params: Promise<{ categoria: string; modulo: string; licao: string }>
 }
 
-// Simple markdown-to-HTML converter (basic support)
+// Escape HTML special characters to prevent XSS
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// Sanitize URL to prevent javascript: and data: XSS attacks
+function sanitizeUrl(url: string): string {
+  const trimmed = url.trim().toLowerCase()
+  // Allow only safe protocols
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('/') ||
+    trimmed.startsWith('#') ||
+    trimmed.startsWith('mailto:')
+  ) {
+    return escapeHtml(url.trim())
+  }
+  // Block potentially dangerous protocols (javascript:, data:, vbscript:, etc.)
+  return '#'
+}
+
+// Simple markdown-to-HTML converter (basic support) with XSS protection
 function renderMarkdown(content: string): string {
   if (!content) return ""
 
-  let html = content
+  // First escape HTML in the content to prevent injection
+  let html = escapeHtml(content)
+
+  html = html
     // Headers
     .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold mt-6 mb-3 text-gray-900 dark:text-white">$1</h3>')
     .replace(/^## (.*$)/gim, '<h2 class="text-xl font-semibold mt-8 mb-4 text-gray-900 dark:text-white">$1</h2>')
@@ -78,10 +108,13 @@ function renderMarkdown(content: string): string {
     .replace(/^\s*[-*]\s+(.*)$/gim, '<li class="ml-4 mb-1">$1</li>')
     // Ordered lists
     .replace(/^\s*\d+\.\s+(.*)$/gim, '<li class="ml-4 mb-1 list-decimal">$1</li>')
-    // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener">$1</a>')
+    // Links - with URL sanitization to prevent XSS
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
+      const safeUrl = sanitizeUrl(url)
+      return `<a href="${safeUrl}" class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">${text}</a>`
+    })
     // Blockquotes
-    .replace(/^>\s+(.*)$/gim, '<blockquote class="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-blue-50 dark:bg-blue-950/30 rounded-r-lg text-gray-700 dark:text-gray-300">$1</blockquote>')
+    .replace(/^&gt;\s+(.*)$/gim, '<blockquote class="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-blue-50 dark:bg-blue-950/30 rounded-r-lg text-gray-700 dark:text-gray-300">$1</blockquote>')
     // Horizontal rules
     .replace(/^---$/gim, '<hr class="my-6 border-gray-200 dark:border-zinc-700" />')
     // Paragraphs (lines not starting with special characters)
