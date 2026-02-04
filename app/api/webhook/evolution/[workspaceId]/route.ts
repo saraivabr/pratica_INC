@@ -259,21 +259,29 @@ async function handleConnectionUpdate(workspaceId: number, data: any) {
 
   // Atualizar status de conexão no registro do usuário (para Salva-Leads)
   // O nome da instância segue o padrão: corretor-{userId}-{timestamp}
-  const userIdMatch = instanceName?.match(/^corretor-(\d+)-/);
+  // userId pode ser UUID (ex: d027e287-919d-4fbd-af01-d6bfc84e1855) ou numérico
+  const userIdMatch = instanceName?.match(/^corretor-([a-f0-9-]+)-\d+$/);
   if (userIdMatch) {
     const userId = userIdMatch[1];
-    await dbQuery(
-      `UPDATE users SET evolution_connected = $1, updated_at = NOW() WHERE id = $2`,
-      [isConnected, userId]
+    // IMPORTANTE: Só atualizar se esta é a instância ATUAL do usuário
+    // Evita que instâncias antigas sobrescrevam o status da instância nova
+    const result = await dbQuery(
+      `UPDATE users SET evolution_connected = $1, updated_at = NOW()
+       WHERE id = $2 AND evolution_instance_name = $3`,
+      [isConnected, userId, instanceName]
     );
-    console.log(`[Connection Update] User ${userId} evolution_connected = ${isConnected}`);
+    if (result.rowCount && result.rowCount > 0) {
+      console.log(`[Connection Update] User ${userId} evolution_connected = ${isConnected}`);
+    } else {
+      console.log(`[Connection Update] Ignored stale instance ${instanceName} (user ${userId} has a different current instance)`);
+    }
   } else {
-    // Fallback: buscar usuário pelo nome da instância
-    await dbQuery(
+    // Fallback: buscar usuário pelo nome da instância (só atualiza se é a instância atual)
+    const result = await dbQuery(
       `UPDATE users SET evolution_connected = $1, updated_at = NOW() WHERE evolution_instance_name = $2`,
       [isConnected, instanceName]
     );
-    console.log(`[Connection Update] Updated users with instance ${instanceName} -> connected = ${isConnected}`);
+    console.log(`[Connection Update] Updated ${result.rowCount || 0} users with instance ${instanceName} -> connected = ${isConnected}`);
   }
 
   console.log(`[Connection Update] Instance: ${instanceName}, State: ${state}, Connected: ${isConnected}`);
@@ -319,6 +327,7 @@ async function handleNewMessage(workspaceId: number, data: any) {
 
     // Salvar mensagem no banco (tanto recebidas quanto enviadas)
     // Usar upsert para evitar duplicatas se webhook enviar mesmo evento duas vezes
+    // IMPORTANTE: O índice único é (instance_name, message_id), não (workspace_id, message_id)
     const messageId = message.key?.id;
     if (messageId) {
       await dbQuery(
@@ -326,7 +335,7 @@ async function handleNewMessage(workspaceId: number, data: any) {
           tenant_id, workspace_id, instance_name, phone_number, message_id, message_type,
           message_text, is_from_me, timestamp, raw_data
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        ON CONFLICT (workspace_id, message_id)
+        ON CONFLICT (instance_name, message_id)
         DO UPDATE SET
           updated_at = NOW(),
           raw_data = EXCLUDED.raw_data`,
@@ -576,18 +585,16 @@ async function handleNewMessage(workspaceId: number, data: any) {
             { phone_number: phoneNumber },
             {
               last_message_at: timestamp.toISOString(),
-              last_interaction_at: timestamp.toISOString(),
-              total_messages_received: existingContacts[0].total_messages_received + 1,
+              total_messages: (existingContacts[0].total_messages || 0) + 1,
             }
           );
         } else {
           await query.insert('whatsapp_contacts', {
+            instance_name: data.instance,
             phone_number: phoneNumber,
-            name: phoneNumber,
+            contact_name: phoneNumber,
             last_message_at: timestamp.toISOString(),
-            last_interaction_at: timestamp.toISOString(),
-            total_messages_received: 1,
-            total_messages_sent: 0,
+            total_messages: 1,
           });
         }
 

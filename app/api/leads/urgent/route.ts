@@ -63,8 +63,11 @@ export async function GET(request: NextRequest) {
     const params: any[] = [workspaceId, SLA_THRESHOLDS.MIN_LEAD_SCORE_FOR_SLA]
 
     if (corretorId) {
-      query = query.replace('ORDER BY', `AND corretor_id = $3 ORDER BY`)
-      params.push(parseInt(corretorId))
+      const corretorIdInt = parseInt(corretorId, 10)
+      if (!isNaN(corretorIdInt)) {
+        query = query.replace('ORDER BY', `AND corretor_id = $3 ORDER BY`)
+        params.push(corretorIdInt)
+      }
     }
 
     const result = await dbQuery(query, params)
