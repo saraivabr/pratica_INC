@@ -16,6 +16,7 @@ interface FilaItem {
   corretor_telefone: string;
   corretor_avatar: string | null;
   posicao_fila: number;
+  sorteio_posicao: number | null;
   status: string;
   checkin_at: string;
   checkin_method: string;
@@ -25,6 +26,10 @@ interface FilaItem {
   leads_ativos: number;
   status_legivel: string;
   disponivel: boolean;
+  // Qualificacao
+  qualificado: boolean;
+  total_ofertas: number;
+  posicao_leads: number | null;
 }
 
 /**
@@ -61,7 +66,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Buscar fila diretamente (inclui leads_ativos)
+    // Buscar fila diretamente (inclui leads_ativos e qualificação)
     const result = await pool.query<FilaItem>(
       `SELECT
         p.id AS presenca_id,
@@ -71,6 +76,7 @@ export async function GET(request: NextRequest) {
         u.telefone AS corretor_telefone,
         u.avatar_url AS corretor_avatar,
         p.posicao_fila,
+        p.sorteio_posicao,
         p.status,
         p.checkin_at,
         p.checkin_method,
@@ -87,9 +93,14 @@ export async function GET(request: NextRequest) {
           WHEN p.status != 'presente' THEN 'Ausente'
           ELSE 'Disponível'
         END AS status_legivel,
-        (p.status = 'presente' AND NOT p.em_atendimento AND NOT p.pausado AND NOT p.feedback_pendente AND COALESCE(p.leads_ativos, 0) < 5) AS disponivel
+        (p.status = 'presente' AND NOT p.em_atendimento AND NOT p.pausado AND NOT p.feedback_pendente AND COALESCE(p.leads_ativos, 0) < 5) AS disponivel,
+        -- Qualificação
+        COALESCE(q.qualificado, false) AS qualificado,
+        COALESCE(q.total_ofertas, 0) AS total_ofertas,
+        q.posicao_roleta_leads AS posicao_leads
       FROM recepcao_presencas p
       JOIN users u ON u.id = p.user_id
+      LEFT JOIN roleta_qualificacao q ON q.presenca_id = p.id
       WHERE p.plantao_id = $1 AND p.workspace_id = $2
       ORDER BY p.posicao_fila ASC`,
       [plantaoId, workspaceId]
@@ -103,6 +114,7 @@ export async function GET(request: NextRequest) {
       pausados: result.rows.filter(r => r.pausado).length,
       aguardando_feedback: result.rows.filter(r => r.feedback_pendente).length,
       limite_leads: result.rows.filter(r => (r.leads_ativos || 0) >= 5).length,
+      qualificados: result.rows.filter(r => r.qualificado).length,
     };
 
     return NextResponse.json({

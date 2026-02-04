@@ -15,9 +15,13 @@ interface PlantaoHoje {
   data: string;
   hora_inicio: string;
   hora_fim: string;
+  hora_limite_checkin: string | null;
   max_corretores: number | null;
   descricao: string | null;
   status: string;
+  sorteio_realizado: boolean;
+  sorteio_at: string | null;
+  meta_ofertas: number;
   local_nome: string;
   local_endereco: string | null;
   total_presentes: number;
@@ -54,7 +58,19 @@ export async function GET(request: NextRequest) {
 
     const query = `
       SELECT
-        p.*,
+        p.id,
+        p.workspace_id,
+        p.local_id,
+        p.data,
+        p.hora_inicio,
+        p.hora_fim,
+        p.hora_limite_checkin,
+        p.max_corretores,
+        p.descricao,
+        p.status,
+        COALESCE(p.sorteio_realizado, false) AS sorteio_realizado,
+        p.sorteio_at,
+        COALESCE(p.meta_ofertas, 30) AS meta_ofertas,
         l.nome AS local_nome,
         l.endereco AS local_endereco,
         COALESCE(stats.total_presentes, 0) AS total_presentes,

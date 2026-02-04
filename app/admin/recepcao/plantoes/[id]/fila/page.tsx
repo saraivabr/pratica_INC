@@ -22,6 +22,11 @@ import {
   CheckCircle,
   PauseCircle,
   PlayCircle,
+  Dices,
+  Shuffle,
+  Target,
+  Star,
+  Smartphone,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
@@ -45,6 +50,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
@@ -60,6 +66,9 @@ interface Plantao {
   hora_inicio: string
   hora_fim: string
   status: string
+  sorteio_realizado: boolean
+  sorteio_at: string | null
+  meta_ofertas: number
   total_presentes: number
   disponiveis: number
   em_atendimento: number
@@ -76,6 +85,7 @@ interface FilaItem {
   corretor_telefone: string
   corretor_avatar: string | null
   posicao_fila: number
+  sorteio_posicao: number | null
   status: string
   checkin_at: string
   checkin_method: string
@@ -85,6 +95,10 @@ interface FilaItem {
   leads_ativos: number
   status_legivel: string
   disponivel: boolean
+  // Qualificacao
+  qualificado?: boolean
+  total_ofertas?: number
+  posicao_leads?: number
 }
 
 interface ProximoCorretor {
@@ -116,6 +130,10 @@ export default function FilaPlantaoPage() {
     lead_origem: "presencial" as "presencial" | "telefone" | "whatsapp",
     lead_observacoes: "",
   })
+
+  // Sorteio
+  const [sorteando, setSorteando] = useState(false)
+  const [activeTab, setActiveTab] = useState<"portaria" | "leads">("portaria")
 
   const fetchData = useCallback(async () => {
     try {
@@ -219,6 +237,33 @@ export default function FilaPlantaoPage() {
     setAtribuindo(false)
   }
 
+  const handleSorteio = async () => {
+    if (plantao?.sorteio_realizado) {
+      toast.info("Sorteio ja foi realizado para este plantao")
+      return
+    }
+
+    setSorteando(true)
+    try {
+      const response = await fetch(`/api/recepcao/plantoes/${plantaoId}/sorteio`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast.success(result.message || "Sorteio realizado com sucesso!")
+        await fetchData()
+      } else {
+        toast.error(result.error || "Erro ao realizar sorteio")
+      }
+    } catch (error) {
+      toast.error("Erro ao realizar sorteio")
+    }
+    setSorteando(false)
+  }
+
   const getStatusIcon = (item: FilaItem) => {
     if ((item.leads_ativos || 0) >= 5) return <UserMinus className="h-4 w-4 text-red-600" />
     if (item.em_atendimento) return <PhoneCall className="h-4 w-4 text-blue-600" />
@@ -300,6 +345,26 @@ export default function FilaPlantaoPage() {
               <RefreshCw className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />
               Atualizar
             </Button>
+            {!plantao.sorteio_realizado ? (
+              <Button
+                variant="outline"
+                onClick={handleSorteio}
+                disabled={sorteando || fila.length === 0}
+                className="gap-2"
+              >
+                {sorteando ? (
+                  <Shuffle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Dices className="h-4 w-4" />
+                )}
+                Realizar Sorteio
+              </Button>
+            ) : (
+              <Badge variant="outline" className="h-9 px-3 flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                Sorteio realizado
+              </Badge>
+            )}
             <Button onClick={handleProximoCorretor} disabled={disponiveis.length === 0}>
               <UserPlus className="h-4 w-4 mr-2" />
               Proximo Corretor
@@ -380,7 +445,7 @@ export default function FilaPlantaoPage() {
           </Card>
         </div>
 
-        {/* Fila */}
+        {/* Fila com Tabs */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -394,71 +459,176 @@ export default function FilaPlantaoPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {fila.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-                <h3 className="font-semibold">Nenhum corretor na fila</h3>
-                <p className="text-sm text-muted-foreground">
-                  Aguardando check-in de corretores
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {fila.map((item) => (
-                  <div
-                    key={item.presenca_id}
-                    className={cn(
-                      "p-4 rounded-lg border transition-colors",
-                      getStatusColor(item)
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white border text-sm font-bold">
-                          {item.posicao_fila}
-                        </div>
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={item.corretor_avatar || undefined} />
-                          <AvatarFallback>
-                            {item.corretor_nome?.slice(0, 2).toUpperCase() || "??"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{item.corretor_nome}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {item.corretor_telefone}
-                            </span>
-                            <span>•</span>
-                            <span>Check-in: {formatTime(item.checkin_at)}</span>
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "portaria" | "leads")}>
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="portaria" className="gap-2">
+                  <Users className="h-4 w-4" />
+                  Portaria
+                  {plantao.sorteio_realizado && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      Sorteado
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="leads" className="gap-2">
+                  <Smartphone className="h-4 w-4" />
+                  Leads
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    {fila.filter(f => f.qualificado).length}
+                  </Badge>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="portaria" className="mt-0">
+                {fila.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                    <h3 className="font-semibold">Nenhum corretor na fila</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Aguardando check-in de corretores
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {fila
+                      .sort((a, b) => (a.sorteio_posicao || a.posicao_fila) - (b.sorteio_posicao || b.posicao_fila))
+                      .map((item) => (
+                      <div
+                        key={item.presenca_id}
+                        className={cn(
+                          "p-4 rounded-lg border transition-colors",
+                          getStatusColor(item)
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white border text-sm font-bold">
+                              {item.sorteio_posicao || item.posicao_fila}
+                            </div>
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={item.corretor_avatar || undefined} />
+                              <AvatarFallback>
+                                {item.corretor_nome?.slice(0, 2).toUpperCase() || "??"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{item.corretor_nome}</p>
+                                {item.qualificado && (
+                                  <Badge variant="outline" className="text-xs bg-yellow-50 border-yellow-300 text-yellow-700">
+                                    <Target className="h-3 w-3 mr-1" />
+                                    Qualificado
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {item.corretor_telefone}
+                                </span>
+                                <span>•</span>
+                                <span>Check-in: {formatTime(item.checkin_at)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(item)}
+                              <span className="text-sm font-medium">{item.status_legivel}</span>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-xs",
+                                (item.leads_ativos || 0) >= 5 && "bg-red-100 border-red-300 text-red-700"
+                              )}
+                            >
+                              {item.leads_ativos || 0}/5 leads
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {item.checkin_method}
+                            </Badge>
                           </div>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(item)}
-                          <span className="text-sm font-medium">{item.status_legivel}</span>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-xs",
-                            (item.leads_ativos || 0) >= 5 && "bg-red-100 border-red-300 text-red-700"
-                          )}
-                        >
-                          {item.leads_ativos || 0}/5 leads
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {item.checkin_method}
-                        </Badge>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                )}
+              </TabsContent>
+
+              <TabsContent value="leads" className="mt-0">
+                {fila.filter(f => f.qualificado).length === 0 ? (
+                  <div className="text-center py-8">
+                    <Target className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                    <h3 className="font-semibold">Nenhum corretor qualificado</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Corretores precisam fazer {plantao.meta_ofertas || 30} ofertas para se qualificar
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {fila
+                      .filter(f => f.qualificado)
+                      .sort((a, b) => (a.posicao_leads || 999) - (b.posicao_leads || 999))
+                      .map((item, index) => (
+                      <div
+                        key={item.presenca_id}
+                        className={cn(
+                          "p-4 rounded-lg border transition-colors",
+                          getStatusColor(item)
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 border-yellow-300 border text-sm font-bold text-yellow-700">
+                              {item.posicao_leads || index + 1}
+                            </div>
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={item.corretor_avatar || undefined} />
+                              <AvatarFallback>
+                                {item.corretor_nome?.slice(0, 2).toUpperCase() || "??"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{item.corretor_nome}</p>
+                                <Badge variant="outline" className="text-xs bg-emerald-50 border-emerald-300 text-emerald-700">
+                                  <Star className="h-3 w-3 mr-1" />
+                                  {item.total_ofertas || 0} ofertas
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {item.corretor_telefone}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(item)}
+                              <span className="text-sm font-medium">{item.status_legivel}</span>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-xs",
+                                (item.leads_ativos || 0) >= 5 && "bg-red-100 border-red-300 text-red-700"
+                              )}
+                            >
+                              {item.leads_ativos || 0}/5 leads
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
