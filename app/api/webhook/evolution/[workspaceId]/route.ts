@@ -590,6 +590,7 @@ async function handleNewMessage(workspaceId: number, data: any) {
           );
         } else {
           await query.insert('whatsapp_contacts', {
+            tenant_id: workspaceId,
             instance_name: data.instance,
             phone_number: phoneNumber,
             contact_name: phoneNumber,
