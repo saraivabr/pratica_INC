@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import {
   LayoutDashboard,
   ShoppingCart,
+  Calculator,
   Users,
   CalendarDays,
   Wallet,
@@ -28,6 +29,11 @@ const sidebarItems = [
     href: "/admin/intermediacao/vendas",
     label: "Vendas",
     icon: ShoppingCart,
+  },
+  {
+    href: "/admin/intermediacao/comissao",
+    label: "Planilha Comissao",
+    icon: Calculator,
   },
   {
     href: "/admin/intermediacao/beneficiarios",
