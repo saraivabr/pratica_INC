@@ -45,7 +45,7 @@ export function FunnelQuickView({ stages = [], totalLeads = 1 }: FunnelQuickView
           <Button
             variant="ghost"
             className="w-full text-xs h-8 mt-2 text-primary hover:bg-primary/5"
-            onClick={() => router.push("/admin/pipeline")}
+            onClick={() => router.push("/admin/leads")}
           >
             Ver Funil Completo <ChevronRight className="h-3 w-3 ml-1" />
           </Button>

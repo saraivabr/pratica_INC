@@ -45,6 +45,8 @@ import {
   Contact,
   Grid3X3,
   Table,
+  Plus,
+  UserPlus,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -52,7 +54,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/lib/auth-context"
 import { useRoletaStatus } from "@/hooks/use-roleta-status"
-import { RoletaFloatingWidget } from "@/components/roleta-floating-widget"
 import {
   Tooltip,
   TooltipContent,
@@ -60,6 +61,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { NavGroup } from "@/components/ui/nav-group"
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover"
 
 // ────────────────────────────────────────────────────────
 // Corretor Navigation - Primary (core) + Secondary (bonificados)
@@ -97,8 +103,7 @@ const adminGroups = {
     defaultOpen: true,
     items: [
       { href: "/admin", icon: Gauge, label: "Painel", description: "Dashboard geral" },
-      { href: "/admin/pipeline", icon: Target, label: "Funil de Vendas", description: "Pipeline de conversão" },
-      { href: "/admin/leads", icon: UserCircle, label: "Leads", description: "Todos os leads" },
+      { href: "/admin/leads", icon: Target, label: "Leads & Funil", description: "Pipeline de vendas e leads" },
     ],
   },
   comunicacao: {
@@ -164,10 +169,35 @@ const corretorMobileNavItems = [
 // Mobile bottom nav for admin (5 main items)
 const adminMobileNavItems = [
   { href: "/admin", icon: Gauge, label: "Painel" },
-  { href: "/admin/pipeline", icon: Target, label: "Funil" },
+  { href: "/admin/leads", icon: Target, label: "Leads" },
   { href: "/admin/whatsapp", icon: Smartphone, label: "WhatsApp" },
   { href: "/corretor/assistente", icon: Sparkles, label: "IA", highlight: true },
-  { href: "/admin/leads", icon: UserCircle, label: "Leads" },
+]
+
+// ────────────────────────────────────────────────────────
+// Recepcionista Navigation - simplified
+// ────────────────────────────────────────────────────────
+const recepcionistaNavItems = [
+  { href: "/recepcionista", icon: ClipboardList, label: "Cadastro de Leads", description: "Registrar novos leads" },
+]
+
+const recepcionistaMobileNavItems = [
+  { href: "/recepcionista", icon: ClipboardList, label: "Leads" },
+]
+
+// ────────────────────────────────────────────────────────
+// Quick Actions (for "Novo" button)
+// ────────────────────────────────────────────────────────
+const adminQuickActions = [
+  { href: "/calculadora", icon: Calculator, label: "Nova Simulação", description: "Simular financiamento" },
+  { href: "/admin/eventos/novo", icon: PartyPopper, label: "Novo Evento", description: "Criar evento para corretores" },
+  { href: "/admin/leads", icon: UserPlus, label: "Novo Lead", description: "Cadastrar novo lead" },
+]
+
+const corretorQuickActions = [
+  { href: "/calculadora", icon: Calculator, label: "Nova Simulação", description: "Simular financiamento" },
+  { href: "/corretor/clientes", icon: UserPlus, label: "Novo Lead", description: "Cadastrar novo cliente" },
+  { href: "/corretor/propostas", icon: FileText, label: "Nova Proposta", description: "Criar proposta comercial" },
 ]
 
 // ────────────────────────────────────────────────────────
@@ -387,6 +417,109 @@ function SidebarDivider() {
 }
 
 // ────────────────────────────────────────────────────────
+// Quick Action Button (Novo)
+// ────────────────────────────────────────────────────────
+function QuickActionButton({
+  isCollapsed,
+  isCorretorView,
+  onNavigate,
+}: {
+  isCollapsed: boolean
+  isCorretorView: boolean
+  onNavigate?: () => void
+}) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const actions = isCorretorView ? corretorQuickActions : adminQuickActions
+
+  const handleAction = (href: string) => {
+    setOpen(false)
+    router.push(href)
+    onNavigate?.()
+  }
+
+  if (isCollapsed) {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button
+                className="flex items-center justify-center h-9 w-9 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-md shadow-violet-500/25 hover:shadow-violet-500/40 transition-all"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          {!open && (
+            <TooltipContent side="right" sideOffset={8} className="text-xs font-medium">
+              Novo
+            </TooltipContent>
+          )}
+        </Tooltip>
+        <PopoverContent side="right" sideOffset={12} align="start" className="w-72 p-0 border-zinc-200/80 dark:border-zinc-700/80 shadow-xl rounded-xl overflow-hidden">
+          <div className="px-4 pt-3 pb-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Criar novo</p>
+          </div>
+          <div className="px-2 pb-2 space-y-0.5">
+            {actions.map((action) => (
+              <button
+                key={action.href}
+                onClick={() => handleAction(action.href)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors group/action"
+              >
+                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-violet-500/10 dark:bg-violet-500/15 shrink-0">
+                  <action.icon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100">{action.label}</p>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">{action.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+    )
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white text-[13px] font-semibold shadow-md shadow-violet-500/25 hover:shadow-violet-500/40 transition-all"
+        >
+          <Plus className="h-4.5 w-4.5" />
+          <span>Novo</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="right" sideOffset={12} align="start" className="w-72 p-0 border-zinc-200/80 dark:border-zinc-700/80 shadow-xl rounded-xl overflow-hidden">
+        <div className="px-4 pt-3 pb-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Criar novo</p>
+        </div>
+        <div className="px-2 pb-2 space-y-0.5">
+          {actions.map((action) => (
+            <button
+              key={action.href}
+              onClick={() => handleAction(action.href)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors group/action"
+            >
+              <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-violet-500/10 dark:bg-violet-500/15 shrink-0">
+                <action.icon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100">{action.label}</p>
+                <p className="text-[11px] text-zinc-400 dark:text-zinc-500">{action.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+// ────────────────────────────────────────────────────────
 // Main AppShell
 // ────────────────────────────────────────────────────────
 const navItems = [
@@ -413,14 +546,19 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
     router.push("/login")
   }
 
-  const showAdminSection = user?.role !== "corretor"
+  const showAdminSection = user?.role !== "corretor" && user?.role !== "recepcionista"
   const isCorretor = user?.role === "corretor"
+  const isRecepcionista = user?.hierarquia?.slug === "recepcionista" || user?.role === "recepcionista"
 
   // Determine current view based on pathname
-  const currentView: "admin" | "corretor" = pathname.startsWith("/corretor") ? "corretor" : "admin"
+  const currentView: "admin" | "corretor" | "recepcionista" = pathname.startsWith("/recepcionista")
+    ? "recepcionista"
+    : pathname.startsWith("/corretor")
+      ? "corretor"
+      : "admin"
 
   // Roleta status polling (only for corretor views)
-  const isCorretorView = isCorretor || currentView === "corretor"
+  const isCorretorView = !isRecepcionista && (isCorretor || currentView === "corretor")
   const isOnRecepcaoPage = pathname.startsWith("/corretor/recepcao")
   const roletaStatus = useRoletaStatus(isCorretorView)
 
@@ -487,6 +625,20 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
         })}
       </>
     )
+  }
+
+  const renderRecepcionistaNav = (collapsed: boolean) => {
+    return recepcionistaNavItems.map((item) => {
+      const isActive = pathname === item.href || (item.href !== "/recepcionista" && pathname.startsWith(item.href))
+      return (
+        <NavItem
+          key={item.href}
+          item={item}
+          isActive={isActive}
+          isCollapsed={collapsed}
+        />
+      )
+    })
   }
 
   const renderAdminNav = (collapsed: boolean) => {
@@ -589,11 +741,18 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
             )}
           </AnimatePresence>
 
+          {/* Quick Action Button */}
+          <div className={cn("px-2 pt-2", sidebarCollapsed ? "flex justify-center" : "px-3")}>
+            <QuickActionButton isCollapsed={sidebarCollapsed} isCorretorView={isCorretor || currentView === "corretor"} />
+          </div>
+
           {/* Navigation */}
           <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto overflow-x-hidden w-full scrollbar-thin">
-            {(isCorretor || currentView === "corretor")
-              ? renderCorretorNav(sidebarCollapsed)
-              : renderAdminNav(sidebarCollapsed)
+            {isRecepcionista
+              ? renderRecepcionistaNav(sidebarCollapsed)
+              : (isCorretor || currentView === "corretor")
+                ? renderCorretorNav(sidebarCollapsed)
+                : renderAdminNav(sidebarCollapsed)
             }
           </nav>
 
@@ -614,7 +773,7 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate group-hover:text-zinc-700 dark:group-hover:text-white">{user?.nome || "Usuário"}</p>
                   <p className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate">
-                    {user?.role === "admin" ? "Administrador" : user?.role === "gerente" ? "Gerente" : "Corretor"}
+                    {user?.role === "admin" ? "Administrador" : user?.role === "gerente" ? "Gerente" : user?.role === "recepcionista" ? "Recepcionista" : "Corretor"}
                   </p>
                 </div>
               </Link>
@@ -710,7 +869,7 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-zinc-900 dark:text-zinc-100 truncate text-[14px]">{user?.nome || "Usuário"}</p>
                     <p className="text-[12px] text-zinc-400 dark:text-zinc-500 truncate">
-                      {user?.role === "admin" ? "Administrador" : user?.role === "gerente" ? "Gerente" : "Corretor"}
+                      {user?.role === "admin" ? "Administrador" : user?.role === "gerente" ? "Gerente" : user?.role === "recepcionista" ? "Recepcionista" : "Corretor"}
                     </p>
                   </div>
                 </Link>
@@ -730,9 +889,33 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
                 </button>
               </div>
 
+              {/* Quick Action Button */}
+              <div className="px-3 pb-2">
+                <QuickActionButton isCollapsed={false} isCorretorView={isCorretor || currentView === "corretor"} onNavigate={() => setSidebarOpen(false)} />
+              </div>
+
               {/* Navigation */}
               <nav className="flex-1 px-2 py-1 space-y-0.5 overflow-y-auto">
-                {(isCorretor || currentView === "corretor") ? (
+                {isRecepcionista ? (
+                  recepcionistaNavItems.map((item) => {
+                    const isActive = pathname === item.href
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150",
+                          isActive
+                            ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium shadow-sm"
+                            : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                        )}
+                      >
+                        <item.icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-current" : "text-zinc-400 dark:text-zinc-500")} />
+                        <span className="text-[13px]">{item.label}</span>
+                      </Link>
+                    )
+                  })
+                ) : (isCorretor || currentView === "corretor") ? (
                   <>
                     {corretorPrimaryItems.map((item) => {
                       const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
@@ -940,13 +1123,8 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
           </main>
         </div>
 
-        {/* Roleta Floating Widget */}
-        {isCorretorView && !isOnRecepcaoPage && (
-          <RoletaFloatingWidget status={roletaStatus} loading={roletaStatus.loading} />
-        )}
-
         {/* Floating Prática IA Button */}
-        {(isCorretor || currentView === "corretor") && !pathname.startsWith("/corretor/assistente") && (
+        {!isRecepcionista && (isCorretor || currentView === "corretor") && !pathname.startsWith("/corretor/assistente") && (
           <Link
             href="/corretor/assistente"
             className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 group"
@@ -964,8 +1142,8 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
         {/* Mobile Bottom Nav */}
         <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-t border-zinc-200/80 dark:border-zinc-800/80 px-2 pb-safe">
           <div className="flex items-center justify-around h-16">
-            {((isCorretor || currentView === "corretor") ? corretorMobileNavItems : adminMobileNavItems).map((item) => {
-              const baseHref = (isCorretor || currentView === "corretor") ? "/corretor" : "/admin"
+            {(isRecepcionista ? recepcionistaMobileNavItems : (isCorretor || currentView === "corretor") ? corretorMobileNavItems : adminMobileNavItems).map((item) => {
+              const baseHref = isRecepcionista ? "/recepcionista" : (isCorretor || currentView === "corretor") ? "/corretor" : "/admin"
               const isActive = pathname === item.href || (item.href !== baseHref && item.href !== "/" && pathname.startsWith(item.href))
               const isHighlight = (item as any).highlight
               return (

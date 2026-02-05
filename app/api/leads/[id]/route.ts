@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
 import pool from '@/lib/db';
+import { dbQuery } from '@/lib/db';
 
 interface CorretorInfo {
     id?: number;
@@ -99,6 +100,7 @@ function normalizeLead(lead: DBLead, interacoes: DBInteracao[] = []) {
         tags: tags || [],
         ultima_conversao: lead.ultima_data_conversao,
         synced_at: lead.synced_at,
+        observacao: (lead as any).observacao || null,
         interacoes: interacoes.map(i => ({
             id: i.id,
             tipo: i.tipo || 'Interação',
@@ -136,7 +138,7 @@ export async function GET(
                 idlead, nome, email, telefone, cpf, data_cad, origem, midia_principal,
                 corretor, corretor_id, imobiliaria, situacao, situacao_id,
                 empreendimento, score, valor_negocio, renda_familiar,
-                cidade, estado, bairro, cep, endereco, tags, ultima_data_conversao, synced_at
+                cidade, estado, bairro, cep, endereco, tags, ultima_data_conversao, synced_at, observacao
             FROM cvcrm_leads
             WHERE workspace_id = $1 AND idlead = $2
         `;
@@ -177,6 +179,100 @@ export async function GET(
         console.error('Erro ao buscar lead:', error);
         return NextResponse.json(
             { error: 'Erro ao buscar lead', details: String(error) },
+            { status: 500 }
+        );
+    }
+}
+
+// Campos editaveis permitidos (whitelist)
+const EDITABLE_FIELDS: Record<string, string> = {
+    nome: 'nome',
+    email: 'email',
+    telefone: 'telefone',
+    cpf: 'cpf',
+    cidade: 'cidade',
+    estado: 'estado',
+    bairro: 'bairro',
+    cep: 'cep',
+    endereco: 'endereco',
+    origem: 'origem',
+    valor_negocio: 'valor_negocio',
+    renda_familiar: 'renda_familiar',
+    observacao: 'observacao',
+};
+
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params;
+        const leadId = parseInt(id);
+
+        if (isNaN(leadId)) {
+            return NextResponse.json({ error: 'ID invalido' }, { status: 400 });
+        }
+
+        const ctx = await requireWorkspaceContext(request);
+        if (ctx.error) return ctx.error;
+
+        const { workspaceId, user } = ctx;
+
+        const body = await request.json();
+
+        // Build SET clause from allowed fields only
+        const setClauses: string[] = [];
+        const values: any[] = [];
+        let paramIndex = 1;
+
+        for (const [key, dbColumn] of Object.entries(EDITABLE_FIELDS)) {
+            if (body[key] !== undefined) {
+                let value = body[key];
+                // Sanitize numeric fields
+                if (key === 'valor_negocio' || key === 'renda_familiar') {
+                    value = value === '' || value === null ? null : Number(value);
+                    if (value !== null && isNaN(value)) continue;
+                }
+                // Sanitize string fields - trim
+                if (typeof value === 'string') {
+                    value = value.trim();
+                }
+                setClauses.push(`${dbColumn} = $${paramIndex}`);
+                values.push(value);
+                paramIndex++;
+            }
+        }
+
+        if (setClauses.length === 0) {
+            return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 });
+        }
+
+        // Add updated_at
+        setClauses.push(`updated_at = NOW()`);
+
+        // Add workspace and lead id params
+        values.push(workspaceId, leadId);
+
+        const query = `
+            UPDATE cvcrm_leads
+            SET ${setClauses.join(', ')}
+            WHERE workspace_id = $${paramIndex} AND idlead = $${paramIndex + 1}
+            RETURNING idlead, nome, email, telefone, cidade, estado, valor_negocio, renda_familiar
+        `;
+
+        const result = await pool.query(query, values);
+
+        if (result.rows.length === 0) {
+            return NextResponse.json({ error: 'Lead nao encontrado' }, { status: 404 });
+        }
+
+        console.log(`[LEAD] Updated fields [${Object.keys(body).filter(k => EDITABLE_FIELDS[k]).join(', ')}] for lead ${leadId} by user ${(user as any).id}`);
+
+        return NextResponse.json({ success: true, data: result.rows[0] });
+    } catch (error) {
+        console.error('Erro ao atualizar lead:', error);
+        return NextResponse.json(
+            { error: 'Erro ao atualizar lead', details: String(error) },
             { status: 500 }
         );
     }

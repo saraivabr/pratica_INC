@@ -2,18 +2,61 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { KanbanLead } from "./types";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { KanbanLead, JOURNEY_STEPS, getJourneyProgress } from "./types";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { CalendarClock, Phone, MoreHorizontal, Flame, Snowflake, Sun } from "lucide-react";
+import {
+  Building2,
+  CalendarClock,
+  DollarSign,
+  Flame,
+  Phone,
+  Snowflake,
+  Sun,
+  User,
+  FileCheck,
+  BookmarkCheck,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface KanbanCardProps {
   lead: KanbanLead;
   onClick?: () => void;
 }
+
+function getInitials(name: string): string {
+  if (!name) return "?";
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+function formatCompactCurrency(value: number): string {
+  if (!value || !isFinite(value)) return "";
+  if (value >= 1000000) return `R$${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `R$${(value / 1000).toFixed(0)}K`;
+  return `R$${value.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
+}
+
+const temperatureConfig = {
+  hot: {
+    border: "border-l-orange-500",
+    icon: <Flame className="h-3 w-3 text-orange-500" />,
+    label: "Quente",
+  },
+  warm: {
+    border: "border-l-amber-400",
+    icon: <Sun className="h-3 w-3 text-amber-500" />,
+    label: "Morno",
+  },
+  cold: {
+    border: "border-l-blue-400",
+    icon: <Snowflake className="h-3 w-3 text-blue-400" />,
+    label: "Frio",
+  },
+} as const;
 
 export function KanbanCard({ lead, onClick }: KanbanCardProps) {
   const {
@@ -25,10 +68,7 @@ export function KanbanCard({ lead, onClick }: KanbanCardProps) {
     isDragging,
   } = useSortable({
     id: lead.id,
-    data: {
-      type: "Lead",
-      lead,
-    },
+    data: { type: "Lead", lead },
   });
 
   const style = {
@@ -41,75 +81,149 @@ export function KanbanCard({ lead, onClick }: KanbanCardProps) {
       <div
         ref={setNodeRef}
         style={style}
-        className="opacity-30 bg-primary/10 h-[150px] rounded-xl border-2 border-dashed border-primary"
+        className="opacity-40 bg-primary/5 h-[140px] rounded-lg border-2 border-dashed border-primary/40"
       />
     );
   }
 
-  const getTemperatureIcon = (temp?: string) => {
-    switch (temp) {
-      case "hot":
-        return <Flame className="h-3 w-3 text-orange-500" />;
-      case "cold":
-        return <Snowflake className="h-3 w-3 text-blue-400" />;
-      case "warm":
-        return <Sun className="h-3 w-3 text-yellow-500" />;
-      default:
-        return null;
-    }
-  };
+  const temp = lead.temperature ? temperatureConfig[lead.temperature] : null;
+  const journeyStep = getJourneyProgress(lead.stage_id);
+  const totalSteps = JOURNEY_STEPS.length;
+  const valorFormatted = formatCompactCurrency(lead.valor_negocio || 0);
+  const hasSimulacao = (lead.simulacoes || 0) > 0;
+  const hasReserva = (lead.reservas || 0) > 0;
 
   return (
-    <Card
+    <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className="cursor-grab active:cursor-grabbing hover:shadow-md transition-all bg-card/80 backdrop-blur-sm border-border/50 group"
+      className={cn(
+        "group cursor-grab active:cursor-grabbing",
+        "bg-card hover:bg-accent/50 dark:bg-card/90 dark:hover:bg-accent/30",
+        "rounded-lg border border-border/60 hover:border-border",
+        "border-l-[3px]",
+        temp?.border || "border-l-border",
+        "shadow-sm hover:shadow-md",
+        "transition-all duration-200 hover:-translate-y-0.5",
+        "p-3 space-y-2"
+      )}
     >
-      <CardHeader className="p-3 pb-0 space-y-0">
-        <div className="flex justify-between items-start">
-          <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal bg-background/50">
-            #{lead.id.slice(0, 4)}
-          </Badge>
+      {/* Row 1: Avatar + Name + Temp */}
+      <div className="flex items-start gap-2.5">
+        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+          <span className="text-[11px] font-bold text-primary">
+            {getInitials(lead.name)}
+          </span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm leading-tight truncate" title={lead.name}>
+            {lead.name}
+          </p>
+          {lead.corretor_nome && (
+            <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+              <User className="h-2.5 w-2.5 shrink-0" />
+              {lead.corretor_nome}
+            </p>
+          )}
+        </div>
+        {temp && (
+          <div className="shrink-0 mt-0.5" title={temp.label}>
+            {temp.icon}
+          </div>
+        )}
+      </div>
+
+      {/* Row 2: Empreendimento + Value */}
+      <div className="flex items-center justify-between gap-2">
+        {lead.empreendimento ? (
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <Building2 className="h-3 w-3 text-emerald-500 shrink-0" />
+            <span className="text-[11px] text-muted-foreground truncate">{lead.empreendimento}</span>
+          </div>
+        ) : (
+          <div />
+        )}
+        {valorFormatted && (
+          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0 flex items-center gap-0.5">
+            <DollarSign className="h-3 w-3" />
+            {valorFormatted}
+          </span>
+        )}
+      </div>
+
+      {/* Row 3: Journey progress dots */}
+      <div className="flex items-center gap-0.5">
+        {JOURNEY_STEPS.map((step, i) => {
+          const isCompleted = step.position <= journeyStep;
+          const isCurrent = step.position === journeyStep;
+          return (
+            <div key={step.id} className="flex items-center flex-1">
+              <div
+                className={cn(
+                  "h-1.5 w-full rounded-full transition-all",
+                  isCompleted
+                    ? isCurrent
+                      ? "bg-primary"
+                      : "bg-primary/50"
+                    : "bg-muted/40"
+                )}
+                title={step.label}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Row 4: Bottom - badges + date */}
+      <div className="flex items-center justify-between pt-0.5 border-t border-border/40">
+        <div className="flex items-center gap-1">
+          {hasSimulacao && (
+            <span
+              className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium"
+              title={`${lead.simulacoes} simulação(ões)`}
+            >
+              <FileCheck className="h-2.5 w-2.5" />
+              Sim
+            </span>
+          )}
+          {hasReserva && (
+            <span
+              className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 font-medium"
+              title={`${lead.reservas} reserva(s)`}
+            >
+              <BookmarkCheck className="h-2.5 w-2.5" />
+              Res
+            </span>
+          )}
           {lead.score !== undefined && lead.score > 0 && (
             <Badge
               variant="secondary"
-              className={`text-[10px] h-5 px-1.5 ${
-                lead.score > 80 ? "bg-green-500/10 text-green-600" : "bg-primary/10"
-              }`}
+              className={cn(
+                "text-[9px] h-4 px-1 font-semibold",
+                lead.score > 80
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : lead.score > 50
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  : "bg-muted text-muted-foreground"
+              )}
             >
-              {lead.score} pts
+              {lead.score}pts
             </Badge>
           )}
         </div>
-      </CardHeader>
-      <CardContent className="p-3 pt-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="font-semibold text-sm line-clamp-1" title={lead.name}>
-            {lead.name}
-          </div>
-          {getTemperatureIcon(lead.temperature)}
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <CalendarClock className="h-2.5 w-2.5" />
+          {lead.last_interaction_at
+            ? formatDistanceToNow(new Date(lead.last_interaction_at), {
+                locale: ptBR,
+                addSuffix: true,
+              })
+            : "Novo"}
         </div>
-        
-        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-           {lead.phone && <Phone className="h-3 w-3" />}
-           <span className="truncate">{lead.phone || "Sem telefone"}</span>
-        </div>
-
-        <div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <CalendarClock className="h-3 w-3" />
-            {lead.last_interaction_at
-              ? formatDistanceToNow(new Date(lead.last_interaction_at), { locale: ptBR, addSuffix: true })
-              : "Sem atividade"}
-          </div>
-          <Avatar className="h-5 w-5">
-             <AvatarFallback className="text-[9px]">JD</AvatarFallback>
-          </Avatar>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

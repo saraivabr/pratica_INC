@@ -13,12 +13,12 @@ import {
   DropAnimation,
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove } from "@dnd-kit/sortable";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { KanbanStage, KanbanLead } from "./types";
 import { KanbanColumn } from "./kanban-column";
 import { KanbanCard } from "./kanban-card";
-import { Loader2 } from "lucide-react";
+import { AddLeadDialog } from "./add-lead-dialog";
 import { toast } from "sonner";
 import { LeadDetailModal } from "@/components/lead";
 
@@ -34,11 +34,12 @@ export function KanbanBoard({ initialStages, initialLeads, onRefresh }: KanbanBo
   const [activeLead, setActiveLead] = useState<KanbanLead | null>(null);
   const [selectedLead, setSelectedLead] = useState<KanbanLead | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 10, // 10px movement to start drag
+        distance: 10,
       },
     })
   );
@@ -69,15 +70,12 @@ export function KanbanBoard({ initialStages, initialLeads, onRefresh }: KanbanBo
 
     if (!isActiveALead) return;
 
-    // Dragging a lead over another lead
     if (isActiveALead && isOverALead) {
       setLeads((prevLeads) => {
         const activeIndex = prevLeads.findIndex((l) => l.id === activeId);
         const overIndex = prevLeads.findIndex((l) => l.id === overId);
 
-        // If in different stages, update stage immediately for visual feedback
         if (prevLeads[activeIndex].stage_id !== prevLeads[overIndex].stage_id) {
-            // Create immutable update - never mutate state directly
             const updatedLeads = prevLeads.map((lead, idx) =>
               idx === activeIndex
                 ? { ...lead, stage_id: prevLeads[overIndex].stage_id }
@@ -90,18 +88,16 @@ export function KanbanBoard({ initialStages, initialLeads, onRefresh }: KanbanBo
       });
     }
 
-    // Dragging a lead over a column
     if (isActiveALead && isOverAColumn) {
       setLeads((prevLeads) => {
         const activeIndex = prevLeads.findIndex((l) => l.id === activeId);
         if (prevLeads[activeIndex].stage_id !== overId) {
-            // Create immutable update - never mutate state directly
             const updatedLeads = prevLeads.map((lead, idx) =>
               idx === activeIndex
                 ? { ...lead, stage_id: String(overId) }
                 : lead
             );
-            return arrayMove(updatedLeads, activeIndex, activeIndex); // Force re-render
+            return arrayMove(updatedLeads, activeIndex, activeIndex);
         }
         return prevLeads;
       });
@@ -132,10 +128,8 @@ export function KanbanBoard({ initialStages, initialLeads, onRefresh }: KanbanBo
         }
 
         if (newStageId && lead && lead.stage_id !== newStageId) {
-            // Optimistic update already happened in DragOver, but ensure consistency
-             setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, stage_id: newStageId! } : l));
-             
-             // Persist to API
+            setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, stage_id: newStageId! } : l));
+
              try {
                  await fetch('/api/crm/pipeline/move', {
                      method: 'POST',
@@ -144,7 +138,6 @@ export function KanbanBoard({ initialStages, initialLeads, onRefresh }: KanbanBo
                  toast.success("Lead movido com sucesso");
              } catch (error) {
                  toast.error("Erro ao mover lead");
-                 // Revert would go here
              }
         }
     }
@@ -161,38 +154,47 @@ export function KanbanBoard({ initialStages, initialLeads, onRefresh }: KanbanBo
   };
 
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
-    >
-      <div className="flex h-full gap-4 overflow-x-auto pb-4 items-start">
-        {stages.map((stage) => (
-          <KanbanColumn
-            key={stage.id}
-            stage={stage}
-            leads={leads.filter((l) => l.stage_id === stage.id)}
-            onCardClick={handleCardClick}
+    <>
+      <DndContext
+        sensors={sensors}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragEnd={onDragEnd}
+      >
+        <div className="flex h-full gap-3 overflow-x-auto pb-4 items-start">
+          {stages.map((stage) => (
+            <KanbanColumn
+              key={stage.id}
+              stage={stage}
+              leads={leads.filter((l) => l.stage_id === stage.id)}
+              onCardClick={handleCardClick}
+              onAddLead={() => setIsAddDialogOpen(true)}
+            />
+          ))}
+        </div>
+
+        {typeof document !== "undefined" && createPortal(
+          <DragOverlay dropAnimation={dropAnimation}>
+            {activeLead && <KanbanCard lead={activeLead} />}
+          </DragOverlay>,
+          document.body
+        )}
+
+        {selectedLead && (
+          <LeadDetailModal
+            lead={selectedLead}
+            open={isModalOpen}
+            onOpenChange={setIsModalOpen}
+            onUpdate={onRefresh}
           />
-        ))}
-      </div>
+        )}
+      </DndContext>
 
-      {createPortal(
-        <DragOverlay dropAnimation={dropAnimation}>
-          {activeLead && <KanbanCard lead={activeLead} />}
-        </DragOverlay>,
-        document.body
-      )}
-
-      {selectedLead && (
-        <LeadDetailModal
-          lead={selectedLead}
-          open={isModalOpen}
-          onOpenChange={setIsModalOpen}
-          onUpdate={onRefresh}
-        />
-      )}
-    </DndContext>
+      <AddLeadDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onLeadCreated={onRefresh}
+      />
+    </>
   );
 }

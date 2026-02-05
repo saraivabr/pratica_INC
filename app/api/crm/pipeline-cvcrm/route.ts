@@ -44,11 +44,17 @@ export async function GET(req: NextRequest) {
     const ctx = await requireWorkspaceContext(req);
     if (ctx.error) return ctx.error;
 
-    const { workspaceId } = ctx;
+    const { workspaceId, user } = ctx;
 
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "500");
     const corretorId = searchParams.get("corretor_id");
+
+    // Auto-filter by corretor for non-admin/gerente users
+    let effectiveCorretorId = corretorId ? parseInt(corretorId) : null;
+    if (!effectiveCorretorId && user.role !== 'admin' && user.role !== 'gerente') {
+      effectiveCorretorId = (user as any).cvcrm_id || null;
+    }
 
     // Buscar leads do CV CRM
     let query = `
@@ -60,12 +66,16 @@ export async function GET(req: NextRequest) {
         origem as source,
         score,
         valor_negocio,
+        renda_familiar,
         data_cad as created_at,
         ultima_data_conversao as last_interaction_at,
         situacao,
         corretor,
         empreendimento,
-        tags
+        tags,
+        qtde_simulacoes_associadas as simulacoes,
+        qtde_reservas_associadas as reservas,
+        possibilidade_venda
       FROM cvcrm_leads
       WHERE workspace_id = $1
     `;
@@ -73,9 +83,9 @@ export async function GET(req: NextRequest) {
     const params: any[] = [workspaceId];
     let paramIndex = 2;
 
-    if (corretorId) {
+    if (effectiveCorretorId) {
       query += ` AND corretor_id = $${paramIndex}`;
-      params.push(parseInt(corretorId));
+      params.push(effectiveCorretorId);
       paramIndex++;
     }
 
@@ -108,6 +118,13 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Parse renda_familiar
+      let rendaFamiliar = 0;
+      if (row.renda_familiar) {
+        const parsed = parseFloat(String(row.renda_familiar));
+        if (!isNaN(parsed) && isFinite(parsed)) rendaFamiliar = parsed;
+      }
+
       return {
         id: String(row.id),
         stage_id: stageId,
@@ -118,6 +135,7 @@ export async function GET(req: NextRequest) {
         score: row.score || 0,
         temperature,
         valor_negocio: valorNegocio,
+        renda_familiar: rendaFamiliar,
         created_at: row.created_at,
         last_interaction_at: row.last_interaction_at,
         situacao: situacaoNome,
@@ -125,6 +143,9 @@ export async function GET(req: NextRequest) {
         corretor_id: corretor?.id || null,
         empreendimento: Array.isArray(empreendimento) ? empreendimento[0]?.nome : empreendimento?.nome || null,
         tags: tags || [],
+        simulacoes: row.simulacoes || 0,
+        reservas: row.reservas || 0,
+        possibilidade_venda: row.possibilidade_venda || 0,
       };
     });
 

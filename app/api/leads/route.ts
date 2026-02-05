@@ -84,6 +84,81 @@ function normalizeLead(lead: DBLead) {
     };
 }
 
+export async function POST(request: NextRequest) {
+    try {
+        const ctx = await requireWorkspaceContext(request);
+        if (ctx.error) return ctx.error;
+
+        const { workspaceId, user } = ctx;
+        const body = await request.json();
+
+        const { nome, telefone, email, origem } = body;
+
+        if (!nome || typeof nome !== 'string' || nome.trim().length === 0) {
+            return NextResponse.json(
+                { error: 'Nome é obrigatório' },
+                { status: 400 }
+            );
+        }
+
+        // Generate a negative idlead for manual leads (to avoid conflict with CV CRM sync)
+        const idResult = await pool.query(
+            `SELECT COALESCE(MIN(idlead), 0) - 1 as next_id FROM cvcrm_leads WHERE idlead < 0`
+        );
+        const nextId = idResult.rows[0].next_id || -1;
+
+        const situacao = JSON.stringify({ id: null, nome: 'Novo' });
+
+        const insertQuery = `
+            INSERT INTO cvcrm_leads (
+                idlead, nome, email, telefone, origem, situacao,
+                data_cad, workspace_id, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, NOW(), NOW())
+            RETURNING idlead, nome, email, telefone, origem, situacao, data_cad
+        `;
+
+        const result = await pool.query(insertQuery, [
+            nextId,
+            nome.trim(),
+            email?.trim() || null,
+            telefone?.trim() || null,
+            origem?.trim() || 'Manual',
+            situacao,
+            workspaceId,
+        ]);
+
+        const lead = result.rows[0];
+
+        return NextResponse.json({
+            success: true,
+            lead: normalizeLead({
+                ...lead,
+                midia_principal: null,
+                corretor: null,
+                corretor_id: null,
+                imobiliaria: null,
+                situacao_id: null,
+                empreendimento: null,
+                score: null,
+                valor_negocio: null,
+                renda_familiar: null,
+                cidade: null,
+                estado: null,
+                bairro: null,
+                tags: null,
+                ultima_data_conversao: null,
+                synced_at: null,
+            }),
+        });
+    } catch (error) {
+        console.error('Erro ao criar lead:', error);
+        return NextResponse.json(
+            { error: 'Erro ao criar lead', details: String(error) },
+            { status: 500 }
+        );
+    }
+}
+
 export async function GET(request: NextRequest) {
     try {
         // Autenticação e contexto do tenant

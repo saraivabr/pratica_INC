@@ -939,7 +939,7 @@ export default function AdminPage() {
               <Button
                 variant="outline"
                 className="h-auto flex-col gap-2 p-4 border-blue-200 hover:border-blue-400 hover:bg-blue-50 dark:border-blue-900 dark:hover:bg-blue-950"
-                onClick={() => router.push("/admin/pipeline")}
+                onClick={() => router.push("/admin/leads")}
               >
                 <TrendingUp className="h-5 w-5 text-blue-600" />
                 <span className="text-xs font-medium">Pipeline</span>
