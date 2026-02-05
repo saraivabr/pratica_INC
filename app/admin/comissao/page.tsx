@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import {
   Plus,
   Trash2,
@@ -13,9 +13,33 @@ import {
   BarChart3,
   AlertCircle,
   Check,
+  Copy,
+  RotateCcw,
+  Printer,
+  Save,
+  FileDown,
+  Search,
+  Loader2,
+  GripVertical,
+  Zap,
 } from "lucide-react"
+import {
+  DndContext,
+  closestCenter,
+  useSensors,
+  useSensor,
+  PointerSensor,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { AppShell } from "@/components/app-shell"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -29,12 +53,18 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { arredondarValor, formatarMoeda } from "@/lib/comissao/calculations"
+import { TEMPLATES_PARCELAS, type TemplateParcelaItem } from "@/lib/comissao/types"
+import {
+  BENEFICIARIOS_PADRAO_PRT,
+  CARGOS_PRT,
+  formatarDocumento,
+} from "@/lib/comissao/beneficiarios-padrao"
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type TipoParcela = "ato" | "mensal" | "bimestral" | "trimestral" | "semestral" | "anual" | "financiamento" | "intercalada" | "chaves" | "personalizado"
+type TipoParcela = "ato" | "mensal" | "bimestral" | "trimestral" | "semestral" | "anual" | "financiamento" | "intercalada" | "chaves" | "entrada" | "personalizado"
 
 interface SerieParcela {
   id: string
@@ -59,12 +89,31 @@ interface CelulaRateio {
   pago: boolean
 }
 
+interface EmpreendimentoBusca {
+  id: string
+  nome: string
+  cidade?: string
+  uf?: string
+}
+
+interface UnidadeBusca {
+  id: string
+  codigo?: string
+  bloco?: string
+  andar?: string
+  area?: number
+  tipologia?: string
+  valor_tabela?: number
+  empreendimento_nome: string
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
 const TIPO_PARCELA_LABELS: Record<TipoParcela, string> = {
   ato: "Ato",
+  entrada: "Entrada",
   mensal: "Mensal",
   bimestral: "Bimestral",
   trimestral: "Trimestral",
@@ -87,6 +136,8 @@ const CARGOS_PADRAO = [
   "Corretor",
 ]
 
+const STORAGE_KEY = "pratica_comissao_simulacao"
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -101,9 +152,150 @@ function parseCurrencyInput(value: string): number {
   return isNaN(num) ? 0 : num
 }
 
-function formatInputCurrency(value: number): string {
+function formatDisplayCurrency(value: number): string {
   if (value === 0) return ""
   return value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function formatCpfMask(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11)
+  if (digits.length <= 3) return digits
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
+}
+
+// ============================================================================
+// CURRENCY INPUT
+// ============================================================================
+
+function CurrencyInput({
+  value,
+  onChange,
+  className,
+  placeholder = "0,00",
+}: {
+  value: number
+  onChange: (v: number) => void
+  className?: string
+  placeholder?: string
+}) {
+  const [raw, setRaw] = useState<string | null>(null)
+  const isEditing = raw !== null
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      placeholder={placeholder}
+      className={className}
+      value={isEditing ? raw : formatDisplayCurrency(value)}
+      onChange={e => {
+        const v = e.target.value
+        setRaw(v)
+        onChange(parseCurrencyInput(v))
+      }}
+      onFocus={e => {
+        setRaw(value === 0 ? "" : String(value).replace(".", ","))
+        requestAnimationFrame(() => e.target.select())
+      }}
+      onBlur={() => setRaw(null)}
+    />
+  )
+}
+
+// ============================================================================
+// AUTOCOMPLETE INPUT
+// ============================================================================
+
+function AutocompleteInput({
+  value,
+  onChange,
+  onSelect,
+  placeholder,
+  fetchUrl,
+  renderItem,
+  getId,
+  getLabel,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onSelect: (item: any) => void
+  placeholder: string
+  fetchUrl: (query: string) => string
+  renderItem: (item: any) => React.ReactNode
+  getId: (item: any) => string
+  getLabel: (item: any) => string
+}) {
+  const [open, setOpen] = useState(false)
+  const [results, setResults] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<NodeJS.Timeout>()
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const search = useCallback((query: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (query.length < 2) { setResults([]); setOpen(false); return }
+
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const res = await fetch(fetchUrl(query))
+        const json = await res.json()
+        if (json.success && json.data) {
+          setResults(json.data)
+          setOpen(json.data.length > 0)
+        }
+      } catch { /* ignore */ }
+      setLoading(false)
+    }, 300)
+  }, [fetchUrl])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+        <Input
+          placeholder={placeholder}
+          className="pl-8"
+          value={value}
+          onChange={e => {
+            onChange(e.target.value)
+            search(e.target.value)
+          }}
+          onFocus={() => { if (results.length > 0) setOpen(true) }}
+        />
+        {loading && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 animate-spin" />}
+      </div>
+      {open && results.length > 0 && (
+        <div className="absolute z-50 top-full mt-1 w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {results.map(item => (
+            <button
+              key={getId(item)}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              onClick={() => {
+                onSelect(item)
+                onChange(getLabel(item))
+                setOpen(false)
+              }}
+            >
+              {renderItem(item)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ============================================================================
@@ -116,12 +308,14 @@ function Section({
   number,
   children,
   defaultOpen = true,
+  actions,
 }: {
   title: string
   icon: React.ElementType
   number: number
   children: React.ReactNode
   defaultOpen?: boolean
+  actions?: React.ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
 
@@ -138,11 +332,10 @@ function Section({
           <Icon className="h-5 w-5 text-zinc-500" />
           <span className="font-semibold text-zinc-900 dark:text-zinc-100">{title}</span>
         </div>
-        {open ? (
-          <ChevronUp className="h-5 w-5 text-zinc-400" />
-        ) : (
-          <ChevronDown className="h-5 w-5 text-zinc-400" />
-        )}
+        <div className="flex items-center gap-2">
+          {actions && open && <div onClick={e => e.stopPropagation()}>{actions}</div>}
+          {open ? <ChevronUp className="h-5 w-5 text-zinc-400" /> : <ChevronDown className="h-5 w-5 text-zinc-400" />}
+        </div>
       </button>
       {open && (
         <CardContent className="px-5 pb-5 pt-0 border-t border-zinc-200/60 dark:border-zinc-800/60">
@@ -154,27 +347,153 @@ function Section({
 }
 
 // ============================================================================
+// SORTABLE AUTONOMO ROW
+// ============================================================================
+
+function SortableAutonomoRow({
+  autonomo,
+  totalAutonomos,
+  valorComissao,
+  onUpdate,
+  onRemove,
+}: {
+  autonomo: Autonomo
+  totalAutonomos: number
+  valorComissao: number
+  onUpdate: (id: string, field: keyof Autonomo, value: string | number) => void
+  onRemove: (id: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: autonomo.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      {/* Desktop */}
+      <div className="hidden sm:grid grid-cols-[28px_1fr_140px_80px_1fr_40px] gap-2 items-center bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-2">
+        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-600 flex items-center justify-center">
+          <GripVertical className="h-4 w-4" />
+        </button>
+
+        <Input placeholder="Nome" className="h-9" value={autonomo.nome} onChange={e => onUpdate(autonomo.id, "nome", e.target.value)} />
+
+        <Select value={autonomo.cargo} onValueChange={v => onUpdate(autonomo.id, "cargo", v)}>
+          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {CARGOS_PADRAO.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
+          </SelectContent>
+        </Select>
+
+        <Input
+          type="number" step="0.1" min="0" max="100" className="h-9"
+          value={autonomo.percentual || ""} onChange={e => onUpdate(autonomo.id, "percentual", parseFloat(e.target.value) || 0)}
+        />
+
+        <CurrencyInput className="h-9" value={autonomo.valorBruto} onChange={v => onUpdate(autonomo.id, "valorBruto", v)} />
+
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-red-500" onClick={() => onRemove(autonomo.id)}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Mobile */}
+      <div className="sm:hidden bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-zinc-400">
+              <GripVertical className="h-4 w-4" />
+            </button>
+            <Badge variant="secondary" className="text-xs">#{autonomo.prioridade}</Badge>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-red-500" onClick={() => onRemove(autonomo.id)}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <Input placeholder="Nome" className="h-9" value={autonomo.nome} onChange={e => onUpdate(autonomo.id, "nome", e.target.value)} />
+        <div className="grid grid-cols-2 gap-2">
+          <Select value={autonomo.cargo} onValueChange={v => onUpdate(autonomo.id, "cargo", v)}>
+            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {CARGOS_PADRAO.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
+            </SelectContent>
+          </Select>
+          <div className="relative">
+            <Input
+              type="number" step="0.1" min="0" max="100" className="h-9 pr-6"
+              value={autonomo.percentual || ""} onChange={e => onUpdate(autonomo.id, "percentual", parseFloat(e.target.value) || 0)}
+            />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400">%</span>
+          </div>
+        </div>
+        <CurrencyInput value={autonomo.valorBruto} onChange={v => onUpdate(autonomo.id, "valorBruto", v)} />
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // MAIN PAGE COMPONENT
 // ============================================================================
 
 export default function ComissaoCalculadoraPage() {
   // ── Section 1: Dados do Imovel e Cliente ──
   const [empreendimento, setEmpreendimento] = useState("")
+  const [empreendimentoId, setEmpreendimentoId] = useState<string | null>(null)
   const [unidade, setUnidade] = useState("")
   const [clienteNome, setClienteNome] = useState("")
   const [clienteCpf, setClienteCpf] = useState("")
   const [valorImovel, setValorImovel] = useState(0)
   const [percentualComissao, setPercentualComissao] = useState(5)
 
-  // ── Section 2: Proposta do Cliente (Series de Parcelas) ──
+  // ── Section 2: Proposta do Cliente ──
   const [series, setSeries] = useState<SerieParcela[]>([])
 
   // ── Section 3: Autonomos ──
   const [autonomos, setAutonomos] = useState<Autonomo[]>([])
 
-  // ── Section 4: Rateio (grid auto x datas) ──
+  // ── Section 4: Rateio ──
   const [rateioGrid, setRateioGrid] = useState<Record<string, Record<string, CelulaRateio>>>({})
   const [rateioCalculado, setRateioCalculado] = useState(false)
+
+  // ── localStorage persistence ──
+  const [loaded, setLoaded] = useState(false)
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        const data = JSON.parse(saved)
+        if (data.empreendimento) setEmpreendimento(data.empreendimento)
+        if (data.unidade) setUnidade(data.unidade)
+        if (data.clienteNome) setClienteNome(data.clienteNome)
+        if (data.clienteCpf) setClienteCpf(data.clienteCpf)
+        if (data.valorImovel) setValorImovel(data.valorImovel)
+        if (data.percentualComissao) setPercentualComissao(data.percentualComissao)
+        if (data.series) setSeries(data.series)
+        if (data.autonomos) setAutonomos(data.autonomos)
+      }
+    } catch { /* ignore */ }
+    setLoaded(true)
+  }, [])
+
+  // Save to localStorage on changes
+  useEffect(() => {
+    if (!loaded) return
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        empreendimento, unidade, clienteNome, clienteCpf,
+        valorImovel, percentualComissao, series, autonomos,
+      }))
+    } catch { /* ignore */ }
+  }, [loaded, empreendimento, unidade, clienteNome, clienteCpf, valorImovel, percentualComissao, series, autonomos])
+
+  // ── DnD sensors ──
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   // ── Calculated values ──
   const valorComissao = useMemo(
@@ -207,23 +526,52 @@ export default function ComissaoCalculadoraPage() {
     [totalProposta, totalValorAutonomos]
   )
 
+  // ── Parcela labels for rateio ──
+  const parcelaLabels = useMemo(() => {
+    const labels: string[] = []
+    series.forEach(s => {
+      for (let i = 0; i < s.quantidade; i++) {
+        labels.push(s.quantidade === 1 ? TIPO_PARCELA_LABELS[s.tipo] : `${TIPO_PARCELA_LABELS[s.tipo]} ${i + 1}`)
+      }
+    })
+    return labels
+  }, [series])
+
+  // ── Reset all ──
+  const resetAll = useCallback(() => {
+    setEmpreendimento("")
+    setEmpreendimentoId(null)
+    setUnidade("")
+    setClienteNome("")
+    setClienteCpf("")
+    setValorImovel(0)
+    setPercentualComissao(5)
+    setSeries([])
+    setAutonomos([])
+    setRateioGrid({})
+    setRateioCalculado(false)
+    localStorage.removeItem(STORAGE_KEY)
+  }, [])
+
   // ── Series helpers ──
   const addSerie = useCallback(() => {
-    setSeries(prev => [
-      ...prev,
-      {
-        id: generateId(),
-        tipo: "mensal",
-        quantidade: 1,
-        valorUnitario: 0,
-        valorTotal: 0,
-        percentualDoImovel: 0,
-      },
-    ])
+    setSeries(prev => [...prev, { id: generateId(), tipo: "mensal", quantidade: 1, valorUnitario: 0, valorTotal: 0, percentualDoImovel: 0 }])
   }, [])
 
   const removeSerie = useCallback((id: string) => {
     setSeries(prev => prev.filter(s => s.id !== id))
+  }, [])
+
+  const duplicateSerie = useCallback((id: string) => {
+    setSeries(prev => {
+      const src = prev.find(s => s.id === id)
+      if (!src) return prev
+      const idx = prev.indexOf(src)
+      const clone = { ...src, id: generateId() }
+      const arr = [...prev]
+      arr.splice(idx + 1, 0, clone)
+      return arr
+    })
   }, [])
 
   const updateSerie = useCallback(
@@ -232,29 +580,17 @@ export default function ComissaoCalculadoraPage() {
         prev.map(s => {
           if (s.id !== id) return s
           const updated = { ...s, [field]: value }
-
-          // Recalculate dependent fields
           if (field === "quantidade" || field === "valorUnitario") {
             updated.valorTotal = arredondarValor(updated.quantidade * updated.valorUnitario)
-            updated.percentualDoImovel = valorImovel > 0
-              ? arredondarValor((updated.valorTotal / valorImovel) * 100)
-              : 0
+            updated.percentualDoImovel = valorImovel > 0 ? arredondarValor((updated.valorTotal / valorImovel) * 100) : 0
           }
           if (field === "valorTotal") {
-            updated.valorUnitario = updated.quantidade > 0
-              ? arredondarValor((value as number) / updated.quantidade)
-              : 0
-            updated.percentualDoImovel = valorImovel > 0
-              ? arredondarValor(((value as number) / valorImovel) * 100)
-              : 0
+            updated.valorUnitario = updated.quantidade > 0 ? arredondarValor((value as number) / updated.quantidade) : 0
+            updated.percentualDoImovel = valorImovel > 0 ? arredondarValor(((value as number) / valorImovel) * 100) : 0
           }
           if (field === "percentualDoImovel") {
-            updated.valorTotal = valorImovel > 0
-              ? arredondarValor(valorImovel * ((value as number) / 100))
-              : 0
-            updated.valorUnitario = updated.quantidade > 0
-              ? arredondarValor(updated.valorTotal / updated.quantidade)
-              : 0
+            updated.valorTotal = valorImovel > 0 ? arredondarValor(valorImovel * ((value as number) / 100)) : 0
+            updated.valorUnitario = updated.quantidade > 0 ? arredondarValor(updated.valorTotal / updated.quantidade) : 0
           }
           return updated
         })
@@ -263,28 +599,38 @@ export default function ComissaoCalculadoraPage() {
     [valorImovel]
   )
 
+  // ── Load template ──
+  const loadTemplate = useCallback((templateId: string) => {
+    const template = TEMPLATES_PARCELAS.find(t => t.id === templateId)
+    if (!template) return
+
+    const newSeries: SerieParcela[] = template.parcelas.map((p: TemplateParcelaItem) => {
+      const qty = p.quantidade || 1
+      const pct = p.percentualTotal || p.percentual || 0
+      const totalVal = valorImovel > 0 ? arredondarValor(valorImovel * (pct / 100)) : 0
+      const unitVal = qty > 0 ? arredondarValor(totalVal / qty) : 0
+
+      return {
+        id: generateId(),
+        tipo: p.tipo as TipoParcela,
+        quantidade: qty,
+        valorUnitario: unitVal,
+        valorTotal: totalVal,
+        percentualDoImovel: pct,
+      }
+    })
+
+    setSeries(newSeries)
+  }, [valorImovel])
+
   // ── Autonomos helpers ──
   const addAutonomo = useCallback(() => {
-    const nextPrioridade = autonomos.length + 1
-    setAutonomos(prev => [
-      ...prev,
-      {
-        id: generateId(),
-        nome: "",
-        cargo: "Corretor",
-        percentual: 0,
-        valorBruto: 0,
-        prioridade: nextPrioridade,
-      },
-    ])
+    setAutonomos(prev => [...prev, { id: generateId(), nome: "", cargo: "Corretor", percentual: 0, valorBruto: 0, prioridade: prev.length + 1 }])
     setRateioCalculado(false)
-  }, [autonomos.length])
+  }, [])
 
   const removeAutonomo = useCallback((id: string) => {
-    setAutonomos(prev => {
-      const filtered = prev.filter(a => a.id !== id)
-      return filtered.map((a, i) => ({ ...a, prioridade: i + 1 }))
-    })
+    setAutonomos(prev => prev.filter(a => a.id !== id).map((a, i) => ({ ...a, prioridade: i + 1 })))
     setRateioCalculado(false)
   }, [])
 
@@ -294,16 +640,11 @@ export default function ComissaoCalculadoraPage() {
         prev.map(a => {
           if (a.id !== id) return a
           const updated = { ...a, [field]: value }
-
           if (field === "percentual") {
-            updated.valorBruto = valorComissao > 0
-              ? arredondarValor(valorComissao * ((value as number) / 100))
-              : 0
+            updated.valorBruto = valorComissao > 0 ? arredondarValor(valorComissao * ((value as number) / 100)) : 0
           }
           if (field === "valorBruto") {
-            updated.percentual = valorComissao > 0
-              ? arredondarValor(((value as number) / valorComissao) * 100)
-              : 0
+            updated.percentual = valorComissao > 0 ? arredondarValor(((value as number) / valorComissao) * 100) : 0
           }
           return updated
         })
@@ -313,52 +654,58 @@ export default function ComissaoCalculadoraPage() {
     [valorComissao]
   )
 
-  const moveAutonomo = useCallback((id: string, direction: "up" | "down") => {
+  // ── Load default team ──
+  const loadDefaultTeam = useCallback(() => {
+    const newAutonomos: Autonomo[] = BENEFICIARIOS_PADRAO_PRT.map((b, i) => {
+      const pctOfComissao = valorComissao > 0 ? arredondarValor((valorImovel * b.percentual_vgv / valorComissao) * 100) : 0
+      return {
+        id: generateId(),
+        nome: b.nome || "",
+        cargo: CARGOS_PRT[b.cargo]?.label || b.cargo,
+        percentual: pctOfComissao,
+        valorBruto: arredondarValor(valorImovel * b.percentual_vgv),
+        prioridade: i + 1,
+      }
+    })
+    setAutonomos(newAutonomos)
+    setRateioCalculado(false)
+  }, [valorImovel, valorComissao])
+
+  // ── DnD handler ──
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
     setAutonomos(prev => {
-      const idx = prev.findIndex(a => a.id === id)
-      if (idx < 0) return prev
-      const newIdx = direction === "up" ? idx - 1 : idx + 1
-      if (newIdx < 0 || newIdx >= prev.length) return prev
-      const arr = [...prev]
-      const temp = arr[idx]
-      arr[idx] = arr[newIdx]
-      arr[newIdx] = temp
-      return arr.map((a, i) => ({ ...a, prioridade: i + 1 }))
+      const oldIdx = prev.findIndex(a => a.id === active.id)
+      const newIdx = prev.findIndex(a => a.id === over.id)
+      return arrayMove(prev, oldIdx, newIdx).map((a, i) => ({ ...a, prioridade: i + 1 }))
     })
     setRateioCalculado(false)
   }, [])
 
-  // ── Rateio calculation (priority-based) ──
-  const calcularRateio = useCallback(() => {
-    if (series.length === 0 || autonomos.length === 0) return
-
-    // Expand series into individual parcelas (dates)
-    const parcelas: { label: string; valor: number; serieId: string }[] = []
+  // ── Auto rateio when data changes ──
+  useEffect(() => {
+    if (series.length === 0 || autonomos.length === 0) {
+      if (rateioCalculado) setRateioCalculado(false)
+      return
+    }
+    // Auto-calculate
+    const parcelas: { label: string; valor: number }[] = []
     series.forEach(s => {
       for (let i = 0; i < s.quantidade; i++) {
-        const label = s.quantidade === 1
-          ? TIPO_PARCELA_LABELS[s.tipo]
-          : `${TIPO_PARCELA_LABELS[s.tipo]} ${i + 1}`
-        parcelas.push({ label, valor: s.valorUnitario, serieId: s.id })
+        parcelas.push({ label: s.quantidade === 1 ? TIPO_PARCELA_LABELS[s.tipo] : `${TIPO_PARCELA_LABELS[s.tipo]} ${i + 1}`, valor: s.valorUnitario })
       }
     })
 
-    // Sort autonomos by priority (lower = higher priority)
     const sorted = [...autonomos].sort((a, b) => a.prioridade - b.prioridade)
-
-    // Build rateio grid: for each parcela, distribute by priority
     const grid: Record<string, Record<string, CelulaRateio>> = {}
     const autoRestante: Record<string, number> = {}
-    sorted.forEach(a => {
-      grid[a.id] = {}
-      autoRestante[a.id] = a.valorBruto
-    })
+    sorted.forEach(a => { grid[a.id] = {}; autoRestante[a.id] = a.valorBruto })
 
-    // For each parcela, assign values by priority until parcela budget is exhausted
     parcelas.forEach((parcela, pIdx) => {
       const key = `p_${pIdx}`
       let remaining = parcela.valor
-
       for (const auto of sorted) {
         if (remaining <= 0 || autoRestante[auto.id] <= 0) {
           grid[auto.id][key] = { valor: 0, pago: false }
@@ -375,20 +722,10 @@ export default function ComissaoCalculadoraPage() {
     setRateioCalculado(true)
   }, [series, autonomos])
 
-  // Expanded parcela labels for rateio grid
-  const parcelaLabels = useMemo(() => {
-    const labels: string[] = []
-    series.forEach(s => {
-      for (let i = 0; i < s.quantidade; i++) {
-        labels.push(
-          s.quantidade === 1
-            ? TIPO_PARCELA_LABELS[s.tipo]
-            : `${TIPO_PARCELA_LABELS[s.tipo]} ${i + 1}`
-        )
-      }
-    })
-    return labels
-  }, [series])
+  // ── Print ──
+  const handlePrint = useCallback(() => {
+    window.print()
+  }, [])
 
   // ============================================================================
   // RENDER
@@ -397,88 +734,133 @@ export default function ComissaoCalculadoraPage() {
   return (
     <AppShell title="Calculo de Comissionamento">
       <div className="max-w-6xl mx-auto space-y-4">
+        {/* Top bar */}
+        <div className="flex items-center justify-between">
+          <div />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Imprimir</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={resetAll} className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
+              <RotateCcw className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Nova Simulacao</span>
+            </Button>
+          </div>
+        </div>
+
         {/* ── Section 1: Dados do Imovel ── */}
         <Section title="Dados do Imovel e Cliente" icon={FileText} number={1}>
           <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="empreendimento">Empreendimento</Label>
-              <Input
-                id="empreendimento"
-                placeholder="Nome do empreendimento"
+              <Label>Empreendimento</Label>
+              <AutocompleteInput
                 value={empreendimento}
-                onChange={e => setEmpreendimento(e.target.value)}
+                onChange={setEmpreendimento}
+                placeholder="Buscar empreendimento..."
+                fetchUrl={(q) => `/api/comissao/buscar/empreendimentos?busca=${encodeURIComponent(q)}`}
+                onSelect={(item: EmpreendimentoBusca) => {
+                  setEmpreendimentoId(item.id)
+                  setEmpreendimento(item.nome)
+                }}
+                getId={(item: EmpreendimentoBusca) => item.id}
+                getLabel={(item: EmpreendimentoBusca) => item.nome}
+                renderItem={(item: EmpreendimentoBusca) => (
+                  <div>
+                    <p className="font-medium">{item.nome}</p>
+                    {item.cidade && <p className="text-xs text-zinc-500">{item.cidade}{item.uf ? ` - ${item.uf}` : ""}</p>}
+                  </div>
+                )}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="unidade">Unidade</Label>
-              <Input
-                id="unidade"
-                placeholder="Ex: Bloco A - 101"
-                value={unidade}
-                onChange={e => setUnidade(e.target.value)}
-              />
+              <Label>Unidade</Label>
+              {empreendimentoId ? (
+                <AutocompleteInput
+                  value={unidade}
+                  onChange={setUnidade}
+                  placeholder="Buscar unidade..."
+                  fetchUrl={(q) => `/api/comissao/buscar/unidades/${empreendimentoId}?busca=${encodeURIComponent(q)}`}
+                  onSelect={(item: UnidadeBusca) => {
+                    const label = [item.bloco, item.codigo].filter(Boolean).join(" - ")
+                    setUnidade(label || item.id)
+                    if (item.valor_tabela && item.valor_tabela > 0) setValorImovel(item.valor_tabela)
+                  }}
+                  getId={(item: UnidadeBusca) => item.id}
+                  getLabel={(item: UnidadeBusca) => [item.bloco, item.codigo].filter(Boolean).join(" - ") || item.id}
+                  renderItem={(item: UnidadeBusca) => (
+                    <div className="flex items-center justify-between">
+                      <span>{[item.bloco, item.codigo].filter(Boolean).join(" - ")}{item.tipologia ? ` (${item.tipologia})` : ""}</span>
+                      {item.valor_tabela && <span className="text-xs text-zinc-500">{formatarMoeda(item.valor_tabela)}</span>}
+                    </div>
+                  )}
+                />
+              ) : (
+                <Input placeholder="Selecione o empreendimento primeiro" value={unidade} onChange={e => setUnidade(e.target.value)} />
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="clienteNome">Nome do Cliente</Label>
-              <Input
-                id="clienteNome"
-                placeholder="Nome completo"
-                value={clienteNome}
-                onChange={e => setClienteNome(e.target.value)}
-              />
+              <Label>Nome do Cliente</Label>
+              <Input placeholder="Nome completo" value={clienteNome} onChange={e => setClienteNome(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="clienteCpf">CPF do Cliente</Label>
+              <Label>CPF do Cliente</Label>
               <Input
-                id="clienteCpf"
                 placeholder="000.000.000-00"
                 value={clienteCpf}
-                onChange={e => setClienteCpf(e.target.value)}
+                onChange={e => setClienteCpf(formatCpfMask(e.target.value))}
+                maxLength={14}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="valorImovel">Valor do Imovel (R$)</Label>
-              <Input
-                id="valorImovel"
-                type="text"
-                inputMode="decimal"
-                placeholder="0,00"
-                value={formatInputCurrency(valorImovel)}
-                onChange={e => setValorImovel(parseCurrencyInput(e.target.value))}
-              />
+              <Label>Valor do Imovel (R$)</Label>
+              <CurrencyInput value={valorImovel} onChange={setValorImovel} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="percentualComissao">% Comissao</Label>
+              <Label>% Comissao</Label>
               <div className="flex items-center gap-2">
                 <Input
-                  id="percentualComissao"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  className="flex-1"
-                  value={percentualComissao || ""}
-                  onChange={e => setPercentualComissao(parseFloat(e.target.value) || 0)}
+                  type="number" step="0.1" min="0" max="100" className="flex-1"
+                  value={percentualComissao || ""} onChange={e => setPercentualComissao(parseFloat(e.target.value) || 0)}
                 />
-                <Badge variant="secondary" className="shrink-0 text-sm px-3 py-1.5">
-                  {formatarMoeda(valorComissao)}
-                </Badge>
+                <Badge variant="secondary" className="shrink-0 text-sm px-3 py-1.5">{formatarMoeda(valorComissao)}</Badge>
               </div>
             </div>
           </div>
         </Section>
 
         {/* ── Section 2: Proposta do Cliente ── */}
-        <Section title="Proposta do Cliente" icon={DollarSign} number={2}>
+        <Section
+          title="Proposta do Cliente"
+          icon={DollarSign}
+          number={2}
+          actions={
+            <Select onValueChange={loadTemplate}>
+              <SelectTrigger className="h-8 w-[180px] text-xs">
+                <SelectValue placeholder="Carregar template..." />
+              </SelectTrigger>
+              <SelectContent>
+                {TEMPLATES_PARCELAS.map(t => (
+                  <SelectItem key={t.id} value={t.id}>
+                    <div>
+                      <span className="font-medium">{t.nome}</span>
+                      <span className="text-zinc-400 ml-1.5 text-[10px]">{t.descricao}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          }
+        >
           <div className="pt-4 space-y-3">
             {series.length === 0 ? (
               <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
-                Nenhuma serie de parcelas adicionada. Clique no botao abaixo para adicionar.
+                Nenhuma serie adicionada. Use um template acima ou adicione manualmente.
               </div>
             ) : (
               <div className="space-y-2">
-                {/* Header */}
-                <div className="hidden sm:grid grid-cols-[140px_70px_1fr_1fr_80px_40px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                {/* Desktop header */}
+                <div className="hidden sm:grid grid-cols-[140px_70px_1fr_1fr_80px_72px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                   <span>Tipo</span>
                   <span>Qtd</span>
                   <span>Valor Unit.</span>
@@ -487,68 +869,69 @@ export default function ComissaoCalculadoraPage() {
                   <span></span>
                 </div>
                 {series.map(s => (
-                  <div
-                    key={s.id}
-                    className="grid grid-cols-1 sm:grid-cols-[140px_70px_1fr_1fr_80px_40px] gap-2 items-center bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-2"
-                  >
-                    <Select
-                      value={s.tipo}
-                      onValueChange={v => updateSerie(s.id, "tipo", v)}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(TIPO_PARCELA_LABELS).map(([key, label]) => (
-                          <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div key={s.id}>
+                    {/* Desktop */}
+                    <div className="hidden sm:grid grid-cols-[140px_70px_1fr_1fr_80px_72px] gap-2 items-center bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-2">
+                      <Select value={s.tipo} onValueChange={v => updateSerie(s.id, "tipo", v)}>
+                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(TIPO_PARCELA_LABELS).map(([key, label]) => (
+                            <SelectItem key={key} value={key}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input type="number" min="1" className="h-9" value={s.quantidade || ""} onChange={e => updateSerie(s.id, "quantidade", parseInt(e.target.value) || 1)} />
+                      <CurrencyInput className="h-9" value={s.valorUnitario} onChange={v => updateSerie(s.id, "valorUnitario", v)} />
+                      <CurrencyInput className="h-9" value={s.valorTotal} onChange={v => updateSerie(s.id, "valorTotal", v)} />
+                      <Input type="number" step="0.01" min="0" max="100" className="h-9" value={s.percentualDoImovel || ""} onChange={e => updateSerie(s.id, "percentualDoImovel", parseFloat(e.target.value) || 0)} />
+                      <div className="flex gap-0.5">
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-600" onClick={() => duplicateSerie(s.id)} title="Duplicar">
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-red-500" onClick={() => removeSerie(s.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
 
-                    <Input
-                      type="number"
-                      min="1"
-                      className="h-9"
-                      value={s.quantidade || ""}
-                      onChange={e => updateSerie(s.id, "quantidade", parseInt(e.target.value) || 1)}
-                    />
-
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      className="h-9"
-                      value={formatInputCurrency(s.valorUnitario)}
-                      onChange={e => updateSerie(s.id, "valorUnitario", parseCurrencyInput(e.target.value))}
-                    />
-
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      className="h-9"
-                      value={formatInputCurrency(s.valorTotal)}
-                      onChange={e => updateSerie(s.id, "valorTotal", parseCurrencyInput(e.target.value))}
-                    />
-
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      className="h-9"
-                      value={s.percentualDoImovel || ""}
-                      onChange={e => updateSerie(s.id, "percentualDoImovel", parseFloat(e.target.value) || 0)}
-                    />
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 text-zinc-400 hover:text-red-500"
-                      onClick={() => removeSerie(s.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {/* Mobile */}
+                    <div className="sm:hidden bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Select value={s.tipo} onValueChange={v => updateSerie(s.id, "tipo", v)}>
+                          <SelectTrigger className="h-8 w-[130px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(TIPO_PARCELA_LABELS).map(([key, label]) => (
+                              <SelectItem key={key} value={key}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400" onClick={() => duplicateSerie(s.id)}>
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-red-500" onClick={() => removeSerie(s.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <span className="text-[10px] text-zinc-400 uppercase">Qtd</span>
+                          <Input type="number" min="1" className="h-8 text-sm" value={s.quantidade || ""} onChange={e => updateSerie(s.id, "quantidade", parseInt(e.target.value) || 1)} />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-zinc-400 uppercase">Unit.</span>
+                          <CurrencyInput className="h-8 text-sm" value={s.valorUnitario} onChange={v => updateSerie(s.id, "valorUnitario", v)} />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-zinc-400 uppercase">%</span>
+                          <Input type="number" step="0.01" className="h-8 text-sm" value={s.percentualDoImovel || ""} onChange={e => updateSerie(s.id, "percentualDoImovel", parseFloat(e.target.value) || 0)} />
+                        </div>
+                      </div>
+                      <div className="text-right text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                        Total: {formatarMoeda(s.valorTotal)}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -564,10 +947,7 @@ export default function ComissaoCalculadoraPage() {
                   <span className="text-zinc-500">
                     Total: <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatarMoeda(totalProposta)}</span>
                   </span>
-                  <Badge
-                    variant={Math.abs(totalPercentualProposta - 100) < 0.1 ? "default" : "destructive"}
-                    className="text-xs"
-                  >
+                  <Badge variant={Math.abs(totalPercentualProposta - 100) < 0.1 ? "default" : "destructive"} className="text-xs">
                     {totalPercentualProposta.toFixed(1)}%
                   </Badge>
                 </div>
@@ -577,111 +957,54 @@ export default function ComissaoCalculadoraPage() {
             {series.length > 0 && Math.abs(totalPercentualProposta - 100) >= 0.1 && (
               <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>
-                  A soma dos percentuais e <strong>{totalPercentualProposta.toFixed(1)}%</strong>. Idealmente deveria ser 100% do valor do imovel.
-                </span>
+                <span>A soma dos percentuais e <strong>{totalPercentualProposta.toFixed(1)}%</strong>. Idealmente deveria ser 100% do valor do imovel.</span>
               </div>
             )}
           </div>
         </Section>
 
-        {/* ── Section 3: Autonomos (Comissoes) ── */}
-        <Section title="Comissoes dos Autonomos" icon={Users} number={3}>
+        {/* ── Section 3: Autonomos ── */}
+        <Section
+          title="Comissoes dos Autonomos"
+          icon={Users}
+          number={3}
+          actions={
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={loadDefaultTeam}>
+              <Zap className="h-3.5 w-3.5 mr-1" />
+              Equipe Padrao
+            </Button>
+          }
+        >
           <div className="pt-4 space-y-3">
             {autonomos.length === 0 ? (
               <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
-                Nenhum autonomo adicionado. Clique no botao abaixo para adicionar.
+                Nenhum autonomo adicionado. Use &quot;Equipe Padrao&quot; ou adicione manualmente.
               </div>
             ) : (
               <div className="space-y-2">
-                {/* Header */}
-                <div className="hidden sm:grid grid-cols-[40px_1fr_140px_80px_1fr_80px_60px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                  <span>#</span>
+                {/* Desktop header */}
+                <div className="hidden sm:grid grid-cols-[28px_1fr_140px_80px_1fr_40px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <span></span>
                   <span>Nome</span>
                   <span>Cargo</span>
                   <span>%</span>
                   <span>Valor Bruto</span>
-                  <span>Prio.</span>
                   <span></span>
                 </div>
-                {autonomos.map(a => (
-                  <div
-                    key={a.id}
-                    className="grid grid-cols-1 sm:grid-cols-[40px_1fr_140px_80px_1fr_80px_60px] gap-2 items-center bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-2"
-                  >
-                    <span className="text-sm font-bold text-zinc-400 text-center">{a.prioridade}</span>
-
-                    <Input
-                      placeholder="Nome"
-                      className="h-9"
-                      value={a.nome}
-                      onChange={e => updateAutonomo(a.id, "nome", e.target.value)}
-                    />
-
-                    <Select
-                      value={a.cargo}
-                      onValueChange={v => updateAutonomo(a.id, "cargo", v)}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CARGOS_PADRAO.map(c => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      className="h-9"
-                      value={a.percentual || ""}
-                      onChange={e => updateAutonomo(a.id, "percentual", parseFloat(e.target.value) || 0)}
-                    />
-
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      className="h-9"
-                      value={formatInputCurrency(a.valorBruto)}
-                      onChange={e => updateAutonomo(a.id, "valorBruto", parseCurrencyInput(e.target.value))}
-                    />
-
-                    <div className="flex items-center gap-0.5 justify-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        disabled={a.prioridade === 1}
-                        onClick={() => moveAutonomo(a.id, "up")}
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        disabled={a.prioridade === autonomos.length}
-                        onClick={() => moveAutonomo(a.id, "down")}
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 text-zinc-400 hover:text-red-500"
-                      onClick={() => removeAutonomo(a.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={autonomos.map(a => a.id)} strategy={verticalListSortingStrategy}>
+                    {autonomos.map(a => (
+                      <SortableAutonomoRow
+                        key={a.id}
+                        autonomo={a}
+                        totalAutonomos={autonomos.length}
+                        valorComissao={valorComissao}
+                        onUpdate={updateAutonomo}
+                        onRemove={removeAutonomo}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               </div>
             )}
 
@@ -695,10 +1018,7 @@ export default function ComissaoCalculadoraPage() {
                   <span className="text-zinc-500">
                     Total: <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatarMoeda(totalValorAutonomos)}</span>
                   </span>
-                  <Badge
-                    variant={Math.abs(totalPercentualAutonomos - 100) < 0.1 ? "default" : "secondary"}
-                    className="text-xs"
-                  >
+                  <Badge variant={Math.abs(totalPercentualAutonomos - 100) < 0.1 ? "default" : "secondary"} className="text-xs">
                     {totalPercentualAutonomos.toFixed(1)}%
                   </Badge>
                 </div>
@@ -708,109 +1028,68 @@ export default function ComissaoCalculadoraPage() {
             {autonomos.length > 0 && totalPercentualAutonomos > 100.1 && (
               <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>
-                  A soma dos percentuais ({totalPercentualAutonomos.toFixed(1)}%) ultrapassa 100% da comissao.
-                </span>
+                <span>A soma dos percentuais ({totalPercentualAutonomos.toFixed(1)}%) ultrapassa 100% da comissao.</span>
               </div>
             )}
           </div>
         </Section>
 
-        {/* ── Section 4: Controle de Pagamentos (Rateio) ── */}
+        {/* ── Section 4: Rateio ── */}
         <Section title="Controle de Pagamentos (Rateio)" icon={BarChart3} number={4} defaultOpen={false}>
           <div className="pt-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Distribuicao dos pagamentos por prioridade. Autonomos com prioridade menor recebem primeiro.
-              </p>
-              <Button
-                size="sm"
-                onClick={calcularRateio}
-                disabled={series.length === 0 || autonomos.length === 0}
-              >
-                <Calculator className="h-4 w-4 mr-1.5" />
-                Calcular Rateio
-              </Button>
-            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Distribuicao automatica por prioridade. Arraste os autonomos acima para reordenar.
+            </p>
 
             {rateioCalculado && parcelaLabels.length > 0 && autonomos.length > 0 ? (
               <div className="overflow-x-auto -mx-5 px-5">
                 <table className="w-full text-sm border-collapse min-w-[600px]">
                   <thead>
                     <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                      <th className="text-left py-2 pr-3 font-medium text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider sticky left-0 bg-white dark:bg-zinc-900 z-10">
-                        Autonomo
-                      </th>
+                      <th className="text-left py-2 pr-3 font-medium text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider sticky left-0 bg-white dark:bg-zinc-900 z-10">Autonomo</th>
                       {parcelaLabels.map((label, i) => (
-                        <th key={i} className="text-right py-2 px-2 font-medium text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider whitespace-nowrap">
-                          {label}
-                        </th>
+                        <th key={i} className="text-right py-2 px-2 font-medium text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider whitespace-nowrap">{label}</th>
                       ))}
-                      <th className="text-right py-2 pl-3 font-bold text-zinc-700 dark:text-zinc-300 text-xs uppercase tracking-wider">
-                        Total
-                      </th>
+                      <th className="text-right py-2 pl-3 font-bold text-zinc-700 dark:text-zinc-300 text-xs uppercase tracking-wider">Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {autonomos
-                      .sort((a, b) => a.prioridade - b.prioridade)
-                      .map(auto => {
-                        const row = rateioGrid[auto.id] || {}
-                        const totalRow = Object.values(row).reduce((acc, c) => acc + c.valor, 0)
-                        return (
-                          <tr key={auto.id} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-                            <td className="py-2 pr-3 font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap sticky left-0 bg-white dark:bg-zinc-900 z-10">
-                              <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-[10px] font-bold text-zinc-600 dark:text-zinc-300">
-                                  {auto.prioridade}
-                                </span>
-                                <span className="truncate max-w-[120px]">{auto.nome || "Sem nome"}</span>
-                              </div>
-                            </td>
-                            {parcelaLabels.map((_, pIdx) => {
-                              const cell = row[`p_${pIdx}`]
-                              const val = cell?.valor || 0
-                              return (
-                                <td key={pIdx} className={cn(
-                                  "text-right py-2 px-2 tabular-nums whitespace-nowrap",
-                                  val > 0
-                                    ? "text-zinc-900 dark:text-zinc-100"
-                                    : "text-zinc-300 dark:text-zinc-600"
-                                )}>
-                                  {val > 0 ? formatarMoeda(val) : "-"}
-                                </td>
-                              )
-                            })}
-                            <td className="text-right py-2 pl-3 font-semibold text-zinc-900 dark:text-zinc-100 tabular-nums">
-                              {formatarMoeda(arredondarValor(totalRow))}
-                            </td>
-                          </tr>
-                        )
-                      })}
+                    {autonomos.sort((a, b) => a.prioridade - b.prioridade).map(auto => {
+                      const row = rateioGrid[auto.id] || {}
+                      const totalRow = Object.values(row).reduce((acc, c) => acc + c.valor, 0)
+                      return (
+                        <tr key={auto.id} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+                          <td className="py-2 pr-3 font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap sticky left-0 bg-white dark:bg-zinc-900 z-10">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-[10px] font-bold text-zinc-600 dark:text-zinc-300">{auto.prioridade}</span>
+                              <span className="truncate max-w-[120px]">{auto.nome || "Sem nome"}</span>
+                            </div>
+                          </td>
+                          {parcelaLabels.map((_, pIdx) => {
+                            const val = row[`p_${pIdx}`]?.valor || 0
+                            return (
+                              <td key={pIdx} className={cn("text-right py-2 px-2 tabular-nums whitespace-nowrap", val > 0 ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-300 dark:text-zinc-600")}>
+                                {val > 0 ? formatarMoeda(val) : "-"}
+                              </td>
+                            )
+                          })}
+                          <td className="text-right py-2 pl-3 font-semibold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(arredondarValor(totalRow))}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-zinc-300 dark:border-zinc-600">
-                      <td className="py-2 pr-3 font-bold text-zinc-700 dark:text-zinc-300 text-xs uppercase sticky left-0 bg-white dark:bg-zinc-900 z-10">
-                        Total
-                      </td>
+                      <td className="py-2 pr-3 font-bold text-zinc-700 dark:text-zinc-300 text-xs uppercase sticky left-0 bg-white dark:bg-zinc-900 z-10">Total</td>
                       {parcelaLabels.map((_, pIdx) => {
-                        const colTotal = autonomos.reduce((acc, auto) => {
-                          const cell = rateioGrid[auto.id]?.[`p_${pIdx}`]
-                          return acc + (cell?.valor || 0)
-                        }, 0)
-                        return (
-                          <td key={pIdx} className="text-right py-2 px-2 font-semibold text-zinc-700 dark:text-zinc-300 tabular-nums whitespace-nowrap">
-                            {formatarMoeda(arredondarValor(colTotal))}
-                          </td>
-                        )
+                        const colTotal = autonomos.reduce((acc, auto) => acc + (rateioGrid[auto.id]?.[`p_${pIdx}`]?.valor || 0), 0)
+                        return (<td key={pIdx} className="text-right py-2 px-2 font-semibold text-zinc-700 dark:text-zinc-300 tabular-nums whitespace-nowrap">{formatarMoeda(arredondarValor(colTotal))}</td>)
                       })}
                       <td className="text-right py-2 pl-3 font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
-                        {formatarMoeda(arredondarValor(
-                          autonomos.reduce((acc, auto) => {
-                            const row = rateioGrid[auto.id] || {}
-                            return acc + Object.values(row).reduce((a, c) => a + c.valor, 0)
-                          }, 0)
-                        ))}
+                        {formatarMoeda(arredondarValor(autonomos.reduce((acc, auto) => {
+                          const row = rateioGrid[auto.id] || {}
+                          return acc + Object.values(row).reduce((a, c) => a + c.valor, 0)
+                        }, 0)))}
                       </td>
                     </tr>
                   </tfoot>
@@ -818,10 +1097,7 @@ export default function ComissaoCalculadoraPage() {
               </div>
             ) : (
               <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
-                {series.length === 0 || autonomos.length === 0
-                  ? "Adicione series de parcelas e autonomos primeiro, depois calcule o rateio."
-                  : "Clique em \"Calcular Rateio\" para gerar a distribuicao."
-                }
+                Adicione series de parcelas e autonomos para ver o rateio automatico.
               </div>
             )}
           </div>
@@ -830,76 +1106,58 @@ export default function ComissaoCalculadoraPage() {
         {/* ── Section 5: Resumo Financeiro ── */}
         <Section title="Resumo Financeiro" icon={Calculator} number={5}>
           <div className="pt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-4 space-y-1">
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Valor do Imovel</p>
-                <p className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(valorImovel)}</p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
+                <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Valor do Imovel</p>
+                <p className="text-base sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(valorImovel)}</p>
               </div>
-
-              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-4 space-y-1">
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Comissao ({percentualComissao}%)</p>
-                <p className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(valorComissao)}</p>
+              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
+                <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Comissao ({percentualComissao}%)</p>
+                <p className="text-base sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(valorComissao)}</p>
               </div>
-
-              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-4 space-y-1">
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Total Proposta</p>
-                <p className={cn(
-                  "text-xl font-bold tabular-nums",
-                  Math.abs(totalPercentualProposta - 100) < 0.1
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-amber-600 dark:text-amber-400"
-                )}>
+              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
+                <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Total Proposta</p>
+                <p className={cn("text-base sm:text-xl font-bold tabular-nums", Math.abs(totalPercentualProposta - 100) < 0.1 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
                   {formatarMoeda(totalProposta)}
                 </p>
-                <p className="text-xs text-zinc-400">{totalPercentualProposta.toFixed(1)}% do imovel</p>
+                <p className="text-[10px] sm:text-xs text-zinc-400">{totalPercentualProposta.toFixed(1)}% do imovel</p>
               </div>
-
-              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-4 space-y-1">
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Total Comissoes</p>
-                <p className={cn(
-                  "text-xl font-bold tabular-nums",
-                  totalPercentualAutonomos <= 100.1
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-red-600 dark:text-red-400"
-                )}>
+              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
+                <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Total Comissoes</p>
+                <p className={cn("text-base sm:text-xl font-bold tabular-nums", totalPercentualAutonomos <= 100.1 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
                   {formatarMoeda(totalValorAutonomos)}
                 </p>
-                <p className="text-xs text-zinc-400">{totalPercentualAutonomos.toFixed(1)}% da comissao</p>
+                <p className="text-[10px] sm:text-xs text-zinc-400">{totalPercentualAutonomos.toFixed(1)}% da comissao</p>
               </div>
             </div>
 
-            <div className="mt-4 bg-zinc-900 dark:bg-white rounded-xl p-5 flex items-center justify-between">
+            <div className="mt-4 bg-zinc-900 dark:bg-white rounded-xl p-4 sm:p-5 flex items-center justify-between">
               <div>
                 <p className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium">Contrato Liquido</p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Proposta - Comissoes</p>
               </div>
-              <p className="text-2xl font-bold text-white dark:text-zinc-900 tabular-nums">
-                {formatarMoeda(contratoLiquido)}
-              </p>
+              <p className="text-xl sm:text-2xl font-bold text-white dark:text-zinc-900 tabular-nums">{formatarMoeda(contratoLiquido)}</p>
             </div>
 
-            {/* Status indicators */}
-            <div className="mt-4 flex flex-wrap gap-3">
-              <StatusPill
-                ok={valorImovel > 0}
-                label="Valor do imovel"
-              />
-              <StatusPill
-                ok={series.length > 0 && Math.abs(totalPercentualProposta - 100) < 0.5}
-                label="Proposta completa"
-              />
-              <StatusPill
-                ok={autonomos.length > 0 && totalPercentualAutonomos <= 100.1}
-                label="Comissoes validas"
-              />
-              <StatusPill
-                ok={rateioCalculado}
-                label="Rateio calculado"
-              />
+            <div className="mt-4 flex flex-wrap gap-2 sm:gap-3">
+              <StatusPill ok={valorImovel > 0} label="Valor do imovel" />
+              <StatusPill ok={series.length > 0 && Math.abs(totalPercentualProposta - 100) < 0.5} label="Proposta completa" />
+              <StatusPill ok={autonomos.length > 0 && totalPercentualAutonomos <= 100.1} label="Comissoes validas" />
+              <StatusPill ok={rateioCalculado} label="Rateio calculado" />
             </div>
           </div>
         </Section>
       </div>
+
+      {/* Print styles */}
+      <style jsx global>{`
+        @media print {
+          nav, header, .fixed, button, [data-radix-popper-content-wrapper] { display: none !important; }
+          main { padding: 0 !important; }
+          .md\\:pl-\\[260px\\], .md\\:pl-\\[68px\\] { padding-left: 0 !important; }
+          * { color-adjust: exact; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      `}</style>
     </AppShell>
   )
 }
@@ -912,9 +1170,7 @@ function StatusPill({ ok, label }: { ok: boolean; label: string }) {
   return (
     <div className={cn(
       "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium",
-      ok
-        ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300"
-        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
+      ok ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
     )}>
       {ok ? <Check className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
       {label}
