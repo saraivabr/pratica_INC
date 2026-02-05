@@ -72,10 +72,10 @@ export function getStatusLabel(status: Unidade["status"]): string {
   switch (status) {
     case "disponivel":
       return "Disponível"
-    case "reservado":
-      return "Reservado"
-    case "vendido":
-      return "Vendido"
+    case "reservada":
+      return "Reservada"
+    case "vendida":
+      return "Vendida"
     default:
       return status
   }
