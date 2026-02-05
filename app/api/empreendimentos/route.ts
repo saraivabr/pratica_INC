@@ -21,15 +21,14 @@ function transformEmpreendimento(emp: typeof empreendimentos[0]): Empreendimento
     // Mapear unidades para o formato esperado pelo frontend
     unidades: emp.unidades.map(u => ({
       id: u.id,
-      tipo: u.tipologia,
-      status: u.status === 'disponivel' ? 'disponivel' as const :
-              u.status === 'reservada' ? 'reservado' as const : 'vendido' as const,
-      metragem: u.area,
+      numero: u.numero,
+      tipologia: u.tipologia,
+      status: u.status,
+      area: u.area,
       quartos: u.quartos,
       valor: u.valor,
       vagas: u.vagas || 1,
       andar: u.andar,
-      final: u.numero,
     })),
     unidadesDisponiveis: emp.unidadesDisponiveis,
     // Campos extras para o card
