@@ -9,6 +9,19 @@
 
 export type ComissaoVendaStatus = 'ativa' | 'calculada' | 'enviada' | 'cancelada';
 export type ComissaoParcelaStatus = 'prevista' | 'recebida' | 'cancelada';
+export type TipoDocumento = 'cpf' | 'cnpj';
+export type GrupoComissao = 'prt' | 'imobiliaria' | 'corretor';
+
+export const CARGO_LABELS: Record<string, string> = {
+  gerente_produto: 'GERENTE DE PRODUTO',
+  gerente_pratica: 'GERENTE PRATICA',
+  coordenador_1: 'COORDENADOR 1',
+  coordenador_2: 'COORDENADOR 2',
+  secretaria: 'SECRETARIA',
+  tributos: 'TRIBUTOS',
+  imobiliaria: 'IMOBILIARIA',
+  corretor: 'CORRETOR',
+};
 
 // ============================================================================
 // INTERFACES BASE
