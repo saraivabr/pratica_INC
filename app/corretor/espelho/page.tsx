@@ -23,7 +23,10 @@ import {
   Check,
   Info,
   Eye,
-  Filter
+  Filter,
+  MapPin,
+  TrendingUp,
+  Sparkles
 } from "lucide-react"
 import { AnimatedBackground } from "@/components/animated-background"
 import { Input } from "@/components/ui/input"
@@ -61,6 +64,16 @@ const statusConfig = {
     gradient: "from-rose-500 to-red-500"
   }
 }
+
+// Empreendimento color palette
+const empColors = [
+  { gradient: "from-emerald-500 to-green-600", bg: "bg-emerald-500", light: "bg-emerald-50 dark:bg-emerald-950/40", text: "text-emerald-600 dark:text-emerald-400" },
+  { gradient: "from-blue-500 to-indigo-600", bg: "bg-blue-500", light: "bg-blue-50 dark:bg-blue-950/40", text: "text-blue-600 dark:text-blue-400" },
+  { gradient: "from-violet-500 to-purple-600", bg: "bg-violet-500", light: "bg-violet-50 dark:bg-violet-950/40", text: "text-violet-600 dark:text-violet-400" },
+  { gradient: "from-amber-500 to-orange-600", bg: "bg-amber-500", light: "bg-amber-50 dark:bg-amber-950/40", text: "text-amber-600 dark:text-amber-400" },
+  { gradient: "from-rose-500 to-pink-600", bg: "bg-rose-500", light: "bg-rose-50 dark:bg-rose-950/40", text: "text-rose-600 dark:text-rose-400" },
+  { gradient: "from-teal-500 to-cyan-600", bg: "bg-teal-500", light: "bg-teal-50 dark:bg-teal-950/40", text: "text-teal-600 dark:text-teal-400" },
+]
 
 // Unit cell component
 function UnitCell({
@@ -414,83 +427,148 @@ export default function EspelhoPage() {
             </div>
           ) : selectedEmpreendimento ? (
             <>
-              {/* Stats Cards */}
-              <div className="grid grid-cols-4 gap-3">
-                <button
-                  onClick={() => setStatusFilter("todos")}
-                  className={cn(
-                    "relative p-4 rounded-xl transition-all",
-                    statusFilter === "todos"
-                      ? "bg-gradient-to-br from-gray-800 to-gray-900 text-white shadow-xl scale-[1.02]"
-                      : "bg-white/70 dark:bg-zinc-900/70 hover:bg-white dark:hover:bg-zinc-800"
-                  )}
-                >
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total</div>
-                  <div className="text-2xl font-bold">{stats.total}</div>
-                </button>
+              {/* Empreendimento Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {empreendimentos.map((emp, idx) => {
+                  const isSelected = selectedEmpreendimento?.id === emp.id
+                  const color = empColors[idx % empColors.length]
+                  const units = (emp as any).unidades || []
+                  const total = units.length
+                  const disponiveis = units.filter((u: any) => u.status === "disponivel").length
+                  const reservadas = units.filter((u: any) => u.status === "reservada").length
+                  const vendidas = units.filter((u: any) => u.status === "vendida").length
+                  const pct = total > 0 ? Math.round((disponiveis / total) * 100) : 0
 
-                <button
-                  onClick={() => setStatusFilter("disponivel")}
-                  className={cn(
-                    "relative p-4 rounded-xl transition-all",
-                    statusFilter === "disponivel"
-                      ? "bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-xl scale-[1.02]"
-                      : "bg-white/70 dark:bg-zinc-900/70 hover:bg-white dark:hover:bg-zinc-800"
-                  )}
-                >
-                  <div className={cn(
-                    "text-xs mb-1",
-                    statusFilter === "disponivel" ? "text-emerald-100" : "text-emerald-500"
-                  )}>Disponíveis</div>
-                  <div className="text-2xl font-bold">{stats.disponivel}</div>
-                </button>
+                  return (
+                    <button
+                      key={emp.id}
+                      onClick={() => {
+                        setSelectedEmpreendimento(emp as any)
+                        setStatusFilter("todos")
+                      }}
+                      className={cn(
+                        "relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 group",
+                        isSelected
+                          ? `bg-gradient-to-br ${color.gradient} text-white shadow-2xl scale-[1.02]`
+                          : "bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border border-white/60 dark:border-zinc-800/60 hover:shadow-xl hover:scale-[1.01]"
+                      )}
+                    >
+                      {/* Decorative elements */}
+                      <div className={cn(
+                        "absolute -right-8 -top-8 w-28 h-28 rounded-full transition-all duration-500",
+                        isSelected ? "bg-white/10 scale-100" : `${color.bg} opacity-[0.04] group-hover:opacity-[0.08] group-hover:scale-110`
+                      )} />
+                      <div className={cn(
+                        "absolute -left-4 -bottom-4 w-16 h-16 rounded-full transition-all duration-500",
+                        isSelected ? "bg-white/5" : `${color.bg} opacity-[0.03] group-hover:opacity-[0.06]`
+                      )} />
 
-                <button
-                  onClick={() => setStatusFilter("reservada")}
-                  className={cn(
-                    "relative p-4 rounded-xl transition-all",
-                    statusFilter === "reservada"
-                      ? "bg-gradient-to-br from-amber-500 to-yellow-600 text-white shadow-xl scale-[1.02]"
-                      : "bg-white/70 dark:bg-zinc-900/70 hover:bg-white dark:hover:bg-zinc-800"
-                  )}
-                >
-                  <div className={cn(
-                    "text-xs mb-1",
-                    statusFilter === "reservada" ? "text-amber-100" : "text-amber-500"
-                  )}>Reservadas</div>
-                  <div className="text-2xl font-bold">{stats.reservada}</div>
-                </button>
+                      <div className="relative">
+                        {/* Header */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className={cn(
+                                "h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                                isSelected ? "bg-white/20" : `${color.light}`
+                              )}>
+                                <Building2 className={cn("h-4 w-4", isSelected ? "text-white" : color.text)} />
+                              </div>
+                              <h3 className={cn(
+                                "font-bold text-sm leading-tight truncate",
+                                isSelected ? "text-white" : "text-gray-900 dark:text-white"
+                              )}>
+                                {emp.nome}
+                              </h3>
+                            </div>
+                            <div className={cn(
+                              "flex items-center gap-1 text-xs ml-10",
+                              isSelected ? "text-white/70" : "text-gray-500"
+                            )}>
+                              <MapPin className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{emp.bairro}</span>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <div className="bg-white/20 rounded-full p-1 flex-shrink-0">
+                              <Sparkles className="h-3.5 w-3.5 text-white" />
+                            </div>
+                          )}
+                        </div>
 
-                <button
-                  onClick={() => setStatusFilter("vendida")}
-                  className={cn(
-                    "relative p-4 rounded-xl transition-all",
-                    statusFilter === "vendida"
-                      ? "bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-xl scale-[1.02]"
-                      : "bg-white/70 dark:bg-zinc-900/70 hover:bg-white dark:hover:bg-zinc-800"
-                  )}
-                >
-                  <div className={cn(
-                    "text-xs mb-1",
-                    statusFilter === "vendida" ? "text-rose-100" : "text-rose-500"
-                  )}>Vendidas</div>
-                  <div className="text-2xl font-bold">{stats.vendida}</div>
-                </button>
+                        {/* Stacked availability bar */}
+                        <div className="mb-2">
+                          <div className={cn(
+                            "h-2 rounded-full overflow-hidden flex",
+                            isSelected ? "bg-white/20" : "bg-gray-100 dark:bg-zinc-800"
+                          )}>
+                            <div
+                              className={cn("h-full transition-all duration-700", isSelected ? "bg-white/70" : "bg-emerald-500")}
+                              style={{ width: `${total > 0 ? (disponiveis / total) * 100 : 0}%` }}
+                            />
+                            <div
+                              className={cn("h-full transition-all duration-700", isSelected ? "bg-white/40" : "bg-amber-400")}
+                              style={{ width: `${total > 0 ? (reservadas / total) * 100 : 0}%` }}
+                            />
+                            <div
+                              className={cn("h-full transition-all duration-700", isSelected ? "bg-white/20" : "bg-rose-400")}
+                              style={{ width: `${total > 0 ? (vendidas / total) * 100 : 0}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Mini stats */}
+                        <div className="flex items-center gap-3">
+                          <div className={cn("flex items-center gap-1 text-xs", isSelected ? "text-white/90" : "text-gray-600 dark:text-gray-400")}>
+                            <div className={cn("w-1.5 h-1.5 rounded-full", isSelected ? "bg-white/70" : "bg-emerald-500")} />
+                            <span className="font-bold">{disponiveis}</span>
+                            <span className="hidden sm:inline">disp.</span>
+                          </div>
+                          <div className={cn("flex items-center gap-1 text-xs", isSelected ? "text-white/70" : "text-gray-400")}>
+                            <div className={cn("w-1.5 h-1.5 rounded-full", isSelected ? "bg-white/40" : "bg-amber-400")} />
+                            <span>{reservadas}</span>
+                          </div>
+                          <div className={cn("flex items-center gap-1 text-xs", isSelected ? "text-white/50" : "text-gray-400")}>
+                            <div className={cn("w-1.5 h-1.5 rounded-full", isSelected ? "bg-white/20" : "bg-rose-400")} />
+                            <span>{vendidas}</span>
+                          </div>
+                          <span className={cn("text-xs ml-auto font-medium", isSelected ? "text-white/60" : "text-gray-400")}>
+                            {pct}%
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
 
-              {/* Legend */}
-              <div className="flex items-center justify-center gap-6 py-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-emerald-500" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Disponível</span>
+              {/* Status Filter Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl rounded-xl px-4 py-3 border border-white/60 dark:border-zinc-800/60">
+                <div className="flex items-center gap-1">
+                  {(["todos", "disponivel", "reservada", "vendida"] as const).map((status) => {
+                    const cfg = status === "todos"
+                      ? { bg: "bg-gray-500", activeBg: "bg-gray-700", label: "Todas", count: stats.total }
+                      : { bg: statusConfig[status].bg, activeBg: statusConfig[status].bg, label: statusConfig[status].label, count: stats[status] }
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => setStatusFilter(status)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all",
+                          statusFilter === status
+                            ? `${cfg.activeBg} text-white font-semibold shadow-md`
+                            : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                        )}
+                      >
+                        {statusFilter !== status && <div className={cn("w-2 h-2 rounded-full", cfg.bg)} />}
+                        <span className="hidden sm:inline">{cfg.label}</span>
+                        <span className={cn("font-bold", statusFilter === status ? "text-white" : "")}>{cfg.count}</span>
+                      </button>
+                    )
+                  })}
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-amber-500" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Reservada</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-rose-500" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Vendida</span>
+                <div className="text-xs text-gray-400">
+                  {stats.total} unidades total
                 </div>
               </div>
 

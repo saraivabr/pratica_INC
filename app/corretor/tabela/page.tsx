@@ -22,7 +22,10 @@ import {
   Eye,
   Share2,
   FileText,
-  MessageCircle
+  MessageCircle,
+  MapPin,
+  TrendingUp,
+  Sparkles
 } from "lucide-react"
 import { AnimatedBackground } from "@/components/animated-background"
 import { Input } from "@/components/ui/input"
@@ -57,6 +60,16 @@ function SortIndicator({ column, sortBy, sortDir }: { column: string; sortBy: st
     <ChevronDown className="h-4 w-4 text-emerald-500" />
   )
 }
+
+// Empreendimento color palette
+const empColors = [
+  { gradient: "from-emerald-500 to-green-600", bg: "bg-emerald-500", light: "bg-emerald-50 dark:bg-emerald-950/40", text: "text-emerald-600 dark:text-emerald-400" },
+  { gradient: "from-blue-500 to-indigo-600", bg: "bg-blue-500", light: "bg-blue-50 dark:bg-blue-950/40", text: "text-blue-600 dark:text-blue-400" },
+  { gradient: "from-violet-500 to-purple-600", bg: "bg-violet-500", light: "bg-violet-50 dark:bg-violet-950/40", text: "text-violet-600 dark:text-violet-400" },
+  { gradient: "from-amber-500 to-orange-600", bg: "bg-amber-500", light: "bg-amber-50 dark:bg-amber-950/40", text: "text-amber-600 dark:text-amber-400" },
+  { gradient: "from-rose-500 to-pink-600", bg: "bg-rose-500", light: "bg-rose-50 dark:bg-rose-950/40", text: "text-rose-600 dark:text-rose-400" },
+  { gradient: "from-teal-500 to-cyan-600", bg: "bg-teal-500", light: "bg-teal-50 dark:bg-teal-950/40", text: "text-teal-600 dark:text-teal-400" },
+]
 
 // Unit detail modal
 function UnitDetailModal({
@@ -335,32 +348,6 @@ export default function TabelaPage() {
             <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400/30 via-green-400/30 to-teal-400/30 rounded-2xl blur-xl opacity-60" />
             <div className="relative bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl rounded-2xl shadow-xl border border-white/60 dark:border-zinc-800/60 p-4">
               <div className="flex flex-col lg:flex-row gap-3">
-                {/* Empreendimento Select */}
-                <Select
-                  value={selectedEmpreendimento?.id.toString()}
-                  onValueChange={(val) => {
-                    const emp = empreendimentos.find(e => e.id.toString() === val)
-                    if (emp) setSelectedEmpreendimento(emp as any)
-                  }}
-                >
-                  <SelectTrigger className="h-12 w-full lg:w-[280px] bg-white/80 dark:bg-zinc-800/80 border-gray-200 dark:border-zinc-700 rounded-xl">
-                    <Building2 className="h-5 w-5 mr-2 text-emerald-500" />
-                    <SelectValue placeholder="Selecione um empreendimento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {empreendimentos.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <span>{emp.nome}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {emp.unidadesDisponiveis} disp.
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
                 {/* Search */}
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -409,24 +396,147 @@ export default function TabelaPage() {
             </div>
           ) : selectedEmpreendimento ? (
             <>
-              {/* Summary Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl rounded-xl p-4 border border-white/60 dark:border-zinc-800/60">
-                  <div className="text-xs text-gray-500 mb-1">Total Unidades</div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
+              {/* Empreendimento Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {empreendimentos.map((emp, idx) => {
+                  const isSelected = selectedEmpreendimento?.id === emp.id
+                  const color = empColors[idx % empColors.length]
+                  const units = (emp as any).unidades || []
+                  const total = units.length
+                  const disponiveis = units.filter((u: any) => u.status === "disponivel").length
+                  const pct = total > 0 ? Math.round((disponiveis / total) * 100) : 0
+                  const valores = units.filter((u: any) => u.status === "disponivel").map((u: any) => u.valor)
+                  const minVal = valores.length > 0 ? Math.min(...valores) : 0
+                  const maxVal = valores.length > 0 ? Math.max(...valores) : 0
+
+                  return (
+                    <button
+                      key={emp.id}
+                      onClick={() => {
+                        setSelectedEmpreendimento(emp as any)
+                        setStatusFilter("todos")
+                        setQuartosFilter("todos")
+                        setSearch("")
+                      }}
+                      className={cn(
+                        "relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 group",
+                        isSelected
+                          ? `bg-gradient-to-br ${color.gradient} text-white shadow-2xl scale-[1.02]`
+                          : "bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border border-white/60 dark:border-zinc-800/60 hover:shadow-xl hover:scale-[1.01]"
+                      )}
+                    >
+                      {/* Decorative elements */}
+                      <div className={cn(
+                        "absolute -right-8 -top-8 w-28 h-28 rounded-full transition-all duration-500",
+                        isSelected ? "bg-white/10 scale-100" : `${color.bg} opacity-[0.04] group-hover:opacity-[0.08] group-hover:scale-110`
+                      )} />
+                      <div className={cn(
+                        "absolute -left-4 -bottom-4 w-16 h-16 rounded-full transition-all duration-500",
+                        isSelected ? "bg-white/5" : `${color.bg} opacity-[0.03] group-hover:opacity-[0.06]`
+                      )} />
+
+                      <div className="relative">
+                        {/* Header */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className={cn(
+                                "h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                                isSelected ? "bg-white/20" : `${color.light}`
+                              )}>
+                                <Building2 className={cn("h-4 w-4", isSelected ? "text-white" : color.text)} />
+                              </div>
+                              <h3 className={cn(
+                                "font-bold text-sm leading-tight truncate",
+                                isSelected ? "text-white" : "text-gray-900 dark:text-white"
+                              )}>
+                                {emp.nome}
+                              </h3>
+                            </div>
+                            <div className={cn(
+                              "flex items-center gap-1 text-xs ml-10",
+                              isSelected ? "text-white/70" : "text-gray-500"
+                            )}>
+                              <MapPin className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{emp.bairro}, {emp.cidade}</span>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <div className="bg-white/20 rounded-full p-1 flex-shrink-0">
+                              <Sparkles className="h-3.5 w-3.5 text-white" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Availability bar */}
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between text-xs mb-1.5">
+                            <span className={cn(isSelected ? "text-white/80" : "text-gray-500")}>
+                              Disponibilidade
+                            </span>
+                            <span className={cn("font-bold", isSelected ? "text-white" : color.text)}>
+                              {disponiveis}/{total}
+                            </span>
+                          </div>
+                          <div className={cn(
+                            "h-2 rounded-full overflow-hidden",
+                            isSelected ? "bg-white/20" : "bg-gray-100 dark:bg-zinc-800"
+                          )}>
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-all duration-700 ease-out",
+                                isSelected ? "bg-white/70" : "bg-gradient-to-r from-emerald-400 to-emerald-500"
+                              )}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Price range */}
+                        {minVal > 0 && (
+                          <div className={cn(
+                            "flex items-center gap-1.5 text-xs",
+                            isSelected ? "text-white/80" : "text-gray-600 dark:text-gray-400"
+                          )}>
+                            <TrendingUp className="h-3 w-3 flex-shrink-0" />
+                            <span className="font-medium">{formatCurrency(minVal)}</span>
+                            <span className="opacity-50">~</span>
+                            <span className="font-medium">{formatCurrency(maxVal)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Compact Stats Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl rounded-xl px-4 py-3 border border-white/60 dark:border-zinc-800/60">
+                <div className="flex items-center gap-4">
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Status</span>
+                  {(["disponivel", "reservada", "vendida"] as const).map((status) => {
+                    const cfg = {
+                      disponivel: { bg: "bg-emerald-500", label: "Disponíveis", count: stats.disponivel },
+                      reservada: { bg: "bg-amber-500", label: "Reservadas", count: stats.reservada },
+                      vendida: { bg: "bg-rose-500", label: "Vendidas", count: stats.vendida },
+                    }[status]
+                    return (
+                      <div key={status} className="flex items-center gap-1.5 text-sm">
+                        <div className={cn("w-2.5 h-2.5 rounded-full", cfg.bg)} />
+                        <span className="hidden sm:inline text-gray-500 dark:text-gray-400">{cfg.label}</span>
+                        <span className="font-bold text-gray-900 dark:text-white">{cfg.count}</span>
+                      </div>
+                    )
+                  })}
                 </div>
-                <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl rounded-xl p-4 border border-white/60 dark:border-zinc-800/60">
-                  <div className="text-xs text-emerald-500 mb-1">Disponíveis</div>
-                  <div className="text-2xl font-bold text-emerald-600">{stats.disponivel}</div>
-                </div>
-                <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl rounded-xl p-4 border border-white/60 dark:border-zinc-800/60">
-                  <div className="text-xs text-gray-500 mb-1">A partir de</div>
-                  <div className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.valorMin)}</div>
-                </div>
-                <div className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl rounded-xl p-4 border border-white/60 dark:border-zinc-800/60">
-                  <div className="text-xs text-gray-500 mb-1">Até</div>
-                  <div className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.valorMax)}</div>
-                </div>
+                {stats.valorMin > 0 && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <DollarSign className="h-3.5 w-3.5 text-emerald-500" />
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(stats.valorMin)}</span>
+                    <span className="text-gray-400">a</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(stats.valorMax)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Table */}
