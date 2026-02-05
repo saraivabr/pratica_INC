@@ -38,7 +38,6 @@ import {
   ClipboardCheck,
   PartyPopper,
   Gauge,
-  Handshake,
   PanelLeft,
   FileText,
   Activity,
@@ -127,7 +126,7 @@ const adminGroups = {
       { href: "/admin/equipe", icon: Users, label: "Equipe", description: "Corretores e ranking" },
       { href: "/admin/eventos", icon: PartyPopper, label: "Eventos", description: "Criar e gerenciar eventos" },
       { href: "/admin/recepcao", icon: ClipboardCheck, label: "Roleta", description: "Controle de plantão e fila" },
-      { href: "/admin/intermediacao/vendas", icon: Handshake, label: "Intermediação", description: "Comissões e vendas" },
+      { href: "/admin/comissao", icon: Calculator, label: "Comissão", description: "Cálculo de comissões" },
     ],
   },
   mais: {
