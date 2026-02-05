@@ -51,6 +51,8 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/lib/auth-context"
+import { useRoletaStatus } from "@/hooks/use-roleta-status"
+import { RoletaFloatingWidget } from "@/components/roleta-floating-widget"
 import {
   Tooltip,
   TooltipContent,
@@ -64,6 +66,7 @@ import { NavGroup } from "@/components/ui/nav-group"
 // Prioridade: Empreendimentos > Espelho > Tabela > Leads
 // ────────────────────────────────────────────────────────
 const corretorPrimaryItems = [
+  { href: "/corretor/recepcao", icon: ClipboardCheck, label: "Roleta", description: "Check-in e fila de plantão", roleta: true },
   { href: "/corretor", icon: Gauge, label: "Painel", description: "Visão geral e métricas" },
   { href: "/corretor/imoveis", icon: Building2, label: "Empreendimentos", description: "Catálogo de imóveis" },
   { href: "/corretor/espelho", icon: Grid3X3, label: "Espelho", description: "Disponibilidade de unidades" },
@@ -73,7 +76,6 @@ const corretorPrimaryItems = [
 
 const corretorSecondaryItems = [
   { href: "/corretor/assistente", icon: Sparkles, label: "Assistente IA", highlight: true, description: "Tire dúvidas com a IA" },
-  { href: "/corretor/recepcao", icon: ClipboardCheck, label: "Roleta", description: "Check-in e fila de plantão" },
   { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads", description: "Follow-up automático" },
   { href: "/corretor/disparador", icon: Send, label: "Disparador", description: "Envios em massa" },
   { href: "/corretor/chat", icon: MessageSquare, label: "Conversas", description: "Chat com leads" },
@@ -217,11 +219,12 @@ function NavItem({
   isActive,
   isCollapsed,
 }: {
-  item: { href: string; icon: React.ElementType; label: string; highlight?: boolean; badge?: string; description?: string }
+  item: { href: string; icon: React.ElementType; label: string; highlight?: boolean; badge?: string; badgeVariant?: "default" | "warning"; roleta?: boolean; description?: string }
   isActive: boolean
   isCollapsed: boolean
 }) {
   const isHighlight = item.highlight
+  const isRoleta = item.roleta
   const hasBadge = item.badge
 
   const content = (
@@ -229,25 +232,54 @@ function NavItem({
       href={item.href}
       className={cn(
         "group/item flex w-full items-center gap-3 px-3 py-2 rounded-xl transition-all duration-150 relative",
-        isHighlight && !isActive
-          ? "bg-gradient-to-r from-violet-500/8 to-indigo-500/8 text-violet-700 dark:text-violet-300 hover:from-violet-500/15 hover:to-indigo-500/15 font-medium"
-          : isActive
-            ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium shadow-sm shadow-zinc-900/10 dark:shadow-white/10"
-            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
-        isHighlight && isActive && "bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-500 dark:to-indigo-500 text-white dark:text-white shadow-md shadow-violet-500/20",
+        // Roleta special styling
+        isRoleta && !isActive
+          ? "bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-700 dark:text-emerald-300 hover:from-emerald-500/18 hover:to-teal-500/18 font-medium"
+          : isRoleta && isActive
+            ? "bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-emerald-500 dark:to-teal-500 text-white dark:text-white font-medium shadow-md shadow-emerald-500/25"
+        // IA highlight styling
+          : isHighlight && !isActive
+            ? "bg-gradient-to-r from-violet-500/8 to-indigo-500/8 text-violet-700 dark:text-violet-300 hover:from-violet-500/15 hover:to-indigo-500/15 font-medium"
+            : isHighlight && isActive
+              ? "bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-500 dark:to-indigo-500 text-white dark:text-white shadow-md shadow-violet-500/20"
+        // Normal styling
+              : isActive
+                ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium shadow-sm shadow-zinc-900/10 dark:shadow-white/10"
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
         isCollapsed && "justify-center px-2 py-2.5"
       )}
     >
+      {/* Pulsing glow behind roleta item when has badge */}
+      {isRoleta && hasBadge && item.badgeVariant === "warning" && !isCollapsed && (
+        <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-amber-400/20 to-yellow-400/20 animate-pulse pointer-events-none" />
+      )}
+      {isRoleta && hasBadge && item.badgeVariant !== "warning" && !isCollapsed && (
+        <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-emerald-400/10 to-teal-400/10 animate-pulse pointer-events-none" />
+      )}
       <item.icon className={cn(
-        "h-[18px] w-[18px] shrink-0 transition-transform duration-150",
+        "h-[18px] w-[18px] shrink-0 transition-transform duration-150 relative z-10",
+        isRoleta && !isActive && "text-emerald-500 dark:text-emerald-400",
+        isRoleta && isActive && "text-white",
         isHighlight && !isActive && "text-violet-500 dark:text-violet-400",
-        isActive && !isHighlight && "text-white dark:text-zinc-900",
+        isActive && !isHighlight && !isRoleta && "text-white dark:text-zinc-900",
         isActive && isHighlight && "text-white",
-        !isActive && !isHighlight && "text-zinc-400 dark:text-zinc-500 group-hover/item:text-zinc-600 dark:group-hover/item:text-zinc-300",
+        !isActive && !isHighlight && !isRoleta && "text-zinc-400 dark:text-zinc-500 group-hover/item:text-zinc-600 dark:group-hover/item:text-zinc-300",
       )} />
       {!isCollapsed && (
-        <>
+        <span className="relative z-10 flex items-center gap-2 flex-1 min-w-0">
           <span className="text-[13px] truncate min-w-0 flex-1">{item.label}</span>
+          {isRoleta && hasBadge && (
+            <span className={cn(
+              "ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full whitespace-nowrap",
+              item.badgeVariant === "warning"
+                ? "bg-amber-500 text-white shadow-sm shadow-amber-500/30 animate-pulse"
+                : isActive
+                  ? "bg-white/20 text-white"
+                  : "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30"
+            )}>
+              {item.badge}
+            </span>
+          )}
           {isHighlight && (
             <span className={cn(
               "ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full",
@@ -256,12 +288,12 @@ function NavItem({
                 : "bg-gradient-to-r from-violet-500 to-indigo-600 text-white"
             )}>IA</span>
           )}
-          {hasBadge && !isHighlight && (
+          {hasBadge && !isHighlight && !isRoleta && (
             <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">
               {item.badge}
             </span>
           )}
-        </>
+        </span>
       )}
     </Link>
   )
@@ -291,7 +323,7 @@ function NavItemSecondary({
   isActive,
   isCollapsed,
 }: {
-  item: { href: string; icon: React.ElementType; label: string; description?: string }
+  item: { href: string; icon: React.ElementType; label: string; description?: string; badge?: string; badgeVariant?: "default" | "warning" }
   isActive: boolean
   isCollapsed: boolean
 }) {
@@ -313,7 +345,19 @@ function NavItemSecondary({
           : "text-zinc-400 dark:text-zinc-600 group-hover/item:text-zinc-500 dark:group-hover/item:text-zinc-400",
       )} />
       {!isCollapsed && (
-        <span className="text-[12px] truncate min-w-0 flex-1">{item.label}</span>
+        <>
+          <span className="text-[12px] truncate min-w-0 flex-1">{item.label}</span>
+          {item.badge && (
+            <span className={cn(
+              "ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full",
+              item.badgeVariant === "warning"
+                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 animate-pulse"
+                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+            )}>
+              {item.badge}
+            </span>
+          )}
+        </>
       )}
     </Link>
   )
@@ -375,6 +419,19 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
   // Determine current view based on pathname
   const currentView: "admin" | "corretor" = pathname.startsWith("/corretor") ? "corretor" : "admin"
 
+  // Roleta status polling (only for corretor views)
+  const isCorretorView = isCorretor || currentView === "corretor"
+  const isOnRecepcaoPage = pathname.startsWith("/corretor/recepcao")
+  const roletaStatus = useRoletaStatus(isCorretorView)
+
+  // Build roleta badge for sidebar
+  const roletaBadge = roletaStatus.isMyTurn
+    ? "SUA VEZ!"
+    : roletaStatus.inQueue
+      ? `#${roletaStatus.posicaoReal ?? roletaStatus.posicao ?? '?'}`
+      : undefined
+  const roletaBadgeVariant = roletaStatus.isMyTurn ? "warning" as const : "default" as const
+
   // Can switch roles (admin and gerente can switch, corretor cannot)
   const canSwitchRoles = user?.role === "admin" || user?.role === "gerente"
 
@@ -403,10 +460,13 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
         {/* Primary items - larger, more prominent */}
         {corretorPrimaryItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
+          const enrichedItem = item.roleta && roletaBadge
+            ? { ...item, badge: roletaBadge, badgeVariant: roletaBadgeVariant }
+            : item
           return (
             <NavItem
               key={item.href}
-              item={item}
+              item={enrichedItem}
               isActive={isActive}
               isCollapsed={collapsed}
             />
@@ -681,23 +741,47 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
                           key={item.href}
                           href={item.href}
                           className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150",
-                            item.highlight && !isActive
-                              ? "bg-gradient-to-r from-violet-500/8 to-indigo-500/8 text-violet-700 dark:text-violet-300 font-medium"
-                              : isActive
-                                ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium shadow-sm"
-                                : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
-                            item.highlight && isActive && "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/20"
+                            "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 relative overflow-hidden",
+                            item.roleta && !isActive
+                              ? "bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-700 dark:text-emerald-300 font-medium"
+                              : item.roleta && isActive
+                                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium shadow-md shadow-emerald-500/25"
+                              : (item as any).highlight && !isActive
+                                ? "bg-gradient-to-r from-violet-500/8 to-indigo-500/8 text-violet-700 dark:text-violet-300 font-medium"
+                                : isActive
+                                  ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium shadow-sm"
+                                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
+                            (item as any).highlight && isActive && "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/20"
                           )}
                         >
+                          {item.roleta && roletaBadge && roletaBadgeVariant === "warning" && (
+                            <span className="absolute inset-0 bg-gradient-to-r from-amber-400/20 to-yellow-400/20 animate-pulse pointer-events-none" />
+                          )}
+                          {item.roleta && roletaBadge && roletaBadgeVariant !== "warning" && (
+                            <span className="absolute inset-0 bg-gradient-to-r from-emerald-400/10 to-teal-400/10 animate-pulse pointer-events-none" />
+                          )}
                           <item.icon className={cn(
-                            "h-[18px] w-[18px] shrink-0",
-                            item.highlight && !isActive && "text-violet-500 dark:text-violet-400",
-                            isActive && "text-current",
-                            !isActive && !item.highlight && "text-zinc-400 dark:text-zinc-500",
+                            "h-[18px] w-[18px] shrink-0 relative z-10",
+                            item.roleta && !isActive && "text-emerald-500 dark:text-emerald-400",
+                            item.roleta && isActive && "text-white",
+                            (item as any).highlight && !isActive && "text-violet-500 dark:text-violet-400",
+                            !item.roleta && isActive && "text-current",
+                            !isActive && !(item as any).highlight && !item.roleta && "text-zinc-400 dark:text-zinc-500",
                           )} />
-                          <span className="text-[13px]">{item.label}</span>
-                          {item.highlight && (
+                          <span className="text-[13px] relative z-10 flex-1">{item.label}</span>
+                          {item.roleta && roletaBadge && (
+                            <span className={cn(
+                              "relative z-10 ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full whitespace-nowrap",
+                              roletaBadgeVariant === "warning"
+                                ? "bg-amber-500 text-white shadow-sm shadow-amber-500/30 animate-pulse"
+                                : isActive
+                                  ? "bg-white/20 text-white"
+                                  : "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30"
+                            )}>
+                              {roletaBadge}
+                            </span>
+                          )}
+                          {(item as any).highlight && (
                             <span className={cn(
                               "ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full",
                               isActive ? "bg-white/20 text-white" : "bg-gradient-to-r from-violet-500 to-indigo-600 text-white"
@@ -855,6 +939,11 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
             {children}
           </main>
         </div>
+
+        {/* Roleta Floating Widget */}
+        {isCorretorView && !isOnRecepcaoPage && (
+          <RoletaFloatingWidget status={roletaStatus} loading={roletaStatus.loading} />
+        )}
 
         {/* Floating Prática IA Button */}
         {(isCorretor || currentView === "corretor") && !pathname.startsWith("/corretor/assistente") && (
