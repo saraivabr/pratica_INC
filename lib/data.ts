@@ -24,14 +24,15 @@ export interface Empreendimento {
 
 export interface Unidade {
   id: string
-  tipo: string
-  metragem: number
-  valor: number
-  status: "disponivel" | "reservado" | "vendido"
+  numero: string
+  tipologia: string
   quartos: number
-  vagas: number
+  area: number
+  valor: number
+  status: "disponivel" | "reservada" | "vendida"
   andar?: number
-  final?: string
+  vagas?: number
+  posicao?: string
 }
 
 export interface CondicaoPagamento {
@@ -58,9 +59,9 @@ export function getStatusColor(status: Unidade["status"]): string {
   switch (status) {
     case "disponivel":
       return "bg-success text-success-foreground"
-    case "reservado":
+    case "reservada":
       return "bg-warning text-warning-foreground"
-    case "vendido":
+    case "vendida":
       return "bg-muted text-muted-foreground"
     default:
       return "bg-muted text-muted-foreground"
