@@ -24,6 +24,7 @@ import {
   Plus,
   Mic,
   Square,
+  RefreshCw,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { useAuth, usePageTracking } from "@/lib/auth-context"
@@ -856,7 +857,26 @@ export default function CorretorDashboard() {
             </section>
           )}
 
-          {/* ===== SECTION 5: Quick Actions Slim ===== */}
+          {/* ===== SECTION 5: Roleta Card ===== */}
+          <section className="px-1">
+            <Link
+              href="/corretor/recepcao"
+              className="block bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-2xl rounded-2xl shadow-lg border border-primary/20 dark:border-primary/10 overflow-hidden hover:border-primary/40 transition-all group"
+            >
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center flex-shrink-0 group-hover:from-primary/20 group-hover:to-primary/30 transition-colors">
+                  <RefreshCw className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Roleta de Leads</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Puxe leads e gerencie atendimentos</p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-primary transition-colors" />
+              </div>
+            </Link>
+          </section>
+
+          {/* ===== SECTION 6: Quick Actions Slim ===== */}
           <section className="flex flex-wrap gap-2 px-1 pb-4">
             <Link
               href="/leads"

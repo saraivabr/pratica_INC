@@ -82,10 +82,19 @@ export async function GET(request: NextRequest) {
         a.*,
         u.nome AS corretor_nome,
         u.telefone AS corretor_telefone,
-        ab.nome AS atribuido_por_nome
+        ab.nome AS atribuido_por_nome,
+        cl.empreendimentos AS lead_empreendimentos,
+        cl.origem AS lead_crm_origem,
+        cl.score AS lead_score,
+        cl.situacao_nome AS lead_situacao,
+        cl.ultima_data_conversao AS lead_ultima_conversao,
+        cl.telefone AS lead_crm_telefone,
+        cl.celular AS lead_celular,
+        cl.created_at AS lead_created_at
       FROM recepcao_atribuicoes a
       JOIN users u ON u.id = a.user_id
       LEFT JOIN users ab ON ab.id = a.atribuido_por
+      LEFT JOIN cvcrm_leads cl ON cl.cvcrm_id = a.cvcrm_lead_id
       ${whereClause}
       ORDER BY a.atribuido_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}

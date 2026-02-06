@@ -1,21 +1,28 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   AlertCircle,
   ArrowLeft,
+  Calendar,
   CheckCircle,
   Clock,
+  ExternalLink,
   Loader2,
   MessageSquare,
+  Pencil,
   Phone,
+  PhoneCall,
   RefreshCw,
   Send,
   User,
+  Mail,
+  Eye,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
@@ -37,7 +44,7 @@ import {
 } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
-import { format } from "date-fns"
+import { format, formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
 
@@ -48,12 +55,30 @@ interface Atribuicao {
   lead_email: string | null
   lead_origem: string
   lead_observacoes: string | null
+  cvcrm_lead_id: number | null
   atribuido_at: string
   atendimento_iniciado_at: string | null
   atendimento_finalizado_at: string | null
   feedback_status: string | null
   feedback_observacoes: string | null
   atribuido_por_nome: string | null
+  // JOIN data from cvcrm_leads
+  lead_empreendimentos: any | null
+  lead_crm_origem: string | null
+  lead_score: number | null
+  lead_situacao: string | null
+  lead_ultima_conversao: string | null
+  lead_crm_telefone: string | null
+  lead_celular: string | null
+  lead_created_at: string | null
+}
+
+interface Anotacao {
+  id: string
+  tipo: string
+  conteudo: string
+  created_at: string
+  user_nome: string
 }
 
 const feedbackOptions = [
@@ -69,6 +94,15 @@ const origemConfig: Record<string, { icon: React.ReactNode; label: string }> = {
   presencial: { icon: <User className="h-4 w-4" />, label: "Presencial" },
   telefone: { icon: <Phone className="h-4 w-4" />, label: "Telefone" },
   whatsapp: { icon: <MessageSquare className="h-4 w-4" />, label: "WhatsApp" },
+  sistema: { icon: <RefreshCw className="h-4 w-4" />, label: "Sistema" },
+}
+
+const tipoAnotacaoConfig: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
+  nota: { icon: <Pencil className="h-3 w-3" />, label: "Nota", color: "text-zinc-500" },
+  ligacao: { icon: <PhoneCall className="h-3 w-3" />, label: "Ligacao", color: "text-blue-500" },
+  whatsapp: { icon: <MessageSquare className="h-3 w-3" />, label: "WhatsApp", color: "text-green-500" },
+  visita: { icon: <Eye className="h-3 w-3" />, label: "Visita", color: "text-purple-500" },
+  email: { icon: <Mail className="h-3 w-3" />, label: "Email", color: "text-orange-500" },
 }
 
 export default function MinhasAtribuicoesPage() {
@@ -78,6 +112,22 @@ export default function MinhasAtribuicoesPage() {
   const [atribuicoes, setAtribuicoes] = useState<Atribuicao[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+
+  // Anotações per atribuição
+  const [anotacoesMap, setAnotacoesMap] = useState<Record<string, Anotacao[]>>({})
+  const [expandedCard, setExpandedCard] = useState<string | null>(null)
+  const [anotacaoForm, setAnotacaoForm] = useState({ tipo: "nota", conteudo: "" })
+  const [savingAnotacao, setSavingAnotacao] = useState(false)
+
+  // Follow-up dialog
+  const [followupDialogOpen, setFollowupDialogOpen] = useState(false)
+  const [followupAtribuicao, setFollowupAtribuicao] = useState<Atribuicao | null>(null)
+  const [followupForm, setFollowupForm] = useState({
+    data_agendamento: "",
+    tipo: "whatsapp" as string,
+    observacoes: "",
+  })
+  const [savingFollowup, setSavingFollowup] = useState(false)
 
   // Feedback Dialog
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false)
@@ -116,6 +166,29 @@ export default function MinhasAtribuicoesPage() {
       toast.error("Erro ao carregar atribuicoes")
     }
     setLoading(false)
+  }
+
+  const fetchAnotacoes = useCallback(async (atribuicaoId: string) => {
+    try {
+      const response = await fetch(`/api/recepcao/atribuicoes/${atribuicaoId}/anotacoes`)
+      const result = await response.json()
+      if (result.success) {
+        setAnotacoesMap((prev) => ({ ...prev, [atribuicaoId]: result.data }))
+      }
+    } catch (error) {
+      console.error("Error fetching anotacoes:", error)
+    }
+  }, [])
+
+  const handleExpandCard = (atribuicaoId: string) => {
+    if (expandedCard === atribuicaoId) {
+      setExpandedCard(null)
+    } else {
+      setExpandedCard(atribuicaoId)
+      if (!anotacoesMap[atribuicaoId]) {
+        fetchAnotacoes(atribuicaoId)
+      }
+    }
   }
 
   const handleRefresh = async () => {
@@ -184,6 +257,97 @@ export default function MinhasAtribuicoesPage() {
     setSendingFeedback(false)
   }
 
+  const handleSaveAnotacao = async (atribuicaoId: string) => {
+    if (!anotacaoForm.conteudo.trim()) {
+      toast.error("Escreva algo na anotacao")
+      return
+    }
+
+    setSavingAnotacao(true)
+    try {
+      const response = await fetch(`/api/recepcao/atribuicoes/${atribuicaoId}/anotacoes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(anotacaoForm),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast.success("Anotacao salva!")
+        setAnotacaoForm({ tipo: "nota", conteudo: "" })
+        await fetchAnotacoes(atribuicaoId)
+      } else {
+        toast.error(result.error || "Erro ao salvar anotacao")
+      }
+    } catch (error) {
+      toast.error("Erro ao salvar anotacao")
+    }
+    setSavingAnotacao(false)
+  }
+
+  const handleOpenFollowup = (atribuicao: Atribuicao) => {
+    setFollowupAtribuicao(atribuicao)
+    setFollowupForm({ data_agendamento: "", tipo: "whatsapp", observacoes: "" })
+    setFollowupDialogOpen(true)
+  }
+
+  const handleSaveFollowup = async () => {
+    if (!followupAtribuicao || !followupForm.data_agendamento) {
+      toast.error("Selecione a data do follow-up")
+      return
+    }
+
+    setSavingFollowup(true)
+    try {
+      const response = await fetch(`/api/recepcao/atribuicoes/${followupAtribuicao.id}/agendar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(followupForm),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast.success("Follow-up agendado!")
+        setFollowupDialogOpen(false)
+        await fetchAnotacoes(followupAtribuicao.id)
+      } else {
+        toast.error(result.error || "Erro ao agendar")
+      }
+    } catch (error) {
+      toast.error("Erro ao agendar")
+    }
+    setSavingFollowup(false)
+  }
+
+  // Helpers
+  const getPhoneForActions = (a: Atribuicao) => {
+    return a.lead_telefone || a.lead_crm_telefone || a.lead_celular || ""
+  }
+
+  const getEmpreendimentoNome = (a: Atribuicao) => {
+    if (!a.lead_empreendimentos) return null
+    try {
+      const emps = typeof a.lead_empreendimentos === "string"
+        ? JSON.parse(a.lead_empreendimentos)
+        : a.lead_empreendimentos
+      if (Array.isArray(emps) && emps.length > 0) {
+        return emps[0]?.nome || emps[0]?.empreendimento || null
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  const getDiasSemContato = (a: Atribuicao) => {
+    const ref = a.lead_ultima_conversao || a.lead_created_at
+    if (!ref) return null
+    const days = Math.floor((Date.now() - new Date(ref).getTime()) / (1000 * 60 * 60 * 24))
+    return days
+  }
+
   const pendentes = atribuicoes.filter(a => !a.feedback_status)
   const finalizados = atribuicoes.filter(a => a.feedback_status)
 
@@ -196,7 +360,7 @@ export default function MinhasAtribuicoesPage() {
   }
 
   return (
-    <AppShell title="Minhas Atribuicoes">
+    <AppShell title="Meus Leads">
       <div className="container px-4 py-6 animate-page-in space-y-6 max-w-lg mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4">
@@ -204,9 +368,9 @@ export default function MinhasAtribuicoesPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold tracking-tight">Minhas Atribuicoes</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Meus Leads</h1>
             <p className="text-muted-foreground text-sm">
-              Leads recebidos e feedback
+              {pendentes.length} pendente{pendentes.length !== 1 ? "s" : ""} / {finalizados.length} finalizado{finalizados.length !== 1 ? "s" : ""}
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
@@ -214,29 +378,32 @@ export default function MinhasAtribuicoesPage() {
           </Button>
         </div>
 
-        {/* Pendentes */}
+        {/* Pendentes - Lead Workspace Cards */}
         {pendentes.length > 0 && (
-          <Card className="border-orange-200 bg-orange-50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2 text-orange-700">
-                <AlertCircle className="h-5 w-5" />
-                Feedback Pendente ({pendentes.length})
-              </CardTitle>
-              <CardDescription className="text-orange-600">
-                Envie o feedback para voltar a fila
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {pendentes.map((atribuicao) => {
-                const origem = origemConfig[atribuicao.lead_origem] || origemConfig.presencial
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-orange-700 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Feedback Pendente ({pendentes.length})
+            </h2>
 
-                return (
-                  <div
-                    key={atribuicao.id}
-                    className="p-4 rounded-lg bg-white border border-orange-200"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
+            {pendentes.map((atribuicao) => {
+              const origem = origemConfig[atribuicao.lead_origem] || origemConfig.presencial
+              const phone = getPhoneForActions(atribuicao)
+              const cleanPhone = phone.replace(/\D/g, "")
+              const empreendimento = getEmpreendimentoNome(atribuicao)
+              const diasSemContato = getDiasSemContato(atribuicao)
+              const isExpanded = expandedCard === atribuicao.id
+              const anotacoes = anotacoesMap[atribuicao.id] || []
+
+              return (
+                <Card
+                  key={atribuicao.id}
+                  className="border-orange-200 bg-white overflow-hidden"
+                >
+                  <CardContent className="p-4 space-y-3">
+                    {/* Lead header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant="outline" className="text-xs">
                             {origem.icon}
@@ -245,29 +412,162 @@ export default function MinhasAtribuicoesPage() {
                           <span className="text-xs text-muted-foreground">
                             {format(new Date(atribuicao.atribuido_at), "HH:mm", { locale: ptBR })}
                           </span>
+                          {atribuicao.lead_score && atribuicao.lead_score > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              Score {atribuicao.lead_score}
+                            </Badge>
+                          )}
                         </div>
 
-                        {atribuicao.lead_nome && (
-                          <p className="font-medium">{atribuicao.lead_nome}</p>
-                        )}
+                        <p className="font-semibold text-base">
+                          {atribuicao.lead_nome || "Lead"}
+                        </p>
 
-                        {atribuicao.lead_telefone && (
+                        {phone && (
                           <p className="text-sm text-muted-foreground flex items-center gap-1">
                             <Phone className="h-3 w-3" />
-                            {atribuicao.lead_telefone}
+                            {phone}
                           </p>
                         )}
 
-                        {atribuicao.lead_observacoes && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {atribuicao.lead_observacoes}
+                        {empreendimento && (
+                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <span className="text-base">🏠</span>
+                            {empreendimento}
+                          </p>
+                        )}
+
+                        {diasSemContato !== null && diasSemContato > 0 && (
+                          <p className={cn(
+                            "text-xs mt-1 flex items-center gap-1",
+                            diasSemContato > 7 ? "text-red-500" : diasSemContato > 3 ? "text-orange-500" : "text-muted-foreground"
+                          )}>
+                            <Clock className="h-3 w-3" />
+                            Ha {diasSemContato} dia{diasSemContato !== 1 ? "s" : ""} sem contato
                           </p>
                         )}
                       </div>
                     </div>
 
-                    <div className="mt-3 flex gap-2">
-                      {!atribuicao.atendimento_iniciado_at ? (
+                    {/* Quick action buttons */}
+                    <div className="flex gap-2">
+                      {cleanPhone && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 text-green-600 border-green-200 hover:bg-green-50"
+                            onClick={() => {
+                              const firstName = atribuicao.lead_nome?.split(" ")[0] || "cliente"
+                              window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(`Ola ${firstName}! Tudo bem?`)}`, "_blank")
+                            }}
+                          >
+                            <MessageSquare className="h-4 w-4 mr-1" />
+                            WhatsApp
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                            onClick={() => window.location.href = `tel:+55${cleanPhone}`}
+                          >
+                            <PhoneCall className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleExpandCard(atribuicao.id)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Expanded: Anotações + Actions */}
+                    {isExpanded && (
+                      <div className="space-y-3 pt-2 border-t">
+                        {/* Anotações timeline */}
+                        {anotacoes.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-muted-foreground">Anotacoes</p>
+                            {anotacoes.map((an) => {
+                              const tipoConfig = tipoAnotacaoConfig[an.tipo] || tipoAnotacaoConfig.nota
+                              return (
+                                <div key={an.id} className="flex gap-2 text-sm">
+                                  <span className={cn("mt-0.5", tipoConfig.color)}>
+                                    {tipoConfig.icon}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm">{an.conteudo}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {format(new Date(an.created_at), "HH:mm", { locale: ptBR })}
+                                    </p>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {/* Add annotation form */}
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <Select
+                              value={anotacaoForm.tipo}
+                              onValueChange={(v) => setAnotacaoForm({ ...anotacaoForm, tipo: v })}
+                            >
+                              <SelectTrigger className="w-[120px] h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="nota">Nota</SelectItem>
+                                <SelectItem value="ligacao">Ligacao</SelectItem>
+                                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                                <SelectItem value="visita">Visita</SelectItem>
+                                <SelectItem value="email">Email</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              placeholder="O que aconteceu..."
+                              value={anotacaoForm.conteudo}
+                              onChange={(e) => setAnotacaoForm({ ...anotacaoForm, conteudo: e.target.value })}
+                              className="h-9 flex-1"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSaveAnotacao(atribuicao.id)
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              className="h-9"
+                              onClick={() => handleSaveAnotacao(atribuicao.id)}
+                              disabled={savingAnotacao || !anotacaoForm.conteudo.trim()}
+                            >
+                              {savingAnotacao ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Send className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Follow-up button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => handleOpenFollowup(atribuicao)}
+                        >
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Agendar Follow-up
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Bottom actions */}
+                    <div className="flex gap-2 pt-1">
+                      {!atribuicao.atendimento_iniciado_at && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -282,22 +582,22 @@ export default function MinhasAtribuicoesPage() {
                           )}
                           Iniciar
                         </Button>
-                      ) : null}
+                      )}
 
                       <Button
                         size="sm"
                         className="flex-1"
                         onClick={() => handleOpenFeedback(atribuicao)}
                       >
-                        <Send className="h-4 w-4 mr-2" />
-                        Feedback
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Dar Feedback
                       </Button>
                     </div>
-                  </div>
-                )
-              })}
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
         )}
 
         {/* Finalizados */}
@@ -354,10 +654,17 @@ export default function MinhasAtribuicoesPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <User className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-              <h3 className="font-semibold">Nenhuma atribuicao</h3>
+              <h3 className="font-semibold">Nenhum lead ainda</h3>
               <p className="text-sm text-muted-foreground">
-                Voce ainda nao recebeu leads hoje
+                Puxe seu primeiro lead na tela da Roleta
               </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => router.push("/corretor/recepcao")}
+              >
+                Ir para Roleta
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -423,6 +730,78 @@ export default function MinhasAtribuicoesPage() {
                   <Send className="h-4 w-4 mr-2" />
                 )}
                 Enviar Feedback
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Follow-up Dialog */}
+        <Dialog open={followupDialogOpen} onOpenChange={setFollowupDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Agendar Follow-up</DialogTitle>
+              <DialogDescription>
+                {followupAtribuicao?.lead_nome || "Lead"}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Data e hora *</Label>
+                <Input
+                  type="datetime-local"
+                  value={followupForm.data_agendamento}
+                  onChange={(e) =>
+                    setFollowupForm({ ...followupForm, data_agendamento: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select
+                  value={followupForm.tipo}
+                  onValueChange={(v) => setFollowupForm({ ...followupForm, tipo: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="ligacao">Ligacao</SelectItem>
+                    <SelectItem value="visita">Visita</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Observacoes (opcional)</Label>
+                <Textarea
+                  placeholder="O que abordar no follow-up..."
+                  value={followupForm.observacoes}
+                  onChange={(e) =>
+                    setFollowupForm({ ...followupForm, observacoes: e.target.value })
+                  }
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setFollowupDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSaveFollowup}
+                disabled={savingFollowup || !followupForm.data_agendamento}
+              >
+                {savingFollowup ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Calendar className="h-4 w-4 mr-2" />
+                )}
+                Agendar
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -15,6 +15,11 @@ import {
   Coffee,
   UserCheck,
   ScanLine,
+  ClipboardList,
+  HelpCircle,
+  Star,
+  ArrowRight,
+  X,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
@@ -27,6 +32,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 import {
@@ -98,6 +110,14 @@ export default function CorretorRecepcaoPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [pausaLoading, setPausaLoading] = useState(false)
   const [gpsLoading, setGpsLoading] = useState(false)
+
+  // Puxar lead
+  const [puxarLoading, setPuxarLoading] = useState(false)
+  const [leadsDisponiveis, setLeadsDisponiveis] = useState<{ total: number; sem_corretor: number; abandonados: number } | null>(null)
+
+  // Onboarding tour
+  const [tourOpen, setTourOpen] = useState(false)
+  const [tourStep, setTourStep] = useState(0)
 
   // Modais
   const [ofertaFormOpen, setOfertaFormOpen] = useState(false)
@@ -171,6 +191,49 @@ export default function CorretorRecepcaoPage() {
     }
   }, [minhaPresenca])
 
+  const fetchLeadsDisponiveis = useCallback(async () => {
+    if (!minhaPresenca) return
+    try {
+      const response = await fetch("/api/recepcao/leads-disponiveis")
+      const result = await response.json()
+      if (result.success) {
+        setLeadsDisponiveis(result.data)
+      }
+    } catch (error) {
+      console.error("Error fetching leads disponiveis:", error)
+    }
+  }, [minhaPresenca])
+
+  const handlePuxarLead = async () => {
+    if (!minhaPresenca) return
+
+    setPuxarLoading(true)
+    try {
+      const response = await fetch("/api/recepcao/puxar-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast.success(result.message, {
+          action: {
+            label: "Ver Lead",
+            onClick: () => router.push("/corretor/recepcao/atribuicoes"),
+          },
+        })
+        await fetchMinhaPresenca()
+        await fetchLeadsDisponiveis()
+      } else {
+        toast.error(result.error || "Erro ao puxar lead")
+      }
+    } catch (error) {
+      toast.error("Erro ao puxar lead")
+    }
+    setPuxarLoading(false)
+  }
+
   // Effects
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -197,8 +260,13 @@ export default function CorretorRecepcaoPage() {
     if (minhaPresenca) {
       fetchQualificacao()
       fetchGamificacao()
+      fetchLeadsDisponiveis()
+
+      // Poll leads count every 30s
+      const interval = setInterval(fetchLeadsDisponiveis, 30000)
+      return () => clearInterval(interval)
     }
-  }, [minhaPresenca, fetchQualificacao, fetchGamificacao])
+  }, [minhaPresenca, fetchQualificacao, fetchGamificacao, fetchLeadsDisponiveis])
 
   // Auto check-in via QR Code
   useEffect(() => {
@@ -227,6 +295,11 @@ export default function CorretorRecepcaoPage() {
       if (result.success) {
         toast.success("Show! Voce esta na fila.")
         await fetchMinhaPresenca()
+        // Show tour on first check-in
+        if (!localStorage.getItem("recepcao_tour_v1")) {
+          setTourStep(0)
+          setTourOpen(true)
+        }
       } else {
         toast.error(result.error || "Erro ao fazer check-in")
       }
@@ -489,7 +562,14 @@ export default function CorretorRecepcaoPage() {
     <AppShell title="Roleta">
       <div className="container px-4 py-6 animate-page-in space-y-5 max-w-lg mx-auto">
         {/* Header com saudacao */}
-        <div className="text-center">
+        <div className="text-center relative">
+          <button
+            onClick={() => { setTourStep(0); setTourOpen(true) }}
+            className="absolute right-0 top-0 p-1 rounded-full text-muted-foreground hover:text-primary transition-colors"
+            title="Como funciona?"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </button>
           <h1 className="text-2xl font-bold tracking-tight">
             {saudacao}, {primeiroNome}!
           </h1>
@@ -576,6 +656,60 @@ export default function CorretorRecepcaoPage() {
                   >
                     <AlertCircle className="h-4 w-4 mr-2" />
                     Enviar Feedback Pendente
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Puxar Proximo Lead */}
+            <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+              <CardContent className="py-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="font-semibold text-sm">Puxar Proximo Lead</p>
+                      <p className="text-xs text-muted-foreground">
+                        {leadsDisponiveis
+                          ? `${leadsDisponiveis.total} leads disponiveis`
+                          : "Carregando..."}
+                      </p>
+                    </div>
+                  </div>
+                  {leadsDisponiveis && leadsDisponiveis.total > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {leadsDisponiveis.sem_corretor} novos / {leadsDisponiveis.abandonados} retorno
+                    </Badge>
+                  )}
+                </div>
+
+                {minhaPresenca.feedback_pendente ? (
+                  <div className="flex items-center gap-2 text-sm text-orange-600 bg-orange-50 rounded-lg px-3 py-2">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    <span>De feedback antes de puxar outro lead</span>
+                  </div>
+                ) : minhaPresenca.leads_ativos >= 5 ? (
+                  <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 rounded-lg px-3 py-2">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    <span>Voce ja tem 5 leads ativos. Finalize alguns.</span>
+                  </div>
+                ) : (
+                  <Button
+                    className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/20"
+                    onClick={handlePuxarLead}
+                    disabled={
+                      puxarLoading ||
+                      minhaPresenca.pausado ||
+                      !leadsDisponiveis ||
+                      leadsDisponiveis.total === 0
+                    }
+                  >
+                    {puxarLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    ) : (
+                      <ClipboardList className="h-5 w-5 mr-2" />
+                    )}
+                    {puxarLoading ? "Puxando..." : "Puxar Lead"}
                   </Button>
                 )}
               </CardContent>
@@ -755,6 +889,94 @@ export default function CorretorRecepcaoPage() {
         type={celebrationType || "star"}
         data={celebrationData}
       />
+
+      {/* Onboarding Tour */}
+      <Dialog open={tourOpen} onOpenChange={setTourOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center">
+              {tourStep === 0 && "Como funciona a Roleta"}
+              {tourStep === 1 && "Puxe leads e anote tudo"}
+              {tourStep === 2 && "De feedback e ganhe estrelas"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-4 text-center space-y-3">
+            {tourStep === 0 && (
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                  <MapPin className="h-8 w-8 text-primary" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Faca check-in via GPS, QR Code ou manual para entrar na fila do plantao.
+                  Voce sera notificado quando for sua vez!
+                </p>
+              </>
+            )}
+            {tourStep === 1 && (
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto">
+                  <ClipboardList className="h-8 w-8 text-blue-600" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Puxe o proximo lead disponivel, entre em contato via WhatsApp ou telefone,
+                  e anote cada interacao. Agende follow-ups para nao perder ninguem!
+                </p>
+              </>
+            )}
+            {tourStep === 2 && (
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto">
+                  <Star className="h-8 w-8 text-amber-600" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Apos cada atendimento, de feedback. Quanto mais rapido, mais estrelas voce ganha!
+                  Acumule estrelas e troque por premios.
+                </p>
+              </>
+            )}
+
+            {/* Step dots */}
+            <div className="flex justify-center gap-2 pt-2">
+              {[0, 1, 2].map((s) => (
+                <div
+                  key={s}
+                  className={cn(
+                    "h-2 w-2 rounded-full transition-colors",
+                    s === tourStep ? "bg-primary" : "bg-muted"
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            {tourStep > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => setTourStep(tourStep - 1)}>
+                Voltar
+              </Button>
+            )}
+            {tourStep < 2 ? (
+              <Button size="sm" onClick={() => setTourStep(tourStep + 1)} className="gap-1">
+                Proximo
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => {
+                  localStorage.setItem("recepcao_tour_v1", "true")
+                  setTourOpen(false)
+                }}
+                className="gap-1"
+              >
+                Bora!
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   )
 }
