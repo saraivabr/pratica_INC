@@ -486,13 +486,7 @@ async function updateConversationAfterSend(
 async function getEvolutionInstanceName(workspaceId: number): Promise<string | null> {
   const tenant = await getWorkspace(workspaceId);
   if (!tenant) return null;
-
-  const instances = tenant.evolution_instances || [];
-  const activeInstance = instances.find(
-    (i) => i.status === 'connected' || i.status === 'open'
-  );
-
-  return activeInstance?.instance_name || instances[0]?.instance_name || null;
+  return (tenant as any).evolution_instance_name || null;
 }
 
 /**

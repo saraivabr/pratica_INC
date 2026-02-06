@@ -47,31 +47,35 @@ export async function GET(
       );
     }
 
-    // Retornar instâncias do tenant
-    const instances = tenant.evolution_instances || [];
+    // Retornar instância do tenant (single instance model)
+    const instanceName = (tenant as any).evolution_instance_name || null;
+    const connected = (tenant as any).evolution_connected || false;
 
-    // Buscar status atual de cada instância
-    const instancesWithStatus = await Promise.all(
-      instances.map(async (instance: any) => {
-        try {
-          const status = await getConnectionStatus(instance.instance_name);
-          return {
-            ...instance,
-            connection_state: status.state,
-          };
-        } catch {
-          return {
-            ...instance,
-            connection_state: 'unknown',
-          };
-        }
-      })
-    );
+    if (!instanceName) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        total: 0,
+      });
+    }
+
+    // Buscar status atual da instância
+    let connectionState = connected ? 'open' : 'disconnected';
+    try {
+      const status = await getConnectionStatus(instanceName);
+      connectionState = status.state || connectionState;
+    } catch {
+      connectionState = 'unknown';
+    }
 
     return NextResponse.json({
       success: true,
-      data: instancesWithStatus,
-      total: instancesWithStatus.length,
+      data: [{
+        instance_name: instanceName,
+        connection_state: connectionState,
+        status: connected ? 'connected' : 'disconnected',
+      }],
+      total: 1,
     });
   } catch (error: any) {
     console.error('Error listing WhatsApp instances:', error);
@@ -176,32 +180,17 @@ export async function POST(
       console.log('QR Code will be generated when connecting');
     }
 
-    // Salvar instância no tenant
-    const currentInstances = tenant.evolution_instances || [];
-    const newInstance = {
-      instance_name: instanceName,
-      display_name: body.displayName || instanceName,
-      qr_code: qrCodeData?.base64 || null,
-      status: 'disconnected',
-      created_at: new Date().toISOString(),
-      webhook_url: webhookUrl,
-      settings: {
-        reject_call: body.reject_call ?? false,
-        groups_ignore: body.groups_ignore ?? true,
-        always_online: body.always_online ?? false,
-        read_messages: body.read_messages ?? false,
-      },
-    };
-
+    // Salvar instância no workspace
     await updateWorkspace(workspaceId, {
-      evolution_instances: [...currentInstances, newInstance] as any[],
+      evolution_instance_name: instanceName,
+      evolution_connected: false,
     });
 
     return NextResponse.json(
       {
         success: true,
         data: {
-          instance: newInstance,
+          instance_name: instanceName,
           qr_code: qrCodeData?.base64,
           pairing_code: qrCodeData?.pairingCode,
         },

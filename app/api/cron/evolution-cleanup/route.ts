@@ -110,9 +110,9 @@ async function shouldCleanupInstance(
 }
 
 /**
- * Processa cleanup para um tenant
+ * Processa cleanup para um workspace (single instance model)
  */
-async function cleanupTenantInstances(workspaceId: number): Promise<CleanupResult[]> {
+async function cleanupWorkspaceInstance(workspaceId: number): Promise<CleanupResult[]> {
   const results: CleanupResult[] = [];
 
   const tenant = await getWorkspace(workspaceId);
@@ -120,45 +120,33 @@ async function cleanupTenantInstances(workspaceId: number): Promise<CleanupResul
     return results;
   }
 
-  const instances = tenant.evolution_instances || [];
-  if (instances.length === 0) {
+  const instanceName = (tenant as any).evolution_instance_name;
+  if (!instanceName) {
     return results;
   }
 
-  const activeInstances: any[] = [];
+  // Build a mock instance object for the check
+  const instance = {
+    instance_name: instanceName,
+    status: (tenant as any).evolution_connected ? 'connected' : 'disconnected',
+    last_connection_update: (tenant as any).updated_at,
+  };
 
-  for (const instance of instances) {
-    const { shouldDelete, reason } = await shouldCleanupInstance(instance, workspaceId);
+  const { shouldDelete, reason } = await shouldCleanupInstance(instance, workspaceId);
 
-    if (shouldDelete) {
-      try {
-        await deleteInstance(instance.instance_name);
-        results.push({
-          instance_name: instance.instance_name,
-          reason,
-          deleted: true,
-        });
-        console.log(`[Evolution Cleanup] Instância ${instance.instance_name} deletada: ${reason}`);
-      } catch (error: any) {
-        // Se falhar na Evolution API, ainda remover do tenant
-        // (pode já ter sido deletada ou não existir)
-        results.push({
-          instance_name: instance.instance_name,
-          reason,
-          deleted: true,
-          error: error.message,
-        });
-        console.warn(`[Evolution Cleanup] Erro ao deletar ${instance.instance_name} na Evolution API:`, error.message);
-      }
-    } else {
-      activeInstances.push(instance);
+  if (shouldDelete) {
+    try {
+      await deleteInstance(instanceName);
+      results.push({ instance_name: instanceName, reason, deleted: true });
+      console.log(`[Evolution Cleanup] Instância ${instanceName} deletada: ${reason}`);
+    } catch (error: any) {
+      results.push({ instance_name: instanceName, reason, deleted: true, error: error.message });
+      console.warn(`[Evolution Cleanup] Erro ao deletar ${instanceName} na Evolution API:`, error.message);
     }
-  }
 
-  // Atualizar lista de instâncias no tenant
-  if (results.length > 0) {
-    await updateWorkspace(workspaceId, { evolution_instances: activeInstances as any[] });
-    console.log(`[Evolution Cleanup] Tenant ${workspaceId}: ${results.length} instâncias removidas, ${activeInstances.length} mantidas`);
+    // Clear instance from workspace
+    await updateWorkspace(workspaceId, { evolution_instance_name: null as any, evolution_connected: false });
+    console.log(`[Evolution Cleanup] Workspace ${workspaceId}: instância removida`);
   }
 
   return results;
@@ -177,32 +165,32 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Buscar todos os tenants com instâncias Evolution
-    const tenantsResult = await pool.query<{ id: number; name: string }>(
-      `SELECT id, name FROM tenants
-       WHERE evolution_instances IS NOT NULL
-         AND jsonb_array_length(evolution_instances) > 0`
+    // Buscar todos os workspaces com instâncias Evolution
+    const workspacesResult = await pool.query<{ id: number; name: string }>(
+      `SELECT id, name FROM workspaces
+       WHERE evolution_instance_name IS NOT NULL
+         AND is_active = true`
     );
 
-    const tenants = tenantsResult.rows;
-    console.log(`[Evolution Cleanup] Verificando ${tenants.length} tenants com instâncias`);
+    const workspaces = workspacesResult.rows;
+    console.log(`[Evolution Cleanup] Verificando ${workspaces.length} workspaces com instâncias`);
 
     const allResults: { workspace_id: number; tenant_name: string; cleaned: CleanupResult[] }[] = [];
     let totalCleaned = 0;
 
-    for (const tenant of tenants) {
+    for (const ws of workspaces) {
       try {
-        const results = await cleanupTenantInstances(tenant.id);
+        const results = await cleanupWorkspaceInstance(ws.id);
         if (results.length > 0) {
           allResults.push({
-            workspace_id: tenant.id,
-            tenant_name: tenant.name,
+            workspace_id: ws.id,
+            tenant_name: ws.name,
             cleaned: results,
           });
           totalCleaned += results.length;
         }
       } catch (error: any) {
-        console.error(`[Evolution Cleanup] Erro no tenant ${tenant.id}:`, error);
+        console.error(`[Evolution Cleanup] Erro no workspace ${ws.id}:`, error);
       }
     }
 
@@ -246,7 +234,7 @@ export async function GET(request: NextRequest) {
       success: true,
       duration,
       summary: {
-        tenants_checked: tenants.length,
+        tenants_checked: workspaces.length,
         instances_cleaned: totalCleaned,
         orphan_users_cleaned: orphansCleaned,
       },

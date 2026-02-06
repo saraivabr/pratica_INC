@@ -334,14 +334,7 @@ async function fetchLastTriggerTimes(
 async function getEvolutionInstanceForTenant(
   tenant: Tenant
 ): Promise<string | null> {
-  const instances = tenant.evolution_instances || [];
-
-  // Buscar instancia conectada
-  const connected = instances.find(
-    (i) => i.status === "connected" || i.status === "open"
-  );
-
-  return connected?.instance_name || instances[0]?.instance_name || null;
+  return (tenant as any).evolution_instance_name || null;
 }
 
 /**

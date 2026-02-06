@@ -14,18 +14,18 @@ export async function GET(request: NextRequest) {
     const workspaceId = ctx.workspaceId;
 
     return await withTenant(workspaceId, async (client) => {
-      // Buscar configuração do tenant
-      const { rows: tenants } = await client.query(
-        `SELECT id, name, settings, evolution_instances FROM tenants WHERE id = $1`,
+      // Buscar configuração do workspace
+      const { rows: workspaces } = await client.query(
+        `SELECT id, name, settings, evolution_instance_name, evolution_connected FROM workspaces WHERE id = $1`,
         [workspaceId]
       );
 
-      if (tenants.length === 0) {
-        return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 });
+      if (workspaces.length === 0) {
+        return NextResponse.json({ error: 'Workspace não encontrado' }, { status: 404 });
       }
 
-      const tenant = tenants[0];
-      const settings = tenant.settings || {};
+      const workspace = workspaces[0];
+      const settings = workspace.settings || {};
       const sofiaConfig = settings.sofia || {
         enabled: false,
         personality: 'amigavel',
@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         config: sofiaConfig,
-        instances: tenant.evolution_instances || [],
+        instanceName: workspace.evolution_instance_name || null,
+        connected: workspace.evolution_connected || false,
       });
     });
   } catch (error) {
@@ -74,16 +75,16 @@ export async function POST(request: NextRequest) {
 
     return await withTenant(workspaceId, async (client) => {
       // Buscar configuração atual
-      const { rows: tenants } = await client.query(
-        `SELECT id, settings FROM tenants WHERE id = $1`,
+      const { rows: workspaces } = await client.query(
+        `SELECT id, settings FROM workspaces WHERE id = $1`,
         [workspaceId]
       );
 
-      if (tenants.length === 0) {
-        return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 });
+      if (workspaces.length === 0) {
+        return NextResponse.json({ error: 'Workspace não encontrado' }, { status: 404 });
       }
 
-      const currentSettings = tenants[0].settings || {};
+      const currentSettings = workspaces[0].settings || {};
       const newSettings = {
         ...currentSettings,
         sofia: {
@@ -93,9 +94,9 @@ export async function POST(request: NextRequest) {
         },
       };
 
-      // Atualizar settings do tenant
+      // Atualizar settings do workspace
       await client.query(
-        `UPDATE tenants SET settings = $1, updated_at = NOW() WHERE id = $2`,
+        `UPDATE workspaces SET settings = $1, updated_at = NOW() WHERE id = $2`,
         [JSON.stringify(newSettings), workspaceId]
       );
 

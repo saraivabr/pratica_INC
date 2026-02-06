@@ -137,47 +137,26 @@ async function getEventosParaLembrete(): Promise<EventoComLembrete[]> {
 }
 
 /**
- * Busca tenants ativos com Evolution API configurada
+ * Busca workspaces ativos com Evolution API configurada
  * NOTE: Cross-workspace query - uses pool directly
  */
 async function getWorkspacesAtivosComEvolution(): Promise<Array<{ id: number; name: string }>> {
   const { rows } = await pool.query<{ id: number; name: string }>(`
-    SELECT t.id, t.name
-    FROM tenants t
-    WHERE t.status = 'active'
-      AND t.evolution_instances IS NOT NULL
-      AND jsonb_array_length(t.evolution_instances) > 0
+    SELECT w.id, w.name
+    FROM workspaces w
+    WHERE w.is_active = true
+      AND w.evolution_instance_name IS NOT NULL
+      AND w.evolution_connected = true
   `);
 
-  // Filtrar apenas os que tem instancia conectada
-  const tenantsComConectada: Array<{ id: number; name: string }> = [];
-
-  for (const tenant of rows) {
-    const fullTenant = await getWorkspace(tenant.id);
-    if (!fullTenant) continue;
-
-    const hasConnected = (fullTenant.evolution_instances || []).some(
-      (i) => i.status === 'connected' || i.status === 'open'
-    );
-
-    if (hasConnected) {
-      tenantsComConectada.push({ id: tenant.id, name: tenant.name });
-    }
-  }
-
-  return tenantsComConectada;
+  return rows;
 }
 
 /**
- * Obtem instancia Evolution conectada do tenant
+ * Obtem instancia Evolution conectada do workspace
  */
 async function getEvolutionInstanceName(tenant: Tenant): Promise<string | null> {
-  const instances = tenant.evolution_instances || [];
-  const activeInstance = instances.find(
-    (i) => i.status === 'connected' || i.status === 'open'
-  );
-
-  return activeInstance?.instance_name || instances[0]?.instance_name || null;
+  return (tenant as any).evolution_instance_name || null;
 }
 
 // ============================================================================

@@ -96,10 +96,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar se há instância WhatsApp configurada
-    const instances = tenant.evolution_instances || [];
-    const instance = instances[0];
+    const instanceName = (tenant as any).evolution_instance_name || null;
 
-    if (!instance?.instance_name) {
+    if (!instanceName) {
       return NextResponse.json(
         {
           success: false,
@@ -108,8 +107,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    const instanceName = instance.instance_name;
 
     // Verificar status diretamente na Evolution API (não usar status salvo no banco)
     try {
