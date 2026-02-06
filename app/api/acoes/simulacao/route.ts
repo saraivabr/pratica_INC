@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
-import { sendTextMessage } from '@/lib/zapi';
+import { sendToClient } from '@/lib/evolution-helpers';
 import { validateRequest, AcaoSimulacaoSchema } from '@/lib/validation-schemas';
 
 export async function POST(request: NextRequest) {
@@ -86,8 +86,7 @@ export async function POST(request: NextRequest) {
           `• Taxa: ${taxa_juros}% ao ano\n\n` +
           `Gostou? Vamos agendar uma visita? 🏡`;
 
-        await sendTextMessage(lead.phone, mensagem);
-        whatsapp_enviado = true;
+        whatsapp_enviado = await sendToClient(lead.phone, mensagem, corretor_id);
         await dbQuery(
           `UPDATE simulacoes SET enviada_whatsapp = TRUE, enviada_em = NOW() WHERE id = $1`,
           [simulacao.id]

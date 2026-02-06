@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
-import { sendTextMessage } from '@/lib/zapi';
+import { sendToClient } from '@/lib/evolution-helpers';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function POST(request: NextRequest) {
@@ -73,8 +73,7 @@ export async function POST(request: NextRequest) {
           `📆 ${dataFormatada}\n\n` +
           `Confirme respondendo *SIM*.`;
 
-        await sendTextMessage(lead.phone, mensagem);
-        whatsapp_enviado = true;
+        whatsapp_enviado = await sendToClient(lead.phone, mensagem, corretor_id);
       } catch (error: any) {
         console.error('[Agendamento] Erro WhatsApp:', error);
       }

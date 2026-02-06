@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { dbQuery } from "@/lib/db";
 import { normalizePhone } from "@/lib/supabase";
-import { sendTextMessage } from "@/lib/zapi";
+import { sendToClient } from "@/lib/evolution-helpers";
 import { getLeadsCVCRM } from "@/lib/cvcrm-client";
 
 type SituacaoLead = "IRREGULAR" | "PERDIDO";
@@ -630,25 +630,24 @@ async function sendRecoveryMessage(input: {
   }
 
   try {
-    const response = await sendTextMessage(normalized, input.message, {
-      delayTyping: 2,
-    });
+    const sent = await sendToClient(normalized, input.message, input.candidate.corretorId);
     await logRecovery({
       atendimentoId: input.candidate.atendimentoId,
       corretorId: input.candidate.corretorId,
       phone: normalized,
       clienteNome: input.candidate.clienteNome,
       situacao: input.candidate.situacao,
-      status: "sent",
+      status: sent ? "sent" : "skipped",
+      reason: sent ? undefined : "corretor sem Evolution conectado",
       message: input.message,
-      response,
     });
     return {
       atendimentoId: input.candidate.atendimentoId,
       phone: normalized,
-      status: "sent",
+      status: sent ? "sent" : "skipped",
       situacao: input.candidate.situacao,
       message: input.message,
+      reason: sent ? undefined : "corretor sem Evolution conectado",
     };
   } catch (error) {
     await logRecovery({

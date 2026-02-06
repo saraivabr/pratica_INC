@@ -4,7 +4,7 @@
  */
 
 import { dbQuery } from '@/lib/db';
-import { sendTextMessage } from '@/lib/zapi';
+import { sendToClient } from '@/lib/evolution-helpers';
 import { notificarAgendamentoProximo } from './notificacaoService';
 
 export interface AgendamentoData {
@@ -204,11 +204,12 @@ export async function cancelarAgendamento(
 
   const agendamento = rows[0];
 
-  // Notificar cliente
+  // Notificar cliente (via WhatsApp do corretor)
   if (agendamento.cliente_telefone) {
-    await sendTextMessage(
+    await sendToClient(
       agendamento.cliente_telefone,
-      `Olá ${agendamento.cliente_nome}, sua visita foi cancelada. Entre em contato para reagendar! 📞`
+      `Olá ${agendamento.cliente_nome}, sua visita foi cancelada. Entre em contato para reagendar! 📞`,
+      agendamento.corretor_id
     );
   }
 
@@ -254,9 +255,10 @@ export async function reagendarVisita(
       timeStyle: 'short',
     });
 
-    await sendTextMessage(
+    await sendToClient(
       agendamento.cliente_telefone,
-      `📅 Sua visita foi reagendada!\n\nNova data: ${dataFormatada}\n\nConfirme respondendo SIM.`
+      `📅 Sua visita foi reagendada!\n\nNova data: ${dataFormatada}\n\nConfirme respondendo SIM.`,
+      agendamento.corretor_id
     );
   }
 

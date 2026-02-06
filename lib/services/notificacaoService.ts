@@ -4,7 +4,7 @@
  */
 
 import { dbQuery } from '@/lib/db';
-import { sendTextMessage } from '@/lib/zapi';
+import { sendToClient, sendToCorretor } from '@/lib/evolution-helpers';
 
 export interface NotificacaoData {
   corretor_id: string;
@@ -58,7 +58,7 @@ export async function enviarNotificacaoWhatsApp(
       return { success: false, error: 'Corretor sem telefone cadastrado' };
     }
 
-    await sendTextMessage(corretor.telefone, mensagem);
+    await sendToCorretor(corretor.telefone, mensagem);
     return { success: true };
   } catch (error: any) {
     console.error('[NotificacaoService] Erro ao enviar WhatsApp:', error);
@@ -218,7 +218,7 @@ export async function notificarAgendamentoProximo(agendamento_id: string) {
       `📍 ${agendamento.imovel_endereco || 'Endereço a confirmar'}\n\n` +
       `Nos vemos lá! 😊`;
 
-    await sendTextMessage(agendamento.lead_telefone, mensagemCliente);
+    await sendToClient(agendamento.lead_telefone, mensagemCliente, agendamento.corretor_id);
   }
 
   return notificacao;
@@ -279,10 +279,11 @@ export async function processarRespostaConfirmacao(
       'Confirmou visita via WhatsApp! ✅'
     );
 
-    // Confirmar com cliente
-    await sendTextMessage(
+    // Confirmar com cliente (via WhatsApp do corretor)
+    await sendToClient(
       telefone,
-      '✅ Visita confirmada! Obrigado! Te esperamos. 🏠'
+      '✅ Visita confirmada! Obrigado! Te esperamos. 🏠',
+      agendamento.corretor_id
     );
   } else {
     // Marcar como cancelado
@@ -306,10 +307,11 @@ export async function processarRespostaConfirmacao(
       link_acao: `/corretor/agendamentos/${agendamento.id}`,
     });
 
-    // Responder ao cliente
-    await sendTextMessage(
+    // Responder ao cliente (via WhatsApp do corretor)
+    await sendToClient(
       telefone,
-      'Entendido. Se mudar de ideia, estamos à disposição! 😊'
+      'Entendido. Se mudar de ideia, estamos à disposição! 😊',
+      agendamento.corretor_id
     );
   }
 

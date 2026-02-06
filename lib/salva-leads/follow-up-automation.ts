@@ -5,7 +5,7 @@
  */
 
 import pool from '@/lib/db';
-import { sendTextMessage } from '@/lib/zapi';
+import { sendToClient } from '@/lib/evolution-helpers';
 
 export interface FollowUpConfig {
   leadId: string;
@@ -158,8 +158,12 @@ export async function enviarFollowUpAutomatico(
       return false;
     }
 
-    // Enviar mensagem
-    await sendTextMessage(lead.whatsapp, mensagem);
+    // Enviar mensagem via WhatsApp do corretor
+    const sent = await sendToClient(lead.whatsapp, mensagem, lead.corretor_id);
+    if (!sent) {
+      console.warn(`[Follow-up] Corretor do lead ${leadId} sem Evolution conectado`);
+      return false;
+    }
 
     // Registrar follow-up
     await pool.query(

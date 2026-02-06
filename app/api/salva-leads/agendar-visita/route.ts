@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
+import { sendToClient, sendToCorretor } from '@/lib/evolution-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,14 +94,13 @@ export async function POST(request: NextRequest) {
         const dataFormatada = new Date(dataAgendamento).toLocaleDateString('pt-BR');
         
         try {
-          const { sendTextMessage } = await import('@/lib/zapi');
           const msg = `📅 VISITA AGENDADA!\n\n👤 Cliente: ${lead.nome}\n📱 ${lead.whatsapp}\n🏢 Imóvel: ${lead.imovel_nome}\n📍 Data: ${dataFormatada} às ${horario}\n${observacoes ? `\n📝 Obs: ${observacoes}` : ''}\n\nNão se atrase! ⏰`;
-          
-          await sendTextMessage(corretor.telefone, msg);
 
-          // Enviar também para o cliente confirmar
+          await sendToCorretor(corretor.telefone, msg);
+
+          // Enviar também para o cliente confirmar (via WhatsApp do corretor)
           const msgCliente = `Olá ${lead.nome}! 📅\n\nSua visita está confirmada!\n🏢 ${lead.imovel_nome}\n📍 ${dataFormatada} às ${horario}\n\nNos vemos lá! 🚀`;
-          await sendTextMessage(lead.whatsapp, msgCliente);
+          await sendToClient(lead.whatsapp, msgCliente, lead.corretor_id);
         } catch (err) {
           console.warn('[Agendar Visita] Erro ao enviar notificação:', err);
         }
