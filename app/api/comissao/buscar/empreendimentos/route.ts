@@ -31,10 +31,10 @@ export async function GET(request: NextRequest) {
           endereco_completo as endereco,
           status
         FROM cvcrm_empreendimentos
-        WHERE workspace_id = $1
+        WHERE 1=1
       `;
-      const params: any[] = [ctx.workspaceId];
-      let paramIndex = 2;
+      const params: any[] = [];
+      let paramIndex = 1;
 
       if (busca) {
         query += ` AND (nome ILIKE $${paramIndex} OR cidade ILIKE $${paramIndex})`;

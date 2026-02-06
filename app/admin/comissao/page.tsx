@@ -7,6 +7,7 @@ import {
   Calculator,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   DollarSign,
   Users,
   FileText,
@@ -480,6 +481,109 @@ function SortableAutonomoRow({
           <CurrencyInput value={autonomo.valorBruto} onChange={v => onUpdate(autonomo.id, "valorBruto", v)} />
         </div>
       </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// COLLAPSIBLE WEBROPAY ADDRESS
+// ============================================================================
+
+function CollapsibleWebropay({
+  clienteEmail, setClienteEmail,
+  clienteTelefone, setClienteTelefone,
+  clienteLogradouro, setClienteLogradouro,
+  clienteNumero, setClienteNumero,
+  clienteComplemento, setClienteComplemento,
+  clienteBairro, setClienteBairro,
+  clienteCidade, setClienteCidade,
+  clienteUf, setClienteUf,
+  clienteCep, setClienteCep,
+  isComplete,
+}: {
+  clienteEmail: string; setClienteEmail: (v: string) => void
+  clienteTelefone: string; setClienteTelefone: (v: string) => void
+  clienteLogradouro: string; setClienteLogradouro: (v: string) => void
+  clienteNumero: string; setClienteNumero: (v: string) => void
+  clienteComplemento: string; setClienteComplemento: (v: string) => void
+  clienteBairro: string; setClienteBairro: (v: string) => void
+  clienteCidade: string; setClienteCidade: (v: string) => void
+  clienteUf: string; setClienteUf: (v: string) => void
+  clienteCep: string; setClienteCep: (v: string) => void
+  isComplete: boolean
+}) {
+  const [open, setOpen] = useState(false)
+
+  const filledCount = [clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero, clienteBairro, clienteCidade, clienteUf, clienteCep].filter(Boolean).length
+  const totalRequired = 8
+
+  return (
+    <div className="mt-4 pt-4 border-t border-zinc-200/60 dark:border-zinc-800/60">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between text-left group"
+      >
+        <div className="flex items-center gap-2">
+          <ChevronRight className={cn("h-4 w-4 text-zinc-400 transition-transform", open && "rotate-90")} />
+          <Building2 className="h-3.5 w-3.5 text-zinc-400" />
+          <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">
+            Dados do comprador (pagadoria)
+          </span>
+          {!open && filledCount > 0 && filledCount < totalRequired && (
+            <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-600 dark:border-amber-600 dark:text-amber-400">
+              {filledCount}/{totalRequired}
+            </Badge>
+          )}
+          {!open && isComplete && (
+            <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-600 dark:border-emerald-600 dark:text-emerald-400">
+              <Check className="h-3 w-3 mr-0.5" /> Completo
+            </Badge>
+          )}
+          {!open && filledCount === 0 && (
+            <Badge variant="outline" className="text-[10px] text-zinc-400">Opcional</Badge>
+          )}
+        </div>
+      </button>
+      {open && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Email do Cliente</Label>
+            <Input placeholder="email@exemplo.com" className="h-9" value={clienteEmail} onChange={e => setClienteEmail(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Telefone</Label>
+            <Input placeholder="(11) 99999-9999" className="h-9" value={clienteTelefone} onChange={e => setClienteTelefone(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Logradouro</Label>
+            <Input placeholder="Rua, Av..." className="h-9" value={clienteLogradouro} onChange={e => setClienteLogradouro(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Numero</Label>
+            <Input placeholder="123" className="h-9" value={clienteNumero} onChange={e => setClienteNumero(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Complemento</Label>
+            <Input placeholder="Apto, Bloco..." className="h-9" value={clienteComplemento} onChange={e => setClienteComplemento(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Bairro</Label>
+            <Input placeholder="Bairro" className="h-9" value={clienteBairro} onChange={e => setClienteBairro(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Cidade</Label>
+            <Input placeholder="Cidade" className="h-9" value={clienteCidade} onChange={e => setClienteCidade(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">UF</Label>
+            <Input placeholder="SP" maxLength={2} className="h-9 uppercase" value={clienteUf} onChange={e => setClienteUf(e.target.value.toUpperCase().slice(0, 2))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">CEP</Label>
+            <Input placeholder="00000-000" className="h-9" value={clienteCep} onChange={e => setClienteCep(formatCepMask(e.target.value))} maxLength={9} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -983,19 +1087,34 @@ export default function ComissaoCalculadoraPage() {
       <div className="max-w-6xl mx-auto space-y-4">
         {/* Top bar */}
         <div className="flex items-center justify-between">
-          <div />
+          <div className="flex items-center gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
+                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                  <span className="hidden sm:inline">Nova Simulacao</span>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Nova simulacao?</AlertDialogTitle>
+                  <AlertDialogDescription>Todos os dados atuais serao apagados. Deseja continuar?</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={resetAll}>Confirmar</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-1.5" />
               <span className="hidden sm:inline">Imprimir</span>
             </Button>
             <Button size="sm" onClick={handleSave} disabled={saving || !empreendimento || valorImovel <= 0}>
-              {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
-              <span className="hidden sm:inline">{vendaId ? "Atualizar" : "Salvar"}</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={resetAll} className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
-              <RotateCcw className="h-4 w-4 mr-1.5" />
-              <span className="hidden sm:inline">Nova Simulacao</span>
+              {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : vendaId ? <Check className="h-4 w-4 mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
+              <span className="hidden sm:inline">{vendaId ? "Salva" : "Salvar"}</span>
             </Button>
           </div>
         </div>
@@ -1079,50 +1198,19 @@ export default function ComissaoCalculadoraPage() {
             </div>
           </div>
 
-          {/* Dados adicionais do cliente (Webropay) */}
-          <div className="mt-4 pt-4 border-t border-zinc-200/60 dark:border-zinc-800/60">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5" /> Dados para Pagadoria (Webropay)
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Email do Cliente</Label>
-                <Input placeholder="email@exemplo.com" className="h-9" value={clienteEmail} onChange={e => setClienteEmail(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Telefone</Label>
-                <Input placeholder="(11) 99999-9999" className="h-9" value={clienteTelefone} onChange={e => setClienteTelefone(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Logradouro</Label>
-                <Input placeholder="Rua, Av..." className="h-9" value={clienteLogradouro} onChange={e => setClienteLogradouro(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Numero</Label>
-                <Input placeholder="123" className="h-9" value={clienteNumero} onChange={e => setClienteNumero(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Complemento</Label>
-                <Input placeholder="Apto, Bloco..." className="h-9" value={clienteComplemento} onChange={e => setClienteComplemento(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Bairro</Label>
-                <Input placeholder="Bairro" className="h-9" value={clienteBairro} onChange={e => setClienteBairro(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Cidade</Label>
-                <Input placeholder="Cidade" className="h-9" value={clienteCidade} onChange={e => setClienteCidade(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">UF</Label>
-                <Input placeholder="SP" maxLength={2} className="h-9 uppercase" value={clienteUf} onChange={e => setClienteUf(e.target.value.toUpperCase().slice(0, 2))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">CEP</Label>
-                <Input placeholder="00000-000" className="h-9" value={clienteCep} onChange={e => setClienteCep(formatCepMask(e.target.value))} maxLength={9} />
-              </div>
-            </div>
-          </div>
+          {/* Dados adicionais do cliente (Webropay) - collapsible */}
+          <CollapsibleWebropay
+            clienteEmail={clienteEmail} setClienteEmail={setClienteEmail}
+            clienteTelefone={clienteTelefone} setClienteTelefone={setClienteTelefone}
+            clienteLogradouro={clienteLogradouro} setClienteLogradouro={setClienteLogradouro}
+            clienteNumero={clienteNumero} setClienteNumero={setClienteNumero}
+            clienteComplemento={clienteComplemento} setClienteComplemento={setClienteComplemento}
+            clienteBairro={clienteBairro} setClienteBairro={setClienteBairro}
+            clienteCidade={clienteCidade} setClienteCidade={setClienteCidade}
+            clienteUf={clienteUf} setClienteUf={setClienteUf}
+            clienteCep={clienteCep} setClienteCep={setClienteCep}
+            isComplete={webropayDadosCompletos}
+          />
         </Section>
 
         {/* ── Section 2: Proposta do Cliente ── */}
@@ -1279,10 +1367,11 @@ export default function ComissaoCalculadoraPage() {
             ) : (
               <div className="space-y-2">
                 {/* Desktop header */}
-                <div className="hidden sm:grid grid-cols-[28px_1fr_140px_80px_1fr_40px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                <div className="hidden sm:grid grid-cols-[28px_1fr_140px_140px_80px_1fr_40px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                   <span></span>
                   <span>Nome</span>
                   <span>Cargo</span>
+                  <span>CPF/CNPJ</span>
                   <span>%</span>
                   <span>Valor Bruto</span>
                   <span></span>
@@ -1435,35 +1524,97 @@ export default function ComissaoCalculadoraPage() {
               <p className="text-xl sm:text-2xl font-bold text-white dark:text-zinc-900 tabular-nums">{formatarMoeda(contratoLiquido)}</p>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2 sm:gap-3">
-              <StatusPill ok={valorImovel > 0} label="Valor do imovel" />
-              <StatusPill ok={series.length > 0 && Math.abs(totalPercentualProposta - 100) < 0.5} label="Proposta completa" />
-              <StatusPill ok={autonomos.length > 0 && totalPercentualAutonomos <= 100.1} label="Comissoes validas" />
-              <StatusPill ok={rateioCalculado} label="Rateio calculado" />
-              <StatusPill ok={webropayDadosCompletos} label="Dados Webropay completos" />
-              {webropayStatus && <StatusPill ok={webropayStatus === 'enviada' || webropayStatus === 'liberada'} label={`Pagadoria: ${WEBROPAY_STATUS_LABELS[webropayStatus]}`} />}
+            {/* Progress bar */}
+            {(() => {
+              const checks = [
+                valorImovel > 0,
+                series.length > 0 && Math.abs(totalPercentualProposta - 100) < 0.5,
+                autonomos.length > 0 && totalPercentualAutonomos <= 100.1,
+                rateioCalculado,
+                webropayDadosCompletos,
+              ]
+              const done = checks.filter(Boolean).length
+              const pct = Math.round((done / checks.length) * 100)
+              return (
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-500 dark:text-zinc-400 font-medium">Preenchimento</span>
+                    <span className={cn("font-bold", pct === 100 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-300")}>{pct}%</span>
+                  </div>
+                  <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                    <div className={cn("h-full rounded-full transition-all duration-500", pct === 100 ? "bg-emerald-500" : "bg-zinc-400 dark:bg-zinc-500")} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )
+            })()}
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Dados</p>
+                <div className="flex flex-wrap gap-2">
+                  <StatusPill ok={valorImovel > 0} label="Valor do imovel" />
+                  <StatusPill ok={series.length > 0 && Math.abs(totalPercentualProposta - 100) < 0.5} label="Proposta completa" />
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Financeiro</p>
+                <div className="flex flex-wrap gap-2">
+                  <StatusPill ok={autonomos.length > 0 && totalPercentualAutonomos <= 100.1} label="Comissoes validas" />
+                  <StatusPill ok={rateioCalculado} label="Rateio calculado" />
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Pagadoria</p>
+                <div className="flex flex-wrap gap-2">
+                  <StatusPill ok={webropayDadosCompletos} label="Dados Webropay completos" />
+                  {webropayStatus && <StatusPill ok={webropayStatus === 'enviada' || webropayStatus === 'liberada'} label={`Pagadoria: ${WEBROPAY_STATUS_LABELS[webropayStatus]}`} />}
+                </div>
+              </div>
             </div>
           </div>
         </Section>
-        {/* ── Section 6: Webropay (appears after save) ── */}
-        {vendaId && (
-          <Section title="Envio para Pagadoria (Webropay)" icon={Send} number={6} defaultOpen={true}>
+        {/* ── Section 6: Webropay ── */}
+        <Section title="Envio para Pagadoria (Webropay)" icon={Send} number={6} defaultOpen={!!vendaId}>
+          {!vendaId ? (
+            <div className="pt-4 flex flex-col items-center justify-center py-8 text-center">
+              <div className="h-12 w-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
+                <Send className="h-5 w-5 text-zinc-400" />
+              </div>
+              <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Salve a comissao para desbloquear</p>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">Apos salvar, voce podera enviar para a pagadoria Webropay</p>
+            </div>
+          ) : (
             <div className="pt-4 space-y-4">
-              {/* Status bar */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Status:</span>
-                {!webropayStatus ? (
+              {/* Status stepper */}
+              <div className="flex items-center gap-2">
+                {(["enviada", "liberada"] as const).map((step, i) => {
+                  const isActive = webropayStatus === step
+                  const isPast = webropayStatus === "liberada" && step === "enviada"
+                  return (
+                    <div key={step} className="flex items-center gap-2">
+                      {i > 0 && <div className={cn("h-0.5 w-8", isPast || isActive ? "bg-emerald-400" : "bg-zinc-200 dark:bg-zinc-700")} />}
+                      <div className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border",
+                        isActive ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
+                          : isPast ? "border-emerald-200 bg-emerald-50/50 text-emerald-500 dark:border-emerald-800 dark:bg-emerald-900/10 dark:text-emerald-500"
+                          : "border-zinc-200 bg-zinc-50 text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500"
+                      )}>
+                        {isPast ? <Check className="h-3 w-3" /> : isActive ? <Check className="h-3 w-3" /> : <span className="h-3 w-3 rounded-full border border-current inline-block" />}
+                        {step === "enviada" ? "Enviada" : "Liberada"}
+                      </div>
+                    </div>
+                  )
+                })}
+                {webropayStatus === "distratada" && (
+                  <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 ml-2">Distratada</Badge>
+                )}
+                {webropayStatus === "bloqueada" && (
+                  <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 ml-2">Bloqueada</Badge>
+                )}
+                {!webropayStatus && (
                   <Badge variant="secondary">Pendente de envio</Badge>
-                ) : webropayStatus === "enviada" ? (
-                  <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Enviada</Badge>
-                ) : webropayStatus === "liberada" ? (
-                  <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Liberada</Badge>
-                ) : webropayStatus === "distratada" ? (
-                  <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">Distratada</Badge>
-                ) : webropayStatus === "bloqueada" ? (
-                  <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">Bloqueada</Badge>
-                ) : null}
-                {vendaId && <span className="text-xs text-zinc-400">ID: {vendaId}</span>}
+                )}
+                <span className="text-xs text-zinc-400 ml-auto">ID: {vendaId}</span>
               </div>
 
               {/* Validation warnings */}
@@ -1590,8 +1741,8 @@ export default function ComissaoCalculadoraPage() {
                 </div>
               )}
             </div>
-          </Section>
-        )}
+          )}
+        </Section>
       </div>
 
       {/* Print styles */}

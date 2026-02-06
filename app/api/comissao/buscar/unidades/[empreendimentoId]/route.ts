@@ -49,10 +49,10 @@ export async function GET(request: NextRequest, { params }: Params) {
           e.nome as empreendimento_nome
         FROM cvcrm_unidades u
         JOIN cvcrm_empreendimentos e ON e.id = u.empreendimento_id
-        WHERE u.workspace_id = $1 AND u.empreendimento_id = $2
+        WHERE u.empreendimento_id = $1
       `;
-      const params_query: any[] = [ctx.workspaceId, empId];
-      let paramIndex = 3;
+      const params_query: any[] = [empId];
+      let paramIndex = 2;
 
       if (busca) {
         query += ` AND (u.nome ILIKE $${paramIndex} OR u.bloco ILIKE $${paramIndex})`;
