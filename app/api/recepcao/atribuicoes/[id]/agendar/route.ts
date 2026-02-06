@@ -40,11 +40,11 @@ export async function POST(
     const { data_agendamento, tipo, observacoes } = validation.data;
 
     return await withTenant(workspaceId, async (client) => {
-      // Verify atribuição belongs to user and workspace
+      // Verify atribuição belongs to user
       const atribCheck = await client.query(
         `SELECT id, cvcrm_lead_id, lead_nome FROM recepcao_atribuicoes
-         WHERE id = $1 AND workspace_id = $2 AND user_id = $3`,
-        [atribuicaoId, workspaceId, userId]
+         WHERE id = $1 AND user_id = $2`,
+        [atribuicaoId, userId]
       );
 
       if (atribCheck.rows.length === 0) {

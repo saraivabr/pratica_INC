@@ -53,9 +53,9 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
     return await withTenant(workspaceId, async (client) => {
-      let whereClause = 'WHERE a.workspace_id = $1';
-      const params: any[] = [workspaceId];
-      let paramIndex = 2;
+      let whereClause = 'WHERE 1=1';
+      const params: any[] = [];
+      let paramIndex = 1;
 
       if (plantaoId) {
         whereClause += ` AND a.plantao_id = $${paramIndex++}`;

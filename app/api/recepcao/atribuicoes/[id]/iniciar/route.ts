@@ -42,8 +42,8 @@ export async function POST(
       // Verificar se atribuição existe e pertence ao corretor
       const checkResult = await client.query<AtribuicaoDB>(
         `SELECT id, user_id, atendimento_iniciado_at FROM recepcao_atribuicoes
-         WHERE id = $1 AND workspace_id = $2`,
-        [id, workspaceId]
+         WHERE id = $1`,
+        [id]
       );
 
       if (checkResult.rows.length === 0) {

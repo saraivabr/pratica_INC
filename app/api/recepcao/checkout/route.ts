@@ -70,19 +70,19 @@ export async function POST(request: NextRequest) {
         query = `
           UPDATE recepcao_presencas
           SET status = 'saiu', checkout_at = NOW()
-          WHERE id = $1 AND user_id = $2 AND workspace_id = $3 AND status = 'presente'
+          WHERE id = $1 AND user_id = $2 AND status = 'presente'
           RETURNING *
         `;
-        params = [presenca_id, (user as any).id, workspaceId];
+        params = [presenca_id, (user as any).id];
       } else {
         // Check-out por ID do plantão
         query = `
           UPDATE recepcao_presencas
           SET status = 'saiu', checkout_at = NOW()
-          WHERE plantao_id = $1 AND user_id = $2 AND workspace_id = $3 AND status = 'presente'
+          WHERE plantao_id = $1 AND user_id = $2 AND status = 'presente'
           RETURNING *
         `;
-        params = [plantao_id, (user as any).id, workspaceId];
+        params = [plantao_id, (user as any).id];
       }
 
       const result = await client.query<PresencaDB>(query, params);

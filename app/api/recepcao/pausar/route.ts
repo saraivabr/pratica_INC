@@ -66,22 +66,22 @@ export async function POST(request: NextRequest) {
         query = `
           UPDATE recepcao_presencas
           SET pausado = true, updated_at = NOW()
-          WHERE id = $1 AND user_id = $2 AND workspace_id = $3
+          WHERE id = $1 AND user_id = $2
             AND status = 'presente'
             AND em_atendimento = false
           RETURNING *
         `;
-        params = [presenca_id, (user as any).id, workspaceId];
+        params = [presenca_id, (user as any).id];
       } else {
         query = `
           UPDATE recepcao_presencas
           SET pausado = true, updated_at = NOW()
-          WHERE plantao_id = $1 AND user_id = $2 AND workspace_id = $3
+          WHERE plantao_id = $1 AND user_id = $2
             AND status = 'presente'
             AND em_atendimento = false
           RETURNING *
         `;
-        params = [plantao_id, (user as any).id, workspaceId];
+        params = [plantao_id, (user as any).id];
       }
 
       const result = await client.query<PresencaDB>(query, params);

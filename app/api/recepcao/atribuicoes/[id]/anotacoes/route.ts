@@ -31,9 +31,9 @@ export async function GET(
         `SELECT la.*, u.nome as user_nome
          FROM lead_anotacoes la
          JOIN users u ON u.id = la.user_id
-         WHERE la.atribuicao_id = $1 AND la.workspace_id = $2
+         WHERE la.atribuicao_id = $1
          ORDER BY la.created_at ASC`,
-        [atribuicaoId, workspaceId]
+        [atribuicaoId]
       );
 
       return NextResponse.json({
@@ -75,11 +75,11 @@ export async function POST(
     const { tipo, conteudo } = validation.data;
 
     return await withTenant(workspaceId, async (client) => {
-      // Verify atribuição belongs to user and workspace
+      // Verify atribuição belongs to user
       const atribCheck = await client.query(
         `SELECT id, cvcrm_lead_id FROM recepcao_atribuicoes
-         WHERE id = $1 AND workspace_id = $2 AND user_id = $3`,
-        [atribuicaoId, workspaceId, userId]
+         WHERE id = $1 AND user_id = $2`,
+        [atribuicaoId, userId]
       );
 
       if (atribCheck.rows.length === 0) {

@@ -61,8 +61,8 @@ export async function GET(
 
     return await withTenant(workspaceId, async (client) => {
       const result = await client.query<LocalDB>(
-        `SELECT * FROM recepcao_locais WHERE id = $1 AND workspace_id = $2`,
-        [id, workspaceId]
+        `SELECT * FROM recepcao_locais WHERE id = $1`,
+        [id]
       );
 
       if (result.rows.length === 0) {
@@ -127,8 +127,8 @@ export async function PUT(
     return await withTenant(workspaceId, async (client) => {
       // Verificar se local existe
       const checkResult = await client.query(
-        'SELECT id FROM recepcao_locais WHERE id = $1 AND workspace_id = $2',
-        [id, workspaceId]
+        'SELECT id FROM recepcao_locais WHERE id = $1',
+        [id]
       );
 
       if (checkResult.rows.length === 0) {
@@ -179,12 +179,12 @@ export async function PUT(
         );
       }
 
-      values.push(id, workspaceId);
+      values.push(id);
 
       const result = await client.query<LocalDB>(
         `UPDATE recepcao_locais
          SET ${updates.join(', ')}, updated_at = NOW()
-         WHERE id = $${paramIndex} AND workspace_id = $${paramIndex + 1}
+         WHERE id = $${paramIndex}
          RETURNING *`,
         values
       );
@@ -229,9 +229,9 @@ export async function DELETE(
       const result = await client.query<LocalDB>(
         `UPDATE recepcao_locais
          SET is_active = false, updated_at = NOW()
-         WHERE id = $1 AND workspace_id = $2
+         WHERE id = $1
          RETURNING *`,
-        [id, workspaceId]
+        [id]
       );
 
       if (result.rows.length === 0) {

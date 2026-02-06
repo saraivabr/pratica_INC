@@ -70,10 +70,10 @@ export async function GET(
         JOIN recepcao_plantoes p ON p.id = a.plantao_id
         JOIN recepcao_locais l ON l.id = p.local_id
         LEFT JOIN users ab ON ab.id = a.atribuido_por
-        WHERE a.id = $1 AND a.workspace_id = $2
+        WHERE a.id = $1
       `;
 
-      const result = await client.query<AtribuicaoWithDetails>(query, [id, workspaceId]);
+      const result = await client.query<AtribuicaoWithDetails>(query, [id]);
 
       if (result.rows.length === 0) {
         return NextResponse.json(

@@ -177,11 +177,11 @@ export async function GET(request: NextRequest) {
         FROM roleta_ofertas o
         JOIN recepcao_plantoes p ON p.id = o.plantao_id
         JOIN recepcao_locais l ON l.id = p.local_id
-        WHERE o.workspace_id = $1 AND o.user_id = $2
+        WHERE o.user_id = $1
       `;
 
-      const params: any[] = [workspaceId, (user as any).id];
-      let paramIndex = 3;
+      const params: any[] = [(user as any).id];
+      let paramIndex = 2;
 
       if (plantao_id) {
         query += ` AND o.plantao_id = $${paramIndex}`;
@@ -197,12 +197,12 @@ export async function GET(request: NextRequest) {
       // Buscar contagem total
       let countQuery = `
         SELECT COUNT(*) AS total FROM roleta_ofertas
-        WHERE workspace_id = $1 AND user_id = $2
+        WHERE user_id = $1
       `;
-      const countParams: any[] = [workspaceId, (user as any).id];
+      const countParams: any[] = [(user as any).id];
 
       if (plantao_id) {
-        countQuery += ` AND plantao_id = $3`;
+        countQuery += ` AND plantao_id = $2`;
         countParams.push(plantao_id);
       }
 

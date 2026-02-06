@@ -51,9 +51,9 @@ export async function GET(request: NextRequest) {
     return await withTenant(workspaceId, async (client) => {
       let query = `
         SELECT * FROM recepcao_locais
-        WHERE workspace_id = $1
+        WHERE 1=1
       `;
-      const params: any[] = [workspaceId];
+      const params: any[] = [];
 
       if (!includeInactive) {
         query += ' AND is_active = true';

@@ -56,12 +56,12 @@ export async function POST(request: NextRequest) {
     const { plantao_id } = validationResult.data;
 
     return await withTenant(workspaceId, async (client) => {
-      // Verificar se plantão existe, está ativo e pertence ao workspace
+      // Verificar se plantão existe e está ativo (global — sem filtro de workspace)
       const plantaoCheck = await client.query<{ id: string; max_corretores: number | null }>(
         `SELECT id, max_corretores FROM recepcao_plantoes
-         WHERE id = $1 AND workspace_id = $2 AND status = 'ativo'
+         WHERE id = $1 AND status = 'ativo'
            AND data = CURRENT_DATE`,
-        [plantao_id, workspaceId]
+        [plantao_id]
       );
 
       if (plantaoCheck.rows.length === 0) {

@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
           END AS mensagem_motivacional
         FROM roleta_qualificacao q
         JOIN recepcao_plantoes p ON p.id = q.plantao_id
-        WHERE q.plantao_id = $1 AND q.user_id = $2 AND q.workspace_id = $3`,
-        [plantao_id, (user as any).id, workspaceId]
+        WHERE q.plantao_id = $1 AND q.user_id = $2`,
+        [plantao_id, (user as any).id]
       );
 
       if (result.rows.length === 0) {

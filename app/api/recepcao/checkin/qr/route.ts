@@ -68,21 +68,20 @@ export async function POST(request: NextRequest) {
          FROM recepcao_locais l
          JOIN recepcao_plantoes p ON p.local_id = l.id
          WHERE l.qr_code_token = $1
-           AND l.workspace_id = $2
            AND l.is_active = true
            AND p.status = 'ativo'
            AND p.data = CURRENT_DATE
            AND CURRENT_TIME BETWEEN p.hora_inicio AND p.hora_fim
          ORDER BY p.hora_inicio ASC
          LIMIT 1`,
-        [qr_code_token, workspaceId]
+        [qr_code_token]
       );
 
       if (plantaoQuery.rows.length === 0) {
         // Verificar se o token existe mas não tem plantão
         const localCheck = await client.query(
-          `SELECT id, nome FROM recepcao_locais WHERE qr_code_token = $1 AND workspace_id = $2`,
-          [qr_code_token, workspaceId]
+          `SELECT id, nome FROM recepcao_locais WHERE qr_code_token = $1`,
+          [qr_code_token]
         );
 
         if (localCheck.rows.length === 0) {

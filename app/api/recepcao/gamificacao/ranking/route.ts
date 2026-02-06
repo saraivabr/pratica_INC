@@ -63,15 +63,13 @@ export async function GET(request: NextRequest) {
           COALESCE(SUM(CASE WHEN g.tipo = 'bonus_pix' AND g.resgatado THEN g.valor ELSE 0 END), 0)::int AS total_pix
         FROM users u
         LEFT JOIN roleta_gamificacao g ON g.user_id = u.id
-          AND g.workspace_id = $1
-          AND ($3::int IS NULL OR g.created_at >= CURRENT_DATE - ($3::int || ' days')::interval)
-        WHERE u.workspace_id = $1
-          AND u.hierarquia_id = (SELECT id FROM hierarquias WHERE slug = 'corretor')
+          AND ($2::int IS NULL OR g.created_at >= CURRENT_DATE - ($2::int || ' days')::interval)
+        WHERE u.hierarquia_id = (SELECT id FROM hierarquias WHERE slug = 'corretor')
         GROUP BY u.id, u.nome, u.avatar_url
         HAVING COALESCE(SUM(CASE WHEN g.tipo LIKE 'estrela_%' THEN 1 ELSE 0 END), 0) > 0
         ORDER BY total_estrelas DESC
-        LIMIT $2`,
-        [workspaceId, limit, daysOffset]
+        LIMIT $1`,
+        [limit, daysOffset]
       );
 
       // Verificar posicao do usuario atual - fully parameterized
@@ -81,13 +79,12 @@ export async function GET(request: NextRequest) {
             user_id,
             ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS posicao
           FROM roleta_gamificacao
-          WHERE workspace_id = $1
-            AND tipo LIKE 'estrela_%'
-            AND ($3::int IS NULL OR created_at >= CURRENT_DATE - ($3::int || ' days')::interval)
+          WHERE tipo LIKE 'estrela_%'
+            AND ($2::int IS NULL OR created_at >= CURRENT_DATE - ($2::int || ' days')::interval)
           GROUP BY user_id
         )
-        SELECT posicao::int FROM ranking WHERE user_id = $2`,
-        [workspaceId, (user as any).id, daysOffset]
+        SELECT posicao::int FROM ranking WHERE user_id = $1`,
+        [(user as any).id, daysOffset]
       );
 
       const userPosicao = userRankResult.rows[0]?.posicao || null;

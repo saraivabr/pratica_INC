@@ -42,8 +42,8 @@ export async function GET(
     return await withTenant(workspaceId, async (client) => {
       const result = await client.query<LocalDB>(
         `SELECT id, nome, qr_code_token FROM recepcao_locais
-         WHERE id = $1 AND workspace_id = $2 AND is_active = true`,
-        [id, workspaceId]
+         WHERE id = $1 AND is_active = true`,
+        [id]
       );
 
       if (result.rows.length === 0) {
@@ -106,9 +106,9 @@ export async function POST(
       const result = await client.query<LocalDB>(
         `UPDATE recepcao_locais
          SET qr_code_token = gen_random_uuid(), updated_at = NOW()
-         WHERE id = $1 AND workspace_id = $2 AND is_active = true
+         WHERE id = $1 AND is_active = true
          RETURNING id, nome, qr_code_token`,
-        [id, workspaceId]
+        [id]
       );
 
       if (result.rows.length === 0) {

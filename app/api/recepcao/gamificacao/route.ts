@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
     return await withTenant(workspaceId, async (client) => {
       // Buscar resumo de estrelas
       const summaryResult = await client.query<EstrelasSummary>(
-        `SELECT * FROM v_roleta_estrelas WHERE user_id = $1 AND workspace_id = $2`,
-        [(user as any).id, workspaceId]
+        `SELECT * FROM v_roleta_estrelas WHERE user_id = $1`,
+        [(user as any).id]
       );
 
       const summary: EstrelasSummary = summaryResult.rows[0] || {
@@ -76,10 +76,10 @@ export async function GET(request: NextRequest) {
           FROM roleta_gamificacao g
           LEFT JOIN recepcao_plantoes p ON p.id = g.plantao_id
           LEFT JOIN recepcao_locais l ON l.id = p.local_id
-          WHERE g.user_id = $1 AND g.workspace_id = $2
+          WHERE g.user_id = $1
           ORDER BY g.created_at DESC
-          LIMIT $3`,
-          [(user as any).id, workspaceId, limit]
+          LIMIT $2`,
+          [(user as any).id, limit]
         );
         historico = historicoResult.rows;
       }

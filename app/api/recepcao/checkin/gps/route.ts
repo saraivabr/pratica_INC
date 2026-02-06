@@ -72,9 +72,9 @@ export async function POST(request: NextRequest) {
         `SELECT p.id, p.max_corretores, l.latitude, l.longitude, l.raio_geofence, l.nome AS local_nome
          FROM recepcao_plantoes p
          JOIN recepcao_locais l ON l.id = p.local_id
-         WHERE p.id = $1 AND p.workspace_id = $2 AND p.status = 'ativo'
+         WHERE p.id = $1 AND p.status = 'ativo'
            AND p.data = CURRENT_DATE`,
-        [plantao_id, workspaceId]
+        [plantao_id]
       );
 
       if (plantaoCheck.rows.length === 0) {
