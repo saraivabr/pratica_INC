@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
 import { withTenant } from "@/lib/tenant-context";
-import pool from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
@@ -93,17 +92,18 @@ export async function GET(request: NextRequest) {
         avgResponseHours: responseTimeMap[c.id] || null
       }));
 
-      // 3. Total de interações por corretor (da tabela interacoes) - no workspace filter available
-      const interacoesRes = await pool.query(`
+      // 3. Total de interações por corretor (da view interacoes)
+      const interacoesRes = await client.query(`
         SELECT
           corretor_id,
           COUNT(*) as total_interactions,
           COUNT(DISTINCT empreendimento_id) as empreendimentos_ativos,
           COUNT(DISTINCT lead_id) FILTER (WHERE lead_id IS NOT NULL) as leads_contactados
         FROM interacoes
-        WHERE created_at >= $1
+        WHERE workspace_id = $1
+        AND created_at >= $2
         GROUP BY corretor_id
-      `, [startOfMonth.toISOString()]);
+      `, [workspaceId, startOfMonth.toISOString()]);
 
       const interacoesMap: Record<string, any> = {};
       interacoesRes.rows.forEach(row => {
@@ -114,8 +114,8 @@ export async function GET(request: NextRequest) {
         };
       });
 
-      // 4. Últimas interações da equipe - no workspace filter available
-      const recentActivitiesRes = await pool.query(`
+      // 4. Últimas interações da equipe
+      const recentActivitiesRes = await client.query(`
         SELECT
           i.id,
           i.corretor_id,
@@ -125,10 +125,11 @@ export async function GET(request: NextRequest) {
           i.lead_nome,
           i.created_at
         FROM interacoes i
-        LEFT JOIN users u ON u.id = i.corretor_id
+        LEFT JOIN users u ON u.id::text = i.corretor_id
+        WHERE i.workspace_id = $1
         ORDER BY i.created_at DESC
         LIMIT 10
-      `);
+      `, [workspaceId]);
 
       const recentActivities = recentActivitiesRes.rows.map(row => ({
         id: row.id,

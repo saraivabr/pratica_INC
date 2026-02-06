@@ -72,15 +72,11 @@ interface LeadResult {
 interface WhatsAppContact {
   id: number;
   phone_number: string;
-  name: string | null;
+  contact_name: string | null;
   profile_picture_url: string | null;
-  is_business: boolean;
-  is_group: boolean;
-  lead_id: number | null;
-  total_messages_received: number;
-  total_messages_sent: number;
+  lead_id: string | null;
+  total_messages: number;
   last_message_at: string | null;
-  last_interaction_at: string | null;
 }
 
 interface Interacao {
@@ -163,10 +159,8 @@ export async function GET(request: NextRequest) {
       // Buscar contato WhatsApp
       const whatsappQuery = `
         SELECT
-          id, phone_number, name, profile_picture_url,
-          is_business, is_group, lead_id,
-          total_messages_received, total_messages_sent,
-          last_message_at, last_interaction_at
+          id, phone_number, contact_name, profile_picture_url,
+          lead_id, total_messages, last_message_at
         FROM whatsapp_contacts
         WHERE workspace_id = $1
           AND REGEXP_REPLACE(phone_number, '[^0-9]', '', 'g') = ANY($2::text[])
@@ -265,16 +259,11 @@ export async function GET(request: NextRequest) {
         normalizedWhatsappContact = {
           id: whatsappContact.id,
           phone_number: whatsappContact.phone_number,
-          name: whatsappContact.name,
+          name: whatsappContact.contact_name,
           profile_picture_url: whatsappContact.profile_picture_url,
-          is_business: whatsappContact.is_business,
-          is_group: whatsappContact.is_group,
           lead_id: whatsappContact.lead_id,
-          total_messages: whatsappContact.total_messages_received + whatsappContact.total_messages_sent,
-          messages_received: whatsappContact.total_messages_received,
-          messages_sent: whatsappContact.total_messages_sent,
+          total_messages: whatsappContact.total_messages || 0,
           last_message_at: whatsappContact.last_message_at,
-          last_interaction_at: whatsappContact.last_interaction_at,
         };
       }
 

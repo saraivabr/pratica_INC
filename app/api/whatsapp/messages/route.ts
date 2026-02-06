@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
 
         return {
           phone_number: msg.phone_number,
-          contact_name: contact?.name || msg.contact_name || msg.phone_number,
+          contact_name: contact?.contact_name || msg.contact_name || msg.phone_number,
           profile_picture_url: contact?.profile_picture_url || null,
           last_message: msg.message_text,
           last_message_type: msg.message_type,

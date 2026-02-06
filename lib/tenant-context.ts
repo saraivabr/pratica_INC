@@ -275,12 +275,13 @@ export class TenantQuery {
   ): Promise<T[]> {
     const { clause, values } = this.where(conditions);
 
-    const result = await pool.query(
-      `SELECT ${columns} FROM ${table} WHERE ${clause}`,
-      values
-    );
-
-    return result.rows;
+    return await withTenant(this.workspaceId, async (client) => {
+      const result = await client.query(
+        `SELECT ${columns} FROM ${table} WHERE ${clause}`,
+        values
+      );
+      return result.rows;
+    });
   }
 
   /**
@@ -297,12 +298,13 @@ export class TenantQuery {
     const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
     const values = keys.map((key) => dataWithTenant[key]);
 
-    const result = await pool.query(
-      `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`,
-      values
-    );
-
-    return result.rows[0];
+    return await withTenant(this.workspaceId, async (client) => {
+      const result = await client.query(
+        `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`,
+        values
+      );
+      return result.rows[0];
+    });
   }
 
   /**
@@ -332,12 +334,13 @@ export class TenantQuery {
 
     const allValues = [...setValues, ...whereValues];
 
-    const result = await pool.query(
-      `UPDATE ${table} SET ${setClause} WHERE ${whereClause} RETURNING *`,
-      allValues
-    );
-
-    return result.rows;
+    return await withTenant(this.workspaceId, async (client) => {
+      const result = await client.query(
+        `UPDATE ${table} SET ${setClause} WHERE ${whereClause} RETURNING *`,
+        allValues
+      );
+      return result.rows;
+    });
   }
 
   /**
@@ -349,12 +352,13 @@ export class TenantQuery {
   ): Promise<number> {
     const { clause, values } = this.where(conditions);
 
-    const result = await pool.query(
-      `DELETE FROM ${table} WHERE ${clause}`,
-      values
-    );
-
-    return result.rowCount || 0;
+    return await withTenant(this.workspaceId, async (client) => {
+      const result = await client.query(
+        `DELETE FROM ${table} WHERE ${clause}`,
+        values
+      );
+      return result.rowCount || 0;
+    });
   }
 }
 
