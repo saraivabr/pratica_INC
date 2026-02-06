@@ -12,18 +12,10 @@ import { AnimatedBackground } from "@/components/animated-background"
 import { toast } from "sonner"
 import {
   BarChart3,
-  TrendingUp,
-  TrendingDown,
   Users,
-  DollarSign,
   Target,
   Calendar,
   Award,
-  ArrowUpRight,
-  ArrowDownRight,
-  Loader2,
-  Building2,
-  Phone,
   MessageSquare,
   CheckCircle2,
   AlertCircle,
@@ -209,11 +201,22 @@ export default function CorretorRelatoriosPage() {
 
   // Calculate metrics
   const metrics = useMemo(() => {
-    const now = Date.now()
+    const now = new Date()
     let ativos = 0
     let convertidos = 0
     let perdidos = 0
     let interacoesTotal = 0
+
+    // Get start of current week (Monday)
+    const startOfWeek = new Date(now)
+    const day = startOfWeek.getDay()
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1) // adjust when day is Sunday
+    startOfWeek.setDate(diff)
+    startOfWeek.setHours(0, 0, 0, 0)
+
+    // Initialize weekly arrays (Mon-Sun)
+    const weeklyLeads = [0, 0, 0, 0, 0, 0, 0]
+    const weeklyInteractions = [0, 0, 0, 0, 0, 0, 0]
 
     leads.forEach((lead) => {
       const situacao = (lead.situacao || "").toLowerCase()
@@ -224,15 +227,42 @@ export default function CorretorRelatoriosPage() {
       } else {
         ativos++
       }
-      interacoesTotal += lead.interacoes?.length || 0
+
+      // Count interactions for this lead
+      const leadInteractions = lead.interacoes?.length || 0
+      interacoesTotal += leadInteractions
+
+      // Calculate weekly data from interaction dates
+      if (lead.interacoes && lead.interacoes.length > 0) {
+        lead.interacoes.forEach((interacao) => {
+          if (interacao.data_cad) {
+            const interacaoDate = new Date(interacao.data_cad)
+            if (interacaoDate >= startOfWeek && interacaoDate <= now) {
+              const dayIndex = interacaoDate.getDay()
+              // Convert Sunday (0) to index 6, Monday (1) to index 0, etc.
+              const weekIndex = dayIndex === 0 ? 6 : dayIndex - 1
+              weeklyInteractions[weekIndex]++
+            }
+          }
+        })
+      }
+
+      // Count leads by creation date (using first interaction date as proxy)
+      if (lead.interacoes && lead.interacoes.length > 0) {
+        const firstInteraction = lead.interacoes[0]
+        if (firstInteraction.data_cad) {
+          const leadDate = new Date(firstInteraction.data_cad)
+          if (leadDate >= startOfWeek && leadDate <= now) {
+            const dayIndex = leadDate.getDay()
+            const weekIndex = dayIndex === 0 ? 6 : dayIndex - 1
+            weeklyLeads[weekIndex]++
+          }
+        }
+      }
     })
 
     const taxaConversao = leads.length > 0 ? Math.round((convertidos / leads.length) * 100) : 0
     const score = Math.min(100, Math.max(0, 70 + (ativos * 2) - (perdidos * 3) + (convertidos * 5)))
-
-    // Mock weekly data
-    const weeklyLeads = [3, 5, 2, 7, 4, 1, 2]
-    const weeklyInteractions = [12, 18, 8, 22, 15, 5, 8]
 
     return {
       total: leads.length,
@@ -245,9 +275,6 @@ export default function CorretorRelatoriosPage() {
       score,
       weeklyLeads,
       weeklyInteractions,
-      // Mock commission data
-      comissaoMes: 12500,
-      comissaoAno: 145000,
     }
   }, [leads])
 
@@ -323,8 +350,6 @@ export default function CorretorRelatoriosPage() {
                   value={metrics.total}
                   subtitle="No período"
                   icon={Users}
-                  trend="up"
-                  trendValue="+12%"
                   gradient="from-blue-500 to-cyan-500"
                   delay={0}
                 />
@@ -333,8 +358,6 @@ export default function CorretorRelatoriosPage() {
                   value={metrics.convertidos}
                   subtitle={`${metrics.taxaConversao}% de conversão`}
                   icon={CheckCircle2}
-                  trend="up"
-                  trendValue="+8%"
                   gradient="from-emerald-500 to-green-500"
                   delay={100}
                 />
@@ -343,8 +366,6 @@ export default function CorretorRelatoriosPage() {
                   value={metrics.ativos}
                   subtitle="Leads ativos"
                   icon={Target}
-                  trend="neutral"
-                  trendValue="="
                   gradient="from-amber-500 to-orange-500"
                   delay={200}
                 />
@@ -353,32 +374,8 @@ export default function CorretorRelatoriosPage() {
                   value={metrics.interacoesTotal}
                   subtitle={`${metrics.mediaInteracoes} por lead`}
                   icon={MessageSquare}
-                  trend="up"
-                  trendValue="+15%"
                   gradient="from-purple-500 to-violet-500"
                   delay={300}
-                />
-              </div>
-
-              {/* Commission Cards */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <StatCard
-                  title="Comissão do Mês"
-                  value={`R$ ${metrics.comissaoMes.toLocaleString("pt-BR")}`}
-                  subtitle="Previsão baseada em vendas"
-                  icon={DollarSign}
-                  trend="up"
-                  trendValue="+22%"
-                  gradient="from-green-500 to-emerald-500"
-                  delay={400}
-                />
-                <StatCard
-                  title="Comissão Acumulada"
-                  value={`R$ ${metrics.comissaoAno.toLocaleString("pt-BR")}`}
-                  subtitle="Total no ano"
-                  icon={Award}
-                  gradient="from-yellow-500 to-amber-500"
-                  delay={500}
                 />
               </div>
 
@@ -439,24 +436,24 @@ export default function CorretorRelatoriosPage() {
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20">
-                      <Phone className="h-6 w-6 text-blue-500 mx-auto mb-2" />
-                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">24</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Ligações</p>
+                      <Users className="h-6 w-6 text-blue-500 mx-auto mb-2" />
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{metrics.total}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Total Leads</p>
                     </div>
                     <div className="text-center p-4 rounded-xl bg-green-50 dark:bg-green-900/20">
                       <MessageSquare className="h-6 w-6 text-green-500 mx-auto mb-2" />
-                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">156</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Mensagens</p>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">{metrics.interacoesTotal}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Interações</p>
                     </div>
                     <div className="text-center p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20">
-                      <Building2 className="h-6 w-6 text-purple-500 mx-auto mb-2" />
-                      <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">8</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Visitas</p>
+                      <CheckCircle2 className="h-6 w-6 text-purple-500 mx-auto mb-2" />
+                      <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{metrics.convertidos}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Convertidos</p>
                     </div>
                     <div className="text-center p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20">
                       <Target className="h-6 w-6 text-amber-500 mx-auto mb-2" />
-                      <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">3</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Propostas</p>
+                      <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{metrics.ativos}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Em Atendimento</p>
                     </div>
                   </div>
                 </CardContent>
