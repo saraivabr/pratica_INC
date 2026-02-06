@@ -37,9 +37,11 @@ export function useWhatsAppNotifications(
   // Inicializar áudio
   useEffect(() => {
     if (typeof window !== 'undefined' && soundEnabled) {
-      // Criar elemento de áudio com som de notificação
-      audioRef.current = new Audio('/sounds/notification.mp3');
-      audioRef.current.volume = 0.5;
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.volume = 0.5;
+      // Only keep reference if audio can load
+      audio.addEventListener('canplaythrough', () => { audioRef.current = audio; }, { once: true });
+      audio.addEventListener('error', () => { audioRef.current = null; }, { once: true });
     }
 
     return () => {
