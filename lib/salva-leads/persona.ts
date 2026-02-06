@@ -42,7 +42,10 @@ export function buildLunaSystemPrompt(config: {
   conversationHistory?: string;
   isReactivation?: boolean;
   diasInativo?: number;
+  assistantName?: string;
+  assistantInstructions?: string;
 }): string {
+  const agentName = config.assistantName || 'Luna';
   const psychologySection = config.psychology ? `
 ## PERFIL PSICOLÓGICO DO LEAD
 
@@ -62,7 +65,13 @@ Sua missão é reconectar de forma natural, sem parecer desesperada ou robótica
 Mostre que você lembrou dele e que tem algo relevante a oferecer.
 ` : '';
 
-  return `Você é Luna, assistente de ${config.corretorNome}${config.imobiliariaNome ? ` da ${config.imobiliariaNome}` : ''}.
+  const customInstructions = config.assistantInstructions ? `
+## INSTRUÇÕES DO CORRETOR
+
+${config.assistantInstructions}
+` : '';
+
+  return `Você é ${agentName}, assistente de ${config.corretorNome}${config.imobiliariaNome ? ` da ${config.imobiliariaNome}` : ''}.
 
 ## REGRAS CRÍTICAS - LEIA ANTES DE RESPONDER
 
@@ -94,7 +103,7 @@ Mostre que você lembrou dele e que tem algo relevante a oferecer.
 
 ## QUEM VOCÊ É
 
-Você é uma assistente HUMANA que ajuda o corretor ${config.corretorNome} a atender seus clientes.
+Você é uma assistente HUMANA chamada ${agentName} que ajuda o corretor ${config.corretorNome} a atender seus clientes.
 Você não é um robô. Você é empática, atenciosa e genuinamente interessada em ajudar.
 
 ## SEU OBJETIVO
@@ -158,6 +167,7 @@ Antes de enviar sua resposta, verifique:
 - [ ] Estou respeitando sinais de encerramento/pausa?
 - [ ] Estou sendo DIRETA ou pedindo permissão desnecessária?
 
+${customInstructions}
 Lembre-se: você é a ponte entre o sonho do cliente e a realização dele.`;
 }
 
@@ -221,23 +231,25 @@ export function generateReactivationOpener(context: {
     cidade?: string;
   };
   psychology?: PsychologicalAnalysis;
+  assistantName?: string;
 }): string {
   const greeting = getGreetingByTime();
   const nome = context.leadNome?.split(' ')[0] || '';
+  const agentName = context.assistantName || 'Luna';
 
   // Different approaches based on psychology
   if (context.psychology?.primaryMotivation === 'security') {
-    return `${greeting}${nome ? `, ${nome}` : ''}! Aqui é a Luna, assistente do ${context.corretorNome}. Lembrei de você - surgiu uma oportunidade bem interessante${context.interesse?.bairro ? ` no ${context.interesse.bairro}` : ''} e achei sua cara. Posso te contar?`;
+    return `${greeting}${nome ? `, ${nome}` : ''}! Aqui é a ${agentName}, assistente do ${context.corretorNome}. Lembrei de você - surgiu uma oportunidade bem interessante${context.interesse?.bairro ? ` no ${context.interesse.bairro}` : ''} e achei sua cara. Posso te contar?`;
   }
 
   if (context.psychology?.primaryMotivation === 'achievement') {
-    return `${greeting}${nome ? `, ${nome}` : ''}! Luna aqui, do ${context.corretorNome}. Apareceu algo especial${context.interesse?.bairro ? ` no ${context.interesse.bairro}` : ''} - alto padrão, localização top. Acho que você vai gostar. Posso mandar?`;
+    return `${greeting}${nome ? `, ${nome}` : ''}! ${agentName} aqui, do ${context.corretorNome}. Apareceu algo especial${context.interesse?.bairro ? ` no ${context.interesse.bairro}` : ''} - alto padrão, localização top. Acho que você vai gostar. Posso mandar?`;
   }
 
   if (context.psychology?.underlyingEmotion === 'frustração') {
-    return `${greeting}${nome ? `, ${nome}` : ''}! Aqui é a Luna, assistente do ${context.corretorNome}. Sei que você estava procurando algo específico${context.interesse?.bairro ? ` no ${context.interesse.bairro}` : ''} e talvez não tenha encontrado ainda. Posso te ajudar a refinar a busca?`;
+    return `${greeting}${nome ? `, ${nome}` : ''}! Aqui é a ${agentName}, assistente do ${context.corretorNome}. Sei que você estava procurando algo específico${context.interesse?.bairro ? ` no ${context.interesse.bairro}` : ''} e talvez não tenha encontrado ainda. Posso te ajudar a refinar a busca?`;
   }
 
   // Default approach
-  return `${greeting}${nome ? `, ${nome}` : ''}! Aqui é a Luna, assistente do ${context.corretorNome}. Tudo bem? Lembrei de você porque apareceram algumas opções${context.interesse?.bairro ? ` no ${context.interesse.bairro}` : ''}. Ainda tá procurando?`;
+  return `${greeting}${nome ? `, ${nome}` : ''}! Aqui é a ${agentName}, assistente do ${context.corretorNome}. Tudo bem? Lembrei de você porque apareceram algumas opções${context.interesse?.bairro ? ` no ${context.interesse.bairro}` : ''}. Ainda tá procurando?`;
 }

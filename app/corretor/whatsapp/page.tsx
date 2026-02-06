@@ -7,8 +7,9 @@ import { useAuth, usePageTracking } from "@/lib/auth-context"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { WhatsAppConnect } from "@/components/corretor/whatsapp-connect"
 import { WhatsAppAutomations } from "@/components/corretor/whatsapp-automations"
+import { WhatsAppSettings } from "@/components/corretor/whatsapp-settings"
 import { ChatCRM } from "@/components/corretor/chat-crm"
-import { Loader2, MessageSquare, Bot } from "lucide-react"
+import { Loader2, MessageSquare, Bot, Settings } from "lucide-react"
 
 export default function CorretorWhatsAppPage() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth()
@@ -140,6 +141,10 @@ export default function CorretorWhatsAppPage() {
             <Bot className="h-4 w-4" />
             Automações
           </TabsTrigger>
+          <TabsTrigger value="ajustes" className="gap-1.5">
+            <Settings className="h-4 w-4" />
+            Ajustes
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="conversas" className="flex-1 min-h-0">
@@ -155,11 +160,20 @@ export default function CorretorWhatsAppPage() {
             <WhatsAppAutomations
               instanceName={instanceName}
               userId={userId}
+              onSwitchToChat={() => setActiveTab("conversas")}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="ajustes" className="flex-1 overflow-auto px-3 sm:px-4 md:px-6">
+          {instanceName && userId && (
+            <WhatsAppSettings
+              instanceName={instanceName}
+              userId={userId}
               pairedPhone={pairedPhone}
               profileName={profileName}
               onReconnect={recheckStatus}
               onDisconnect={handleDisconnect}
-              onSwitchToChat={() => setActiveTab("conversas")}
             />
           )}
         </TabsContent>

@@ -213,36 +213,16 @@ async function findUserByPhone(phone: string, workspaceId: number) {
  * Handle QR Code update
  */
 async function handleQRCodeUpdate(workspaceId: number, data: any) {
-  const tenant = await getWorkspace(workspaceId);
-  if (!tenant) return;
-
-  const instances = tenant.evolution_instances || [];
-  const instanceIndex = instances.findIndex(
-    (i: any) => i.instance_name === data.instance
-  );
-
-  if (instanceIndex !== -1) {
-    (instances[instanceIndex] as any).qr_code = data.data?.qrcode?.base64 || null;
-    (instances[instanceIndex] as any).pairing_code = data.data?.qrcode?.pairingCode || null;
-
-    await updateWorkspace(workspaceId, { evolution_instances: instances as any[] });
-
-    console.log(`[QR Code Updated] Instance: ${data.instance}`);
-  }
+  // QR code updates are transient — no need to persist in workspace
+  // The client polls /api/whatsapp/session/status which fetches live from Evolution API
+  console.log(`[QR Code Updated] Instance: ${data.instance}, workspace: ${workspaceId}`);
 }
 
 /**
  * Handle connection status update
  */
 async function handleConnectionUpdate(workspaceId: number, data: any) {
-  const tenant = await getWorkspace(workspaceId);
-  if (!tenant) return;
-
   const instanceName = data.instance;
-  const instances = tenant.evolution_instances || [];
-  const instanceIndex = instances.findIndex(
-    (i: any) => i.instance_name === instanceName
-  );
 
   // Evolution API pode enviar estado em diferentes formatos
   const state = data.data?.state
@@ -253,12 +233,8 @@ async function handleConnectionUpdate(workspaceId: number, data: any) {
 
   const isConnected = state === 'open' || state === 'connected';
 
-  if (instanceIndex !== -1) {
-    (instances[instanceIndex] as any).status = isConnected ? 'connected' : 'disconnected';
-    (instances[instanceIndex] as any).last_connection_update = new Date().toISOString();
-
-    await updateWorkspace(workspaceId, { evolution_instances: instances as any[] });
-  }
+  // Update workspace connection status
+  await updateWorkspace(workspaceId, { evolution_connected: isConnected });
 
   // Atualizar status de conexão no registro do usuário (para Salva-Leads)
   // O nome da instância segue o padrão: corretor-{userId}-{timestamp}

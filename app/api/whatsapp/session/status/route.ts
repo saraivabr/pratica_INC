@@ -56,9 +56,22 @@ export async function GET(request: NextRequest) {
 
     const workspaceId = (workspace as any).id;
 
-    // Buscar instância do workspace
+    // Buscar instância do workspace (com fallback para tabela users)
     const userId = (user as any).id;
-    const instanceName = (workspace as any).evolution_instance_name;
+    let instanceName = (workspace as any).evolution_instance_name || null;
+
+    // Fallback: se workspace não tem instance_name, buscar do user
+    if (!instanceName) {
+      try {
+        const { rows } = await (await import("@/lib/db")).dbQuery(
+          `SELECT evolution_instance_name FROM users WHERE id = $1`,
+          [userId]
+        );
+        if (rows[0]?.evolution_instance_name) {
+          instanceName = rows[0].evolution_instance_name;
+        }
+      } catch {}
+    }
 
     if (!instanceName) {
       return NextResponse.json({
@@ -141,7 +154,7 @@ export async function GET(request: NextRequest) {
           try {
             const qrData = await getQRCode(instanceName);
             qrCode = qrData?.code || qrData?.base64 || null;
-            if (qrData?.pairingCode && qrData.pairingCode.length === 8 && /^\d+$/.test(qrData.pairingCode)) {
+            if (qrData?.pairingCode && qrData.pairingCode.length >= 6 && /^[A-Z0-9]+$/i.test(qrData.pairingCode)) {
               pairingCode = qrData.pairingCode;
             }
           } catch {

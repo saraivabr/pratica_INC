@@ -14,7 +14,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local' });
 
-const EVOLUTION_BASE_URL = process.env.EVOLUTION_BASE_URL || 'https://pratica-evolution-api.robuvi.easypanel.host';
+const EVOLUTION_BASE_URL = process.env.EVOLUTION_BASE_URL || 'http://localhost:8080';
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 
 // Configuration
@@ -259,35 +259,32 @@ export async function createInstance(config: InstanceConfig): Promise<InstanceDa
 
 /**
  * Get QR Code for instance connection
+ * Note: Evolution API v2 may return an array instead of a single object
  */
 export async function getQRCode(instanceName: string): Promise<QRCodeData> {
-  return evolutionFetch<QRCodeData>(`/instance/connect/${instanceName}`);
+  const raw = await evolutionFetch<QRCodeData | QRCodeData[]>(`/instance/connect/${instanceName}`);
+  return Array.isArray(raw) ? raw[0] : raw;
 }
 
 /**
- * Get Pairing Code for instance connection (8-digit code)
+ * Get Pairing Code for instance connection (alphanumeric code like "FNPG5AYK")
  * This allows users to connect by entering a code directly in WhatsApp
  * instead of scanning a QR code - much more convenient for mobile users
  *
- * Evolution API v2 requires the number in the request BODY with pairing: true
- * Docs: https://github.com/EvolutionAPI/evolution-api/issues/2197
+ * Evolution API v2: GET /instance/connect/{instance}?number={number}
+ * The number must also be provided during createInstance() for pairing to work.
+ * @see https://github.com/EvolutionAPI/evolution-api/issues/1220
  */
-export async function getPairingCode(instanceName: string, phoneNumber: string): Promise<{ code: string; pairingCode: string }> {
+export async function getPairingCode(instanceName: string, phoneNumber: string): Promise<QRCodeData> {
   // Format phone number - remove non-digits and ensure country code (E.164 format)
   const formattedNumber = phoneNumber.replace(/\D/g, '');
   const numberWithCountry = formattedNumber.startsWith('55') ? formattedNumber : `55${formattedNumber}`;
 
-  // Evolution API v2: send number in body with pairing: true
-  return evolutionFetch<{ code: string; pairingCode: string }>(
-    `/instance/connect/${instanceName}`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        number: numberWithCountry,
-        pairing: true,
-      }),
-    }
+  // Evolution API v2: GET with ?number= query param returns pairingCode + QR
+  const raw = await evolutionFetch<QRCodeData | QRCodeData[]>(
+    `/instance/connect/${instanceName}?number=${numberWithCountry}`
   );
+  return Array.isArray(raw) ? raw[0] : raw;
 }
 
 /**

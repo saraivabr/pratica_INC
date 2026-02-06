@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import {
@@ -10,35 +9,16 @@ import {
   Settings,
   ArrowRight,
   Loader2,
-  RefreshCcw,
-  Smartphone,
   Activity,
   Users,
   MailCheck,
   Zap,
-  Unplug,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { useConversations } from "@/hooks/use-chat"
 
 interface WhatsAppAutomationsProps {
   instanceName: string
   userId: string
-  pairedPhone?: string | null
-  profileName?: string | null
-  onReconnect?: () => void
-  onDisconnect?: () => void
   onSwitchToChat?: () => void
 }
 
@@ -83,27 +63,8 @@ function QuickLink({ href, icon: Icon, title, description }: { href: string; ico
 export function WhatsAppAutomations({
   instanceName,
   userId,
-  pairedPhone,
-  profileName,
-  onReconnect,
-  onDisconnect,
   onSwitchToChat,
 }: WhatsAppAutomationsProps) {
-  const [disconnecting, setDisconnecting] = useState(false)
-
-  const handleDisconnect = async () => {
-    setDisconnecting(true)
-    try {
-      const res = await fetch("/api/whatsapp/session/logout", { method: "POST" })
-      if (res.ok) {
-        onDisconnect?.()
-      }
-    } catch {
-      // Keep current state on error
-    } finally {
-      setDisconnecting(false)
-    }
-  }
   // Salva-Leads stats
   const { data: slStats, isLoading: slLoading } = useQuery<{
     conversations: { active: number; completed: number; with_potential: number }
@@ -124,64 +85,6 @@ export function WhatsAppAutomations({
 
   return (
     <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
-      {/* Connection Status */}
-      <div className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-              <Smartphone className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-white dark:border-zinc-900" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-900 dark:text-white">Conectado</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400">Ativo</span>
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {pairedPhone || "WhatsApp"}{profileName ? ` - ${profileName}` : ""}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {onReconnect && (
-            <Button variant="outline" size="sm" onClick={onReconnect} className="gap-1.5">
-              <RefreshCcw className="h-3.5 w-3.5" />
-              Reconectar
-            </Button>
-          )}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20 dark:hover:border-red-700">
-                <Unplug className="h-3.5 w-3.5" />
-                Desconectar
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Desconectar WhatsApp?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Suas conversas e automações serão pausadas. Você precisará reconectar escaneando o QR Code novamente.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDisconnect}
-                  disabled={disconnecting}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  {disconnecting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                  ) : null}
-                  Sim, desconectar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
-
       {/* Salva-Leads Metrics */}
       <div>
         <div className="flex items-center justify-between mb-3">

@@ -114,10 +114,8 @@ export async function POST(request: NextRequest) {
         console.warn(`[WhatsApp] Usuário ${(user as any).id} sem telefone cadastrado. Pairing code não estará disponível, apenas QR Code.`);
       }
 
-      // Verificar se já existe instância para este tenant
-      const instances = tenant.evolution_instances || [];
-      let instance = instances[0];
-      let instanceName = instance?.instance_name;
+      // Verificar se já existe instância para este workspace
+      let instanceName = (tenant as any).evolution_instance_name || null;
 
       // Se freshConnection=true, deletar instância existente para criar uma nova
       if (freshConnection && instanceName) {
@@ -129,11 +127,8 @@ export async function POST(request: NextRequest) {
           console.error(`[WhatsApp] Erro ao deletar instância:`, deleteError);
           // Continuar mesmo se falhar a deleção
         }
-        // Limpar referência para forçar criação de nova instância
-        instance = undefined as any;
-        instanceName = undefined as any;
-        // Limpar instâncias salvas no tenant
-        await updateWorkspace(workspaceId, { evolution_instances: [] });
+        instanceName = null;
+        await updateWorkspace(workspaceId, { evolution_instance_name: null, evolution_connected: false });
       }
 
       // Se não existe instância, criar uma nova
@@ -213,35 +208,13 @@ export async function POST(request: NextRequest) {
             console.error(`[WhatsApp] Erro ao configurar webhook:`, whError.message);
           }
 
-          // Salvar nova instância no tenant
-          const newInstance = {
-            instance_name: instanceName,
-            display_name: `WhatsApp ${tenant.name || tenant.slug}`,
-            qr_code: undefined as string | undefined,
-            pairing_code: undefined as string | undefined,
-            status: 'connecting',
-            created_at: new Date().toISOString(),
-            webhook_url: webhookUrl,
-            settings: {
-              reject_call: false,
-              groups_ignore: true,
-              always_online: false,
-              read_messages: false,
-            },
-          };
-
-          await updateWorkspace(workspaceId, {
-            evolution_instances: [newInstance as any],
-          });
-
-          // Salvar instância também no registro do usuário (para Salva-Leads)
+          // Salvar instância no workspace e no usuário
+          await updateWorkspace(workspaceId, { evolution_instance_name: instanceName });
           await client.query(
             `UPDATE users SET evolution_instance_name = $1, updated_at = NOW() WHERE id = $2`,
             [instanceName, userId]
           );
-          console.log(`[WhatsApp] Instância ${instanceName} salva no usuário ${userId}`);
-
-          instance = newInstance as any;
+          console.log(`[WhatsApp] Instância ${instanceName} salva no workspace ${workspaceId} e usuário ${userId}`);
         } catch (createError: any) {
           console.error("Error creating Evolution instance:", createError);
           return NextResponse.json(
@@ -276,7 +249,7 @@ export async function POST(request: NextRequest) {
         const qrData = await getQRCode(instanceName);
         qrCode = qrData?.code || qrData?.base64 || null;
         // Pairing code pode vir junto com o QR
-        if (qrData?.pairingCode && qrData.pairingCode.length === 8 && /^\d+$/.test(qrData.pairingCode)) {
+        if (qrData?.pairingCode && qrData.pairingCode.length >= 6 && /^[A-Z0-9]+$/i.test(qrData.pairingCode)) {
           pairingCode = qrData.pairingCode;
         }
         console.log(`QR Code obtained, pairingCode from QR: ${pairingCode ? 'yes' : 'no'}`);
@@ -291,9 +264,9 @@ export async function POST(request: NextRequest) {
           const pairingData = await getPairingCode(instanceName, userPhone);
           console.log(`[WhatsApp] Pairing API response:`, JSON.stringify(pairingData, null, 2));
 
-          // Pairing code deve ser exatamente 8 dígitos
+          // Pairing code is alphanumeric, 6-8 characters
           const receivedCode = pairingData?.pairingCode;
-          if (receivedCode && receivedCode.length === 8 && /^\d+$/.test(receivedCode)) {
+          if (receivedCode && receivedCode.length >= 6 && /^[A-Z0-9]+$/i.test(receivedCode)) {
             pairingCode = receivedCode;
             console.log(`[WhatsApp] Pairing code generated successfully: ${pairingCode.slice(0,4)}****`);
           } else {
@@ -311,32 +284,6 @@ export async function POST(request: NextRequest) {
         }
       } else if (!userPhone) {
         console.log(`[WhatsApp] No user phone available for pairing code`);
-      }
-
-      // Salvar ambos os códigos no tenant
-      if (qrCode || pairingCode) {
-        const updatedInstances = instances.length > 0
-          ? instances.map((inst: any) => {
-              if (inst.instance_name === instanceName) {
-                return {
-                  ...inst,
-                  qr_code: qrCode,
-                  pairing_code: pairingCode,
-                  status: 'connecting'
-                };
-              }
-              return inst;
-            })
-          : [{
-              ...instance,
-              qr_code: qrCode,
-              pairing_code: pairingCode,
-              status: 'connecting',
-            }];
-
-        await updateWorkspace(workspaceId, {
-          evolution_instances: updatedInstances,
-        });
       }
 
       // Determinar o melhor status baseado no que conseguimos

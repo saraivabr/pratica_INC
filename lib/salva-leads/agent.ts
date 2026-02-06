@@ -12,7 +12,28 @@ import { analyzePsychology, quickAnalyzePsychology } from '../sofia/langchain/ps
 import { detectObjectionType, getObjectionReframe } from '../sofia/psychology/objection-reframes';
 import { buildLunaSystemPrompt, generateReactivationOpener } from './persona';
 import { getConversationHistoryForAI } from './conversation';
+import { dbQuery } from '../db';
 import type { PsychologicalAnalysis } from '../sofia/psychology/types';
+
+/**
+ * Load user's custom Luna config from users.metadata
+ */
+async function getUserLunaConfig(userId: string): Promise<{ assistantName?: string; assistantInstructions?: string }> {
+  try {
+    const { rows } = await dbQuery(
+      `SELECT metadata->'salva_leads' as salva_leads FROM users WHERE id = $1`,
+      [userId]
+    );
+    const sl = rows[0]?.salva_leads;
+    if (!sl) return {};
+    return {
+      assistantName: sl.assistant_name || undefined,
+      assistantInstructions: sl.assistant_instructions || undefined,
+    };
+  } catch {
+    return {};
+  }
+}
 
 // Lazy initialization to avoid build-time errors
 let _openai: OpenAI | null = null;
@@ -76,7 +97,10 @@ Sugestão de resposta empática: ${reframe.response}
     2000 // max chars
   );
 
-  // 4. Build Luna's system prompt with psychology
+  // 4. Load user's custom Luna config
+  const lunaConfig = await getUserLunaConfig(conversation.corretor_id);
+
+  // 5. Build Luna's system prompt with psychology + custom config
   const systemPrompt = buildLunaSystemPrompt({
     corretorNome: context.corretorNome || 'Corretor',
     imobiliariaNome: context.imobiliariaNome,
@@ -86,9 +110,11 @@ Sugestão de resposta empática: ${reframe.response}
     conversationHistory: conversationHistory || conversation.messages.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n'),
     isReactivation: context.isReactivation || false,
     diasInativo: context.diasInativo,
+    assistantName: lunaConfig.assistantName,
+    assistantInstructions: lunaConfig.assistantInstructions,
   });
 
-  // 5. Build messages for OpenAI
+  // 6. Build messages for OpenAI
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: systemPrompt + objectionContext },
     ...conversation.messages.map(m => ({
@@ -98,7 +124,7 @@ Sugestão de resposta empática: ${reframe.response}
     { role: 'user', content: newMessage }
   ];
 
-  // 6. Define tools for OpenAI
+  // 7. Define tools for OpenAI
   const tools = SALVA_LEADS_TOOLS.map(tool => ({
     type: 'function' as const,
     function: {
@@ -108,7 +134,7 @@ Sugestão de resposta empática: ${reframe.response}
     }
   }));
 
-  // 7. Call OpenAI
+  // 8. Call OpenAI
   const requestParams: any = {
     model: process.env.OPENAI_SALVA_LEADS_MODEL || 'gpt-4o-mini',
     messages,
@@ -124,7 +150,7 @@ Sugestão de resposta empática: ${reframe.response}
   const response = await getOpenAI().chat.completions.create(requestParams);
   const assistantMessage = response.choices[0].message;
 
-  // 8. Handle tool calls if any (parallel execution)
+  // 9. Handle tool calls if any (parallel execution)
   const toolCalls = (assistantMessage as any).tool_calls;
   if (toolCalls && toolCalls.length > 0) {
     const toolResultsPromises = await Promise.all(
@@ -226,6 +252,9 @@ export async function generateInitialRecoveryMessage(
     }
   }
 
+  // Load user's custom Luna config
+  const lunaConfig = await getUserLunaConfig(conversation.corretor_id);
+
   // Generate opener using Luna's reactivation strategies
   return generateReactivationOpener({
     leadNome: conversation.lead_name || '',
@@ -233,5 +262,6 @@ export async function generateInitialRecoveryMessage(
     diasInativo: context.diasInativo || 7,
     interesse: context.interesse,
     psychology,
+    assistantName: lunaConfig.assistantName,
   });
 }
