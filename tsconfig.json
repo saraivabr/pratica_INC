@@ -47,7 +47,6 @@
     "practica-bot-server",
     "flutter_app",
     "google-cloud-sdk",
-    "components/intermediacao",
     "components/pdf-templates"
   ]
 }
