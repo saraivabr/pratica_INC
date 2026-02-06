@@ -73,12 +73,12 @@ export async function syncLeadsInteracoes(workspaceId: number, fullSync = false)
     // Prepare upsert query
     const upsertQuery = `
       INSERT INTO cvcrm_leads_interacoes (
-        workspace_id, idinteracao, idlead, referencia, referencia_data,
+        workspace_id, id_interacao, id_lead, referencia, referencia_data,
         ativo, tipo, descricao, data_cad, situacao,
         enviar_corretor, enviar_imobiliaria, enviar_cliente,
-        idimobiliaria, imobiliaria,
-        idcorretor, corretor,
-        idgestor, gestor_interacao, corretor_interacao, imobiliaria_interacao,
+        id_imobiliaria, imobiliaria,
+        id_corretor, corretor,
+        id_gestor, gestor_interacao, corretor_interacao, imobiliaria_interacao,
         synced_at
       ) VALUES (
         $1, $2, $3, $4, $5,
@@ -89,8 +89,8 @@ export async function syncLeadsInteracoes(workspaceId: number, fullSync = false)
         $18, $19, $20, $21,
         NOW()
       )
-      ON CONFLICT (workspace_id, idinteracao) DO UPDATE SET
-        idlead = EXCLUDED.idlead,
+      ON CONFLICT (workspace_id, id_interacao) DO UPDATE SET
+        id_lead = EXCLUDED.id_lead,
         referencia = EXCLUDED.referencia,
         referencia_data = EXCLUDED.referencia_data,
         ativo = EXCLUDED.ativo,
@@ -101,11 +101,11 @@ export async function syncLeadsInteracoes(workspaceId: number, fullSync = false)
         enviar_corretor = EXCLUDED.enviar_corretor,
         enviar_imobiliaria = EXCLUDED.enviar_imobiliaria,
         enviar_cliente = EXCLUDED.enviar_cliente,
-        idimobiliaria = EXCLUDED.idimobiliaria,
+        id_imobiliaria = EXCLUDED.id_imobiliaria,
         imobiliaria = EXCLUDED.imobiliaria,
-        idcorretor = EXCLUDED.idcorretor,
+        id_corretor = EXCLUDED.id_corretor,
         corretor = EXCLUDED.corretor,
-        idgestor = EXCLUDED.idgestor,
+        id_gestor = EXCLUDED.id_gestor,
         gestor_interacao = EXCLUDED.gestor_interacao,
         corretor_interacao = EXCLUDED.corretor_interacao,
         imobiliaria_interacao = EXCLUDED.imobiliaria_interacao,

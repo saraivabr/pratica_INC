@@ -105,20 +105,20 @@ export async function syncAtendimentosCore(workspaceId: number, fullSync = false
     // Prepare upsert query
     const upsertQuery = `
       INSERT INTO cvcrm_atendimentos (
-        workspace_id, idatendimento, nome, email, telefone, documento,
+        workspace_id, id_atendimento, nome, email, telefone, documento,
         titulo, descricao, tipo, classificacao, prioridade,
         humor_cliente, nota_atendimento,
-        idsituacao, situacao,
+        id_situacao, situacao,
         data_cad, data_ultima_modificacao_situacao, ultima_interacao,
-        idassunto, assunto, idsubassunto, subassunto,
+        id_assunto, assunto, id_subassunto, subassunto,
         sla_assunto, data_vencimento_assunto,
         sla_subassunto, data_vencimento_subassunto,
         sla_workflow, data_vencimento_workflow,
         tempo_resposta, tempo_finalizado,
-        idassistencia, imobiliaria, corretor,
-        idresponsavel, responsavel,
-        ids_unidades, unidades, idbloco, bloco,
-        empreendimento, idempreendimento,
+        id_assistencia, imobiliaria, corretor,
+        id_responsavel, responsavel,
+        ids_unidades, unidades, id_bloco, bloco,
+        empreendimento, id_empreendimento,
         campos_adicionais,
         synced_at
       ) VALUES (
@@ -139,7 +139,7 @@ export async function syncAtendimentosCore(workspaceId: number, fullSync = false
         $42,
         NOW()
       )
-      ON CONFLICT (workspace_id, idatendimento) DO UPDATE SET
+      ON CONFLICT (workspace_id, id_atendimento) DO UPDATE SET
         nome = EXCLUDED.nome,
         email = EXCLUDED.email,
         telefone = EXCLUDED.telefone,
@@ -151,14 +151,14 @@ export async function syncAtendimentosCore(workspaceId: number, fullSync = false
         prioridade = EXCLUDED.prioridade,
         humor_cliente = EXCLUDED.humor_cliente,
         nota_atendimento = EXCLUDED.nota_atendimento,
-        idsituacao = EXCLUDED.idsituacao,
+        id_situacao = EXCLUDED.id_situacao,
         situacao = EXCLUDED.situacao,
         data_cad = EXCLUDED.data_cad,
         data_ultima_modificacao_situacao = EXCLUDED.data_ultima_modificacao_situacao,
         ultima_interacao = EXCLUDED.ultima_interacao,
-        idassunto = EXCLUDED.idassunto,
+        id_assunto = EXCLUDED.id_assunto,
         assunto = EXCLUDED.assunto,
-        idsubassunto = EXCLUDED.idsubassunto,
+        id_subassunto = EXCLUDED.id_subassunto,
         subassunto = EXCLUDED.subassunto,
         sla_assunto = EXCLUDED.sla_assunto,
         data_vencimento_assunto = EXCLUDED.data_vencimento_assunto,
@@ -168,17 +168,17 @@ export async function syncAtendimentosCore(workspaceId: number, fullSync = false
         data_vencimento_workflow = EXCLUDED.data_vencimento_workflow,
         tempo_resposta = EXCLUDED.tempo_resposta,
         tempo_finalizado = EXCLUDED.tempo_finalizado,
-        idassistencia = EXCLUDED.idassistencia,
+        id_assistencia = EXCLUDED.id_assistencia,
         imobiliaria = EXCLUDED.imobiliaria,
         corretor = EXCLUDED.corretor,
-        idresponsavel = EXCLUDED.idresponsavel,
+        id_responsavel = EXCLUDED.id_responsavel,
         responsavel = EXCLUDED.responsavel,
         ids_unidades = EXCLUDED.ids_unidades,
         unidades = EXCLUDED.unidades,
-        idbloco = EXCLUDED.idbloco,
+        id_bloco = EXCLUDED.id_bloco,
         bloco = EXCLUDED.bloco,
         empreendimento = EXCLUDED.empreendimento,
-        idempreendimento = EXCLUDED.idempreendimento,
+        id_empreendimento = EXCLUDED.id_empreendimento,
         campos_adicionais = EXCLUDED.campos_adicionais,
         synced_at = NOW(),
         updated_at = NOW()
@@ -247,7 +247,7 @@ export async function syncAtendimentosCore(workspaceId: number, fullSync = false
         if (atendimento.arquivos && atendimento.arquivos.length > 0) {
           // Delete old arquivos first
           await pool.query(
-            'DELETE FROM cvcrm_atendimentos_arquivos WHERE workspace_id = $1 AND idatendimento = $2',
+            'DELETE FROM cvcrm_atendimentos_arquivos WHERE workspace_id = $1 AND id_atendimento = $2',
             [workspaceId, atendimento.idatendimento]
           );
 
@@ -255,7 +255,7 @@ export async function syncAtendimentosCore(workspaceId: number, fullSync = false
           for (const arquivo of atendimento.arquivos) {
             await pool.query(
               `INSERT INTO cvcrm_atendimentos_arquivos (
-                workspace_id, idatendimento, idarquivo, nome, servidor, tipo, tamanho, data_cad, url
+                workspace_id, id_atendimento, id_arquivo, nome, servidor, tipo, tamanho, data_cad, url
               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
               [
                 workspaceId,

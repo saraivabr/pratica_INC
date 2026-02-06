@@ -108,7 +108,7 @@ export async function syncLeadsCore(workspaceId: number, fullSync = false): Prom
     // Added: situacao_nome (normalized from situacao JSONB)
     const upsertQuery = `
       INSERT INTO cvcrm_leads (
-        workspace_id, idlead, codigointerno, nome, email, telefone,
+        workspace_id, id_lead, codigo_interno, nome, email, telefone,
         documento_tipo, documento, sexo, profissao,
         cep, endereco, numero, bairro, complemento, cidade, estado,
         score, renda_familiar, valor_negocio, possibilidade_venda,
@@ -119,7 +119,7 @@ export async function syncLeadsCore(workspaceId: number, fullSync = false): Prom
         data_cancelamento, data_venda,
         qtde_simulacoes_associadas, qtde_reservas_associadas,
         link_interacoes, link_simulacoes, link_reservas, link_interesses,
-        idrd_station, link_rdstation,
+        id_rd_station, link_rdstation,
         campos_adicionais, autor_ultima_alteracao, empreendimentos_id,
         synced_at
       ) VALUES (
@@ -138,8 +138,8 @@ export async function syncLeadsCore(workspaceId: number, fullSync = false): Prom
         $43, $44, $45,
         NOW()
       )
-      ON CONFLICT (workspace_id, idlead) DO UPDATE SET
-        codigointerno = EXCLUDED.codigointerno,
+      ON CONFLICT (workspace_id, id_lead) DO UPDATE SET
+        codigo_interno = EXCLUDED.codigo_interno,
         nome = EXCLUDED.nome,
         email = EXCLUDED.email,
         telefone = EXCLUDED.telefone,
@@ -177,7 +177,7 @@ export async function syncLeadsCore(workspaceId: number, fullSync = false): Prom
         link_simulacoes = EXCLUDED.link_simulacoes,
         link_reservas = EXCLUDED.link_reservas,
         link_interesses = EXCLUDED.link_interesses,
-        idrd_station = EXCLUDED.idrd_station,
+        id_rd_station = EXCLUDED.id_rd_station,
         link_rdstation = EXCLUDED.link_rdstation,
         campos_adicionais = EXCLUDED.campos_adicionais,
         autor_ultima_alteracao = EXCLUDED.autor_ultima_alteracao,

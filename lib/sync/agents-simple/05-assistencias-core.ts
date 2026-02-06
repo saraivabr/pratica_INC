@@ -60,8 +60,8 @@ export async function syncAssistenciasCore(workspaceId: number, fullSync = false
     // Prepare upsert query
     const upsertQuery = `
       INSERT INTO cvcrm_assistencias (
-        workspace_id, idassistencia, situacao, idsituacao,
-        idatendimento, protocolo_atendimento,
+        workspace_id, id_assistencia, situacao, id_situacao,
+        id_atendimento, protocolo_atendimento,
         cadastro, sla_assistencia_vencido,
         synced_at
       ) VALUES (
@@ -70,10 +70,10 @@ export async function syncAssistenciasCore(workspaceId: number, fullSync = false
         $7, $8,
         NOW()
       )
-      ON CONFLICT (workspace_id, idassistencia) DO UPDATE SET
+      ON CONFLICT (workspace_id, id_assistencia) DO UPDATE SET
         situacao = EXCLUDED.situacao,
-        idsituacao = EXCLUDED.idsituacao,
-        idatendimento = EXCLUDED.idatendimento,
+        id_situacao = EXCLUDED.id_situacao,
+        id_atendimento = EXCLUDED.id_atendimento,
         protocolo_atendimento = EXCLUDED.protocolo_atendimento,
         cadastro = EXCLUDED.cadastro,
         sla_assistencia_vencido = EXCLUDED.sla_assistencia_vencido,

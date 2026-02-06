@@ -71,9 +71,9 @@ export async function syncLeadsTarefas(workspaceId: number, fullSync = false): P
     // Prepare upsert query
     const upsertQuery = `
       INSERT INTO cvcrm_leads_tarefas (
-        workspace_id, idtarefa, idlead,
+        workspace_id, id_tarefa, id_lead,
         responsavel, tipo_responsavel,
-        idusuario, idcorretor, idimobiliaria,
+        id_usuario, id_corretor, id_imobiliaria,
         nome, descricao, tipo,
         data_cad, data, data_vencimento, data_conclusao, data_cancelamento,
         situacao, nota_conclusao, observacao,
@@ -87,13 +87,13 @@ export async function syncLeadsTarefas(workspaceId: number, fullSync = false): P
         $17, $18, $19,
         NOW()
       )
-      ON CONFLICT (workspace_id, idtarefa) DO UPDATE SET
-        idlead = EXCLUDED.idlead,
+      ON CONFLICT (workspace_id, id_tarefa) DO UPDATE SET
+        id_lead = EXCLUDED.id_lead,
         responsavel = EXCLUDED.responsavel,
         tipo_responsavel = EXCLUDED.tipo_responsavel,
-        idusuario = EXCLUDED.idusuario,
-        idcorretor = EXCLUDED.idcorretor,
-        idimobiliaria = EXCLUDED.idimobiliaria,
+        id_usuario = EXCLUDED.id_usuario,
+        id_corretor = EXCLUDED.id_corretor,
+        id_imobiliaria = EXCLUDED.id_imobiliaria,
         nome = EXCLUDED.nome,
         descricao = EXCLUDED.descricao,
         tipo = EXCLUDED.tipo,
