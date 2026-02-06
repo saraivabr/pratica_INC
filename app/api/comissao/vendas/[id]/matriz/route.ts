@@ -6,8 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 import { arredondarValor } from "@/lib/comissao/calculations";
 import type { MatrizPlanilha, MatrizPlanilhaRow } from "@/lib/comissao/types";
 
@@ -33,103 +33,105 @@ export async function GET(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Buscar venda
-    const { rows: vendaRows } = await dbQuery(
-      `SELECT * FROM comissao_vendas
-       WHERE id = $1 AND workspace_id = $2`,
-      [vendaId, ctx.workspaceId]
-    );
-
-    if (vendaRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Venda nao encontrada" },
-        { status: 404 }
+    return await withTenant(ctx.workspaceId, async (client) => {
+      // Buscar venda
+      const { rows: vendaRows } = await client.query(
+        `SELECT * FROM comissao_vendas
+         WHERE id = $1 AND workspace_id = $2`,
+        [vendaId, ctx.workspaceId]
       );
-    }
 
-    const venda = vendaRows[0];
-
-    // Buscar corretores
-    const { rows: corretores } = await dbQuery(
-      `SELECT * FROM comissao_corretores
-       WHERE venda_id = $1
-       ORDER BY prioridade DESC, nome`,
-      [vendaId]
-    );
-
-    // Buscar parcelas
-    const { rows: parcelas } = await dbQuery(
-      `SELECT * FROM comissao_parcelas
-       WHERE venda_id = $1
-       ORDER BY numero`,
-      [vendaId]
-    );
-
-    // Buscar matriz calculada
-    const { rows: matrizRows } = await dbQuery(
-      `SELECT * FROM comissao_matriz
-       WHERE venda_id = $1`,
-      [vendaId]
-    );
-
-    // Montar estrutura da planilha
-    const matriz: MatrizPlanilhaRow[] = corretores.map((corretor: any) => {
-      const valoresPorParcela = parcelas.map((parcela: any) => {
-        const item = matrizRows.find(
-          (m: any) => m.corretor_id === corretor.id && m.parcela_id === parcela.id
+      if (vendaRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Venda nao encontrada" },
+          { status: 404 }
         );
-        return item ? parseFloat(item.valor_calculado) : 0;
+      }
+
+      const venda = vendaRows[0];
+
+      // Buscar corretores
+      const { rows: corretores } = await client.query(
+        `SELECT * FROM comissao_corretores
+         WHERE venda_id = $1
+         ORDER BY prioridade DESC, nome`,
+        [vendaId]
+      );
+
+      // Buscar parcelas
+      const { rows: parcelas } = await client.query(
+        `SELECT * FROM comissao_parcelas
+         WHERE venda_id = $1
+         ORDER BY numero`,
+        [vendaId]
+      );
+
+      // Buscar matriz calculada
+      const { rows: matrizRows } = await client.query(
+        `SELECT * FROM comissao_matriz
+         WHERE venda_id = $1`,
+        [vendaId]
+      );
+
+      // Montar estrutura da planilha
+      const matriz: MatrizPlanilhaRow[] = corretores.map((corretor: any) => {
+        const valoresPorParcela = parcelas.map((parcela: any) => {
+          const item = matrizRows.find(
+            (m: any) => m.corretor_id === corretor.id && m.parcela_id === parcela.id
+          );
+          return item ? parseFloat(item.valor_calculado) : 0;
+        });
+
+        const total = valoresPorParcela.reduce((acc, v) => acc + v, 0);
+
+        return {
+          corretor_id: corretor.id,
+          corretor_nome: corretor.nome,
+          percentual_participacao: parseFloat(corretor.percentual_participacao),
+          corretor_comissao_total: parseFloat(corretor.valor_comissao),
+          valores_por_parcela: valoresPorParcela,
+          total: arredondarValor(total),
+        };
       });
 
-      const total = valoresPorParcela.reduce((acc, v) => acc + v, 0);
+      // Calcular totais por parcela
+      const totais_parcela = parcelas.map((_: any, parcelaIndex: number) => {
+        const total = matriz.reduce(
+          (acc, row) => acc + row.valores_por_parcela[parcelaIndex],
+          0
+        );
+        return arredondarValor(total);
+      });
 
-      return {
-        corretor_id: corretor.id,
-        corretor_nome: corretor.nome,
-        percentual_participacao: parseFloat(corretor.percentual_participacao),
-        corretor_comissao_total: parseFloat(corretor.valor_comissao),
-        valores_por_parcela: valoresPorParcela,
-        total: arredondarValor(total),
+      // Total geral
+      const total_geral = arredondarValor(matriz.reduce((acc, row) => acc + row.total, 0));
+
+      const response: MatrizPlanilha = {
+        venda: {
+          ...venda,
+          valor_venda: parseFloat(venda.valor_venda),
+          percentual_comissao: parseFloat(venda.percentual_comissao),
+          valor_comissao_total: parseFloat(venda.valor_comissao_total),
+        },
+        corretores: corretores.map((c: any) => ({
+          ...c,
+          percentual_participacao: parseFloat(c.percentual_participacao),
+          valor_comissao: parseFloat(c.valor_comissao),
+        })),
+        parcelas: parcelas.map((p: any) => ({
+          ...p,
+          valor_parcela: parseFloat(p.valor_parcela),
+          percentual_comissao: parseFloat(p.percentual_comissao),
+        })),
+        matriz,
+        totais_parcela,
+        total_geral,
       };
-    });
 
-    // Calcular totais por parcela
-    const totais_parcela = parcelas.map((_: any, parcelaIndex: number) => {
-      const total = matriz.reduce(
-        (acc, row) => acc + row.valores_por_parcela[parcelaIndex],
-        0
-      );
-      return arredondarValor(total);
-    });
-
-    // Total geral
-    const total_geral = arredondarValor(matriz.reduce((acc, row) => acc + row.total, 0));
-
-    const response: MatrizPlanilha = {
-      venda: {
-        ...venda,
-        valor_venda: parseFloat(venda.valor_venda),
-        percentual_comissao: parseFloat(venda.percentual_comissao),
-        valor_comissao_total: parseFloat(venda.valor_comissao_total),
-      },
-      corretores: corretores.map((c: any) => ({
-        ...c,
-        percentual_participacao: parseFloat(c.percentual_participacao),
-        valor_comissao: parseFloat(c.valor_comissao),
-      })),
-      parcelas: parcelas.map((p: any) => ({
-        ...p,
-        valor_parcela: parseFloat(p.valor_parcela),
-        percentual_comissao: parseFloat(p.percentual_comissao),
-      })),
-      matriz,
-      totais_parcela,
-      total_geral,
-    };
-
-    return NextResponse.json({
-      success: true,
-      data: response,
+      return NextResponse.json({
+        success: true,
+        data: response,
+      });
     });
   } catch (error: any) {
     console.error("Erro ao buscar matriz:", error);

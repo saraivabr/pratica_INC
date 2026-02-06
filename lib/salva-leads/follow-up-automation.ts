@@ -4,7 +4,7 @@
  * Envia mensagens automáticas de follow-up baseado em tempo e interações
  */
 
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { sendToClient } from '@/lib/evolution-helpers';
 
 export interface FollowUpConfig {
@@ -74,44 +74,46 @@ export async function verificarFollowUpNecessario(
   workspaceId: number
 ): Promise<{ precisa: boolean; tipo: string } | null> {
   try {
-    // Buscar lead e última interação
-    const leadResult = await pool.query(
-      `SELECT l.*, 
-        (SELECT MAX(created_at) FROM leads_interactions WHERE lead_id = l.id) as ultima_interacao,
-        (SELECT COUNT(*) FROM leads_interactions WHERE lead_id = l.id AND tipo = 'follow_up_enviado') as total_followups
-      FROM leads l
-      WHERE l.id = $1 AND l.workspace_id = $2`,
-      [leadId, workspaceId]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      // Buscar lead e última interação
+      const leadResult = await client.query(
+        `SELECT l.*,
+          (SELECT MAX(created_at) FROM leads_interactions WHERE lead_id = l.id) as ultima_interacao,
+          (SELECT COUNT(*) FROM leads_interactions WHERE lead_id = l.id AND tipo = 'follow_up_enviado') as total_followups
+        FROM leads l
+        WHERE l.id = $1 AND l.workspace_id = $2`,
+        [leadId, workspaceId]
+      );
 
-    if (!leadResult.rows[0]) {
-      return null;
-    }
+      if (!leadResult.rows[0]) {
+        return null;
+      }
 
-    const lead = leadResult.rows[0];
-    const ultimaInteracao = lead.ultima_interacao ? new Date(lead.ultima_interacao) : new Date(lead.created_at);
-    const agora = new Date();
-    const tempoDecorrido = agora.getTime() - ultimaInteracao.getTime();
-    const totalFollowups = parseInt(lead.total_followups || 0);
+      const lead = leadResult.rows[0];
+      const ultimaInteracao = lead.ultima_interacao ? new Date(lead.ultima_interacao) : new Date(lead.created_at);
+      const agora = new Date();
+      const tempoDecorrido = agora.getTime() - ultimaInteracao.getTime();
+      const totalFollowups = parseInt(lead.total_followups || 0);
 
-    // Definir qual follow-up enviar
-    if (totalFollowups === 0 && tempoDecorrido >= FOLLOW_UP_DELAYS.primeira) {
-      return { precisa: true, tipo: 'primeira_mensagem' };
-    }
+      // Definir qual follow-up enviar
+      if (totalFollowups === 0 && tempoDecorrido >= FOLLOW_UP_DELAYS.primeira) {
+        return { precisa: true, tipo: 'primeira_mensagem' };
+      }
 
-    if (totalFollowups === 1 && tempoDecorrido >= FOLLOW_UP_DELAYS.segunda) {
-      return { precisa: true, tipo: 'segunda_mensagem' };
-    }
+      if (totalFollowups === 1 && tempoDecorrido >= FOLLOW_UP_DELAYS.segunda) {
+        return { precisa: true, tipo: 'segunda_mensagem' };
+      }
 
-    if (totalFollowups === 2 && tempoDecorrido >= FOLLOW_UP_DELAYS.terceira) {
-      return { precisa: true, tipo: 'terceira_mensagem' };
-    }
+      if (totalFollowups === 2 && tempoDecorrido >= FOLLOW_UP_DELAYS.terceira) {
+        return { precisa: true, tipo: 'terceira_mensagem' };
+      }
 
-    if (totalFollowups === 3 && tempoDecorrido >= FOLLOW_UP_DELAYS.reengajamento) {
-      return { precisa: true, tipo: 'reengajamento' };
-    }
+      if (totalFollowups === 3 && tempoDecorrido >= FOLLOW_UP_DELAYS.reengajamento) {
+        return { precisa: true, tipo: 'reengajamento' };
+      }
 
-    return { precisa: false, tipo: '' };
+      return { precisa: false, tipo: '' };
+    });
 
   } catch (error) {
     console.error('[Follow-up] Erro ao verificar follow-up:', error);
@@ -128,57 +130,59 @@ export async function enviarFollowUpAutomatico(
   tipoFollowUp: string
 ): Promise<boolean> {
   try {
-    // Buscar dados do lead
-    const leadResult = await pool.query(
-      `SELECT * FROM leads WHERE id = $1 AND workspace_id = $2`,
-      [leadId, workspaceId]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      // Buscar dados do lead
+      const leadResult = await client.query(
+        `SELECT * FROM leads WHERE id = $1 AND workspace_id = $2`,
+        [leadId, workspaceId]
+      );
 
-    if (!leadResult.rows[0]) {
-      return false;
-    }
+      if (!leadResult.rows[0]) {
+        return false;
+      }
 
-    const lead = leadResult.rows[0];
+      const lead = leadResult.rows[0];
 
-    // Gerar mensagem
-    let mensagem = '';
-    const templates = TEMPLATES_FOLLOWUP as any;
+      // Gerar mensagem
+      let mensagem = '';
+      const templates = TEMPLATES_FOLLOWUP as any;
 
-    if (tipoFollowUp === 'primeira_mensagem') {
-      mensagem = templates.primeira_mensagem(lead.nome, lead.imovel_nome || 'imóvel');
-    } else if (tipoFollowUp === 'segunda_mensagem') {
-      mensagem = templates.segunda_mensagem(lead.nome);
-    } else if (tipoFollowUp === 'terceira_mensagem') {
-      mensagem = templates.terceira_mensagem(lead.nome);
-    } else if (tipoFollowUp === 'reengajamento') {
-      mensagem = templates.reengajamento(lead.nome);
-    }
+      if (tipoFollowUp === 'primeira_mensagem') {
+        mensagem = templates.primeira_mensagem(lead.nome, lead.imovel_nome || 'imóvel');
+      } else if (tipoFollowUp === 'segunda_mensagem') {
+        mensagem = templates.segunda_mensagem(lead.nome);
+      } else if (tipoFollowUp === 'terceira_mensagem') {
+        mensagem = templates.terceira_mensagem(lead.nome);
+      } else if (tipoFollowUp === 'reengajamento') {
+        mensagem = templates.reengajamento(lead.nome);
+      }
 
-    if (!mensagem) {
-      return false;
-    }
+      if (!mensagem) {
+        return false;
+      }
 
-    // Enviar mensagem via WhatsApp do corretor
-    const sent = await sendToClient(lead.whatsapp, mensagem, lead.corretor_id);
-    if (!sent) {
-      console.warn(`[Follow-up] Corretor do lead ${leadId} sem Evolution conectado`);
-      return false;
-    }
+      // Enviar mensagem via WhatsApp do corretor
+      const sent = await sendToClient(lead.whatsapp, mensagem, lead.corretor_id);
+      if (!sent) {
+        console.warn(`[Follow-up] Corretor do lead ${leadId} sem Evolution conectado`);
+        return false;
+      }
 
-    // Registrar follow-up
-    await pool.query(
-      `INSERT INTO leads_interactions (
-        lead_id,
-        workspace_id,
-        tipo,
-        descricao,
-        created_at
-      ) VALUES ($1, $2, $3, $4, NOW())`,
-      [leadId, workspaceId, 'follow_up_enviado', tipoFollowUp]
-    );
+      // Registrar follow-up
+      await client.query(
+        `INSERT INTO leads_interactions (
+          lead_id,
+          workspace_id,
+          tipo,
+          descricao,
+          created_at
+        ) VALUES ($1, $2, $3, $4, NOW())`,
+        [leadId, workspaceId, 'follow_up_enviado', tipoFollowUp]
+      );
 
-    console.log('[Follow-up] Enviado com sucesso:', leadId, tipoFollowUp);
-    return true;
+      console.log('[Follow-up] Enviado com sucesso:', leadId, tipoFollowUp);
+      return true;
+    });
 
   } catch (error: any) {
     console.error('[Follow-up] Erro ao enviar:', error.message);
@@ -200,14 +204,16 @@ export async function executarFollowUpsBatch(workspaceId: number): Promise<{
 
   try {
     // Buscar todos os leads que precisam de follow-up
-    const leadsResult = await pool.query(
-      `SELECT id FROM leads 
-       WHERE workspace_id = $1 
-       AND status NOT IN ('visitou', 'fechado', 'descartado')
-       AND created_at < NOW() - INTERVAL '4 hours'
-       LIMIT 50`,
-      [workspaceId]
-    );
+    const leadsResult = await withTenant(workspaceId, async (client) => {
+      return client.query(
+        `SELECT id FROM leads
+         WHERE workspace_id = $1
+         AND status NOT IN ('visitou', 'fechado', 'descartado')
+         AND created_at < NOW() - INTERVAL '4 hours'
+         LIMIT 50`,
+        [workspaceId]
+      );
+    });
 
     for (const { id: leadId } of leadsResult.rows) {
       processados++;

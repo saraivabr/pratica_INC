@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
-import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 interface CorretorInfo {
     id?: number;
@@ -131,49 +130,51 @@ export async function GET(
 
         const { workspaceId, user } = ctx;
 
-        // Buscar lead
-        let query = `
-            SELECT
-                id_lead, nome, email, telefone, cpf, data_cad, origem, midia_principal,
-                corretor, corretor_id, imobiliaria, situacao_nome, situacao_id,
-                empreendimento, score, valor_negocio, renda_familiar,
-                cidade, estado, bairro, cep, endereco, tags, ultima_data_conversao, synced_at, observacao
-            FROM cvcrm_leads
-            WHERE workspace_id = $1 AND id_lead = $2
-        `;
-        const queryParams: any[] = [workspaceId, leadId];
+        return await withTenant(workspaceId, async (client) => {
+            // Buscar lead
+            let query = `
+                SELECT
+                    id_lead, nome, email, telefone, cpf, data_cad, origem, midia_principal,
+                    corretor, corretor_id, imobiliaria, situacao_nome, situacao_id,
+                    empreendimento, score, valor_negocio, renda_familiar,
+                    cidade, estado, bairro, cep, endereco, tags, ultima_data_conversao, synced_at, observacao
+                FROM cvcrm_leads
+                WHERE workspace_id = $1 AND id_lead = $2
+            `;
+            const queryParams: any[] = [workspaceId, leadId];
 
-        // Se não for admin ou gerente, verificar se é o corretor do lead
-        if (user.role !== 'admin' && user.role !== 'gerente') {
-            const cvcrm_id = (user as any).cvcrm_id || null;
-            if (cvcrm_id) {
-                query += ` AND corretor_id = $3`;
-                queryParams.push(cvcrm_id);
+            // Se não for admin ou gerente, verificar se é o corretor do lead
+            if (user.role !== 'admin' && user.role !== 'gerente') {
+                const cvcrm_id = (user as any).cvcrm_id || null;
+                if (cvcrm_id) {
+                    query += ` AND corretor_id = $3`;
+                    queryParams.push(cvcrm_id);
+                }
             }
-        }
 
-        const result = await pool.query<DBLead>(query, queryParams);
+            const result = await client.query<DBLead>(query, queryParams);
 
-        if (result.rows.length === 0) {
-            return NextResponse.json(
-                { error: 'Lead não encontrado' },
-                { status: 404 }
-            );
-        }
+            if (result.rows.length === 0) {
+                return NextResponse.json(
+                    { error: 'Lead não encontrado' },
+                    { status: 404 }
+                );
+            }
 
-        // Buscar interações do lead
-        const interacoesQuery = `
-            SELECT id, tipo, descricao, data_cadastro, usuario_nome
-            FROM cvcrm_lead_interacoes
-            WHERE cvcrm_lead_id = $1 AND workspace_id = $2
-            ORDER BY data_cadastro DESC
-            LIMIT 50
-        `;
-        const interacoesResult = await pool.query<DBInteracao>(interacoesQuery, [leadId, workspaceId]);
+            // Buscar interações do lead
+            const interacoesQuery = `
+                SELECT id, tipo, descricao, data_cadastro, usuario_nome
+                FROM cvcrm_lead_interacoes
+                WHERE cvcrm_lead_id = $1 AND workspace_id = $2
+                ORDER BY data_cadastro DESC
+                LIMIT 50
+            `;
+            const interacoesResult = await client.query<DBInteracao>(interacoesQuery, [leadId, workspaceId]);
 
-        const lead = normalizeLead(result.rows[0], interacoesResult.rows);
+            const lead = normalizeLead(result.rows[0], interacoesResult.rows);
 
-        return NextResponse.json({ data: lead });
+            return NextResponse.json({ data: lead });
+        });
     } catch (error) {
         console.error('Erro ao buscar lead:', error);
         return NextResponse.json(
@@ -259,15 +260,17 @@ export async function PATCH(
             RETURNING id_lead, nome, email, telefone, cidade, estado, valor_negocio, renda_familiar
         `;
 
-        const result = await pool.query(query, values);
+        return await withTenant(workspaceId, async (client) => {
+            const result = await client.query(query, values);
 
-        if (result.rows.length === 0) {
-            return NextResponse.json({ error: 'Lead nao encontrado' }, { status: 404 });
-        }
+            if (result.rows.length === 0) {
+                return NextResponse.json({ error: 'Lead nao encontrado' }, { status: 404 });
+            }
 
-        console.log(`[LEAD] Updated fields [${Object.keys(body).filter(k => EDITABLE_FIELDS[k]).join(', ')}] for lead ${leadId} by user ${(user as any).id}`);
+            console.log(`[LEAD] Updated fields [${Object.keys(body).filter(k => EDITABLE_FIELDS[k]).join(', ')}] for lead ${leadId} by user ${(user as any).id}`);
 
-        return NextResponse.json({ success: true, data: result.rows[0] });
+            return NextResponse.json({ success: true, data: result.rows[0] });
+        });
     } catch (error) {
         console.error('Erro ao atualizar lead:', error);
         return NextResponse.json(

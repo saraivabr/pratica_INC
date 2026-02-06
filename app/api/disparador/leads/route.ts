@@ -3,13 +3,13 @@
  *
  * GET /api/disparador/leads
  *
- * Filtra leads do corretor com opções de situação, empreendimento e dias sem contato.
- * Exclui leads já disparados nas últimas 48h e sem telefone.
+ * Filtra leads do corretor com opcoes de situacao, empreendimento e dias sem contato.
+ * Exclui leads ja disparados nas ultimas 48h e sem telefone.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     if (!corretorId) {
       return NextResponse.json(
-        { error: 'Corretor não vinculado ao CV CRM' },
+        { error: 'Corretor nao vinculado ao CV CRM' },
         { status: 400 }
       );
     }
@@ -33,146 +33,148 @@ export async function GET(request: NextRequest) {
     const empreendimento = searchParams.get('empreendimento');
     const diasSemContato = parseInt(searchParams.get('dias_sem_contato') || '0');
 
-    // Build query
-    const conditions: string[] = [
-      'l.workspace_id = $1',
-      'l.corretor_id = $2',
-      "l.telefones IS NOT NULL AND l.telefones != '[]'::jsonb AND l.telefones != 'null'",
-    ];
-    const params: any[] = [workspaceId, corretorId];
-    let paramIndex = 3;
+    return await withTenant(workspaceId, async (client) => {
+      // Build query
+      const conditions: string[] = [
+        'l.workspace_id = $1',
+        'l.corretor_id = $2',
+        "l.telefones IS NOT NULL AND l.telefones != '[]'::jsonb AND l.telefones != 'null'",
+      ];
+      const params: any[] = [workspaceId, corretorId];
+      let paramIndex = 3;
 
-    // Excluir leads com disparo nas últimas 48h
-    conditions.push(`
-      NOT EXISTS (
-        SELECT 1 FROM disparo_leads dl
-        JOIN disparos d ON d.id = dl.disparo_id
-        WHERE dl.lead_cvcrm_id = l.id_lead
-          AND dl.status = 'enviado'
-          AND dl.enviado_at > NOW() - INTERVAL '48 hours'
-      )
-    `);
-
-    // Filtro por situação
-    if (situacao) {
-      conditions.push(`l.situacao_nome = $${paramIndex}`);
-      params.push(situacao);
-      paramIndex++;
-    }
-
-    // Filtro por empreendimento (campo JSONB)
-    if (empreendimento) {
-      conditions.push(`l.empreendimentos::text ILIKE $${paramIndex}`);
-      params.push(`%${empreendimento}%`);
-      paramIndex++;
-    }
-
-    // Filtro por dias sem contato (parametrizado para prevenir SQL injection)
-    if (diasSemContato > 0) {
+      // Excluir leads com disparo nas ultimas 48h
       conditions.push(`
         NOT EXISTS (
-          SELECT 1 FROM cvcrm_lead_interacoes i
-          WHERE i.id_lead = l.id_lead
-            AND i.workspace_id = l.workspace_id
-            AND i.created_at > NOW() - INTERVAL '1 day' * $${paramIndex}
+          SELECT 1 FROM disparo_leads dl
+          JOIN disparos d ON d.id = dl.disparo_id
+          WHERE dl.lead_cvcrm_id = l.id_lead
+            AND dl.status = 'enviado'
+            AND dl.enviado_at > NOW() - INTERVAL '48 hours'
         )
       `);
-      params.push(diasSemContato);
-      paramIndex++;
-    }
 
-    const whereClause = conditions.join(' AND ');
+      // Filtro por situacao
+      if (situacao) {
+        conditions.push(`l.situacao_nome = $${paramIndex}`);
+        params.push(situacao);
+        paramIndex++;
+      }
 
-    // Count total
-    const countResult = await pool.query(
-      `SELECT COUNT(*) as total FROM cvcrm_leads l WHERE ${whereClause}`,
-      params
-    );
-    const total = parseInt(countResult.rows[0].total);
+      // Filtro por empreendimento (campo JSONB)
+      if (empreendimento) {
+        conditions.push(`l.empreendimentos::text ILIKE $${paramIndex}`);
+        params.push(`%${empreendimento}%`);
+        paramIndex++;
+      }
 
-    // Fetch leads (max 50)
-    const leadsResult = await pool.query(
-      `SELECT
-        l.id,
-        l.id_lead,
-        l.nome,
-        l.telefones,
-        l.empreendimentos,
-        l.situacao_nome,
-        l.created_at
-      FROM cvcrm_leads l
-      WHERE ${whereClause}
-      ORDER BY l.created_at DESC
-      LIMIT 50`,
-      params
-    );
+      // Filtro por dias sem contato (parametrizado para prevenir SQL injection)
+      if (diasSemContato > 0) {
+        conditions.push(`
+          NOT EXISTS (
+            SELECT 1 FROM cvcrm_lead_interacoes i
+            WHERE i.id_lead = l.id_lead
+              AND i.workspace_id = l.workspace_id
+              AND i.created_at > NOW() - INTERVAL '1 day' * $${paramIndex}
+          )
+        `);
+        params.push(diasSemContato);
+        paramIndex++;
+      }
 
-    // Extract first valid phone from JSONB telefones
-    const leads = leadsResult.rows.map((lead: any) => {
-      let telefone = '';
-      try {
-        const telefones = typeof lead.telefones === 'string'
-          ? JSON.parse(lead.telefones)
-          : lead.telefones;
-        if (Array.isArray(telefones) && telefones.length > 0) {
-          telefone = telefones[0]?.ddd && telefones[0]?.telefone
-            ? `${telefones[0].ddd}${telefones[0].telefone}`
-            : typeof telefones[0] === 'string' ? telefones[0] : '';
-        }
-      } catch { /* ignore parse errors */ }
+      const whereClause = conditions.join(' AND ');
 
-      let empreendimentoNome = '';
-      try {
-        const emps = typeof lead.empreendimentos === 'string'
-          ? JSON.parse(lead.empreendimentos)
-          : lead.empreendimentos;
-        if (Array.isArray(emps) && emps.length > 0) {
-          empreendimentoNome = emps[0]?.nome || emps[0] || '';
-        } else if (typeof emps === 'string') {
-          empreendimentoNome = emps;
-        }
-      } catch { /* ignore */ }
+      // Count total
+      const countResult = await client.query(
+        `SELECT COUNT(*) as total FROM cvcrm_leads l WHERE ${whereClause}`,
+        params
+      );
+      const total = parseInt(countResult.rows[0].total);
 
-      return {
-        id: lead.id,
-        id_lead: lead.id_lead,
-        nome: lead.nome,
-        telefone,
-        empreendimento: empreendimentoNome,
-        situacao: lead.situacao_nome,
-      };
-    }).filter((l: any) => l.telefone); // Filter out leads where phone extraction failed
+      // Fetch leads (max 50)
+      const leadsResult = await client.query(
+        `SELECT
+          l.id,
+          l.id_lead,
+          l.nome,
+          l.telefones,
+          l.empreendimentos,
+          l.situacao_nome,
+          l.created_at
+        FROM cvcrm_leads l
+        WHERE ${whereClause}
+        ORDER BY l.created_at DESC
+        LIMIT 50`,
+        params
+      );
 
-    // Fetch available filters (distinct situações e empreendimentos)
-    const situacoesResult = await pool.query(
-      `SELECT DISTINCT situacao_nome FROM cvcrm_leads
-       WHERE workspace_id = $1 AND corretor_id = $2 AND situacao_nome IS NOT NULL
-       ORDER BY situacao_nome`,
-      [workspaceId, corretorId]
-    );
+      // Extract first valid phone from JSONB telefones
+      const leads = leadsResult.rows.map((lead: any) => {
+        let telefone = '';
+        try {
+          const telefones = typeof lead.telefones === 'string'
+            ? JSON.parse(lead.telefones)
+            : lead.telefones;
+          if (Array.isArray(telefones) && telefones.length > 0) {
+            telefone = telefones[0]?.ddd && telefones[0]?.telefone
+              ? `${telefones[0].ddd}${telefones[0].telefone}`
+              : typeof telefones[0] === 'string' ? telefones[0] : '';
+          }
+        } catch { /* ignore parse errors */ }
 
-    const empreendimentosResult = await pool.query(
-      `SELECT DISTINCT jsonb_array_elements(
-        CASE WHEN jsonb_typeof(empreendimentos) = 'array' THEN empreendimentos ELSE '[]'::jsonb END
-      )->>'nome' as nome
-      FROM cvcrm_leads
-      WHERE workspace_id = $1 AND corretor_id = $2
-        AND empreendimentos IS NOT NULL
-        AND empreendimentos != 'null'
-      ORDER BY nome`,
-      [workspaceId, corretorId]
-    );
+        let empreendimentoNome = '';
+        try {
+          const emps = typeof lead.empreendimentos === 'string'
+            ? JSON.parse(lead.empreendimentos)
+            : lead.empreendimentos;
+          if (Array.isArray(emps) && emps.length > 0) {
+            empreendimentoNome = emps[0]?.nome || emps[0] || '';
+          } else if (typeof emps === 'string') {
+            empreendimentoNome = emps;
+          }
+        } catch { /* ignore */ }
 
-    return NextResponse.json({
-      success: true,
-      total,
-      leads,
-      filtros: {
-        situacoes: situacoesResult.rows.map((r: any) => r.situacao_nome),
-        empreendimentos: empreendimentosResult.rows
-          .map((r: any) => r.nome)
-          .filter(Boolean),
-      },
+        return {
+          id: lead.id,
+          id_lead: lead.id_lead,
+          nome: lead.nome,
+          telefone,
+          empreendimento: empreendimentoNome,
+          situacao: lead.situacao_nome,
+        };
+      }).filter((l: any) => l.telefone); // Filter out leads where phone extraction failed
+
+      // Fetch available filters (distinct situacoes e empreendimentos)
+      const situacoesResult = await client.query(
+        `SELECT DISTINCT situacao_nome FROM cvcrm_leads
+         WHERE workspace_id = $1 AND corretor_id = $2 AND situacao_nome IS NOT NULL
+         ORDER BY situacao_nome`,
+        [workspaceId, corretorId]
+      );
+
+      const empreendimentosResult = await client.query(
+        `SELECT DISTINCT jsonb_array_elements(
+          CASE WHEN jsonb_typeof(empreendimentos) = 'array' THEN empreendimentos ELSE '[]'::jsonb END
+        )->>'nome' as nome
+        FROM cvcrm_leads
+        WHERE workspace_id = $1 AND corretor_id = $2
+          AND empreendimentos IS NOT NULL
+          AND empreendimentos != 'null'
+        ORDER BY nome`,
+        [workspaceId, corretorId]
+      );
+
+      return NextResponse.json({
+        success: true,
+        total,
+        leads,
+        filtros: {
+          situacoes: situacoesResult.rows.map((r: any) => r.situacao_nome),
+          empreendimentos: empreendimentosResult.rows
+            .map((r: any) => r.nome)
+            .filter(Boolean),
+        },
+      });
     });
   } catch (error: any) {
     console.error('[Disparador Leads] Erro:', error);

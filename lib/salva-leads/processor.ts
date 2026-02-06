@@ -7,7 +7,8 @@
  */
 
 import { dbQuery } from '@/lib/db';
-import { getWorkspace } from '@/lib/tenant-context';
+import { getWorkspace, withTenant } from '@/lib/tenant-context';
+import type { PoolClient } from 'pg';
 import {
   sendTextMessage as sendEvolutionMessage,
   formatPhoneNumber,
@@ -525,19 +526,21 @@ async function wasRecentlyProcessed(
   workspaceId: number,
   atendimentoId: string
 ): Promise<boolean> {
-  const { rows } = await dbQuery(
-    `SELECT 1 FROM salva_leads_conversations
-     WHERE workspace_id = $1
-       AND atendimento_id = $2
-       AND (
-         (status = 'active' AND updated_at >= NOW() - INTERVAL '24 hours')
-         OR status = 'invalid_phone'
-       )
-     LIMIT 1`,
-    [workspaceId, atendimentoId]
-  );
+  return withTenant(workspaceId, async (client) => {
+    const { rows } = await client.query(
+      `SELECT 1 FROM salva_leads_conversations
+       WHERE workspace_id = $1
+         AND atendimento_id = $2
+         AND (
+           (status = 'active' AND updated_at >= NOW() - INTERVAL '24 hours')
+           OR status = 'invalid_phone'
+         )
+       LIMIT 1`,
+      [workspaceId, atendimentoId]
+    );
 
-  return rows.length > 0;
+    return rows.length > 0;
+  });
 }
 
 /**
@@ -550,18 +553,20 @@ async function markPhoneAsInvalid(
   phone: string
 ): Promise<void> {
   try {
-    await dbQuery(
-      `INSERT INTO salva_leads_conversations
-         (workspace_id, atendimento_id, lead_phone, status, classification, context)
-       VALUES ($1, $2, $3, 'invalid_phone', 'telefone_invalido', '{"reason": "not_on_whatsapp"}'::jsonb)
-       ON CONFLICT (workspace_id, atendimento_id)
-       DO UPDATE SET
-         status = 'invalid_phone',
-         classification = 'telefone_invalido',
-         context = '{"reason": "not_on_whatsapp"}'::jsonb,
-         updated_at = NOW()`,
-      [workspaceId, atendimentoId, phone]
-    );
+    await withTenant(workspaceId, async (client) => {
+      await client.query(
+        `INSERT INTO salva_leads_conversations
+           (workspace_id, atendimento_id, lead_phone, status, classification, context)
+         VALUES ($1, $2, $3, 'invalid_phone', 'telefone_invalido', '{"reason": "not_on_whatsapp"}'::jsonb)
+         ON CONFLICT (workspace_id, atendimento_id)
+         DO UPDATE SET
+           status = 'invalid_phone',
+           classification = 'telefone_invalido',
+           context = '{"reason": "not_on_whatsapp"}'::jsonb,
+           updated_at = NOW()`,
+        [workspaceId, atendimentoId, phone]
+      );
+    });
   } catch (error) {
     console.error('[Salva-Leads] Erro ao marcar telefone inválido:', error);
   }
@@ -577,12 +582,14 @@ async function logRun(
   sent: number,
   results: ProcessorResult[]
 ): Promise<void> {
-  await dbQuery(
-    `INSERT INTO salva_leads_runs
-       (workspace_id, corretor_id, scheduled_for, status, leads_processed, leads_sent, results)
-     VALUES ($1, $2, NOW(), 'completed', $3, $4, $5)`,
-    [workspaceId, corretorId, processed, sent, JSON.stringify(results)]
-  );
+  await withTenant(workspaceId, async (client) => {
+    await client.query(
+      `INSERT INTO salva_leads_runs
+         (workspace_id, corretor_id, scheduled_for, status, leads_processed, leads_sent, results)
+       VALUES ($1, $2, NOW(), 'completed', $3, $4, $5)`,
+      [workspaceId, corretorId, processed, sent, JSON.stringify(results)]
+    );
+  });
 }
 
 // ============================================================================
@@ -596,30 +603,13 @@ export async function getActiveTenantsWithEvolution(): Promise<
   Array<{ id: number; name: string }>
 > {
   const { rows } = await dbQuery<{ id: number; name: string }>(
-    `SELECT t.id, t.name
-     FROM tenants t
-     WHERE t.status = 'active'
-       AND t.evolution_instances IS NOT NULL
-       AND jsonb_array_length(t.evolution_instances) > 0`
+    `SELECT w.id, w.name
+     FROM workspaces w
+     WHERE w.is_active = true
+       AND w.evolution_instance_name IS NOT NULL`
   );
 
-  // Filtrar apenas os que tem instancia conectada
-  const tenantsWithConnected: Array<{ id: number; name: string }> = [];
-
-  for (const tenant of rows) {
-    const fullTenant = await getWorkspace(tenant.id);
-    if (!fullTenant) continue;
-
-    const hasConnected = (fullTenant.evolution_instances || []).some(
-      (i) => i.status === 'connected' || i.status === 'open'
-    );
-
-    if (hasConnected) {
-      tenantsWithConnected.push({ id: tenant.id, name: tenant.name });
-    }
-  }
-
-  return tenantsWithConnected;
+  return rows;
 }
 
 /**
@@ -627,34 +617,36 @@ export async function getActiveTenantsWithEvolution(): Promise<
  * Só retorna corretores que podem enviar mensagens
  */
 export async function getCorretoresComWhatsAppAtivo(
-  _workspaceId: number
+  workspaceId: number
 ): Promise<Array<{ id: string; phone: string; name?: string; evolutionInstance?: string }>> {
-  // Buscar apenas corretores com Evolution conectada
-  const { rows } = await dbQuery<{
-    id: string;
-    nome: string;
-    telefone: string;
-    evolution_instance_name: string | null;
-  }>(
-    `SELECT id, nome, telefone, evolution_instance_name
-     FROM users
-     WHERE role = 'corretor'
-       AND is_active = true
-       AND telefone IS NOT NULL
-       AND telefone != ''
-       AND onboarding_status = 'completed'
-       AND evolution_instance_name IS NOT NULL
-       AND evolution_connected = true
-     ORDER BY nome ASC`,
-    []
-  );
+  return withTenant(workspaceId, async (client) => {
+    // Buscar apenas corretores com Evolution conectada
+    const { rows } = await client.query<{
+      id: string;
+      nome: string;
+      telefone: string;
+      evolution_instance_name: string | null;
+    }>(
+      `SELECT id, nome, telefone, evolution_instance_name
+       FROM users
+       WHERE role = 'corretor'
+         AND is_active = true
+         AND telefone IS NOT NULL
+         AND telefone != ''
+         AND onboarding_status = 'completed'
+         AND evolution_instance_name IS NOT NULL
+         AND evolution_connected = true
+       ORDER BY nome ASC`,
+      []
+    );
 
-  return rows.map((r) => ({
-    id: r.id,
-    phone: r.telefone,
-    name: r.nome,
-    evolutionInstance: r.evolution_instance_name || undefined,
-  }));
+    return rows.map((r) => ({
+      id: r.id,
+      phone: r.telefone,
+      name: r.nome,
+      evolutionInstance: r.evolution_instance_name || undefined,
+    }));
+  });
 }
 
 /**

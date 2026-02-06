@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 interface AtribuicaoWithDetails {
   id: string;
@@ -55,35 +55,37 @@ export async function GET(
       );
     }
 
-    const query = `
-      SELECT
-        a.*,
-        u.nome AS corretor_nome,
-        u.telefone AS corretor_telefone,
-        ab.nome AS atribuido_por_nome,
-        l.nome AS local_nome,
-        p.data AS plantao_data
-      FROM recepcao_atribuicoes a
-      JOIN users u ON u.id = a.user_id
-      JOIN recepcao_presencas pr ON pr.id = a.presenca_id
-      JOIN recepcao_plantoes p ON p.id = a.plantao_id
-      JOIN recepcao_locais l ON l.id = p.local_id
-      LEFT JOIN users ab ON ab.id = a.atribuido_por
-      WHERE a.id = $1 AND a.workspace_id = $2
-    `;
+    return await withTenant(workspaceId, async (client) => {
+      const query = `
+        SELECT
+          a.*,
+          u.nome AS corretor_nome,
+          u.telefone AS corretor_telefone,
+          ab.nome AS atribuido_por_nome,
+          l.nome AS local_nome,
+          p.data AS plantao_data
+        FROM recepcao_atribuicoes a
+        JOIN users u ON u.id = a.user_id
+        JOIN recepcao_presencas pr ON pr.id = a.presenca_id
+        JOIN recepcao_plantoes p ON p.id = a.plantao_id
+        JOIN recepcao_locais l ON l.id = p.local_id
+        LEFT JOIN users ab ON ab.id = a.atribuido_por
+        WHERE a.id = $1 AND a.workspace_id = $2
+      `;
 
-    const result = await pool.query<AtribuicaoWithDetails>(query, [id, workspaceId]);
+      const result = await client.query<AtribuicaoWithDetails>(query, [id, workspaceId]);
 
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Atribuição não encontrada' },
-        { status: 404 }
-      );
-    }
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Atribuição não encontrada' },
+          { status: 404 }
+        );
+      }
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows[0],
+      return NextResponse.json({
+        success: true,
+        data: result.rows[0],
+      });
     });
   } catch (error) {
     console.error('Erro ao buscar atribuição:', error);

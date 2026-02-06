@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { sendTextMessage, formatPhoneNumber } from '@/lib/evolution-api';
 
 export async function POST(
@@ -35,114 +35,116 @@ export async function POST(
       return NextResponse.json({ error: 'Data e horário são obrigatórios' }, { status: 400 });
     }
 
-    // Buscar dados do lead (com verificação de tenant)
-    const leadResult = await dbQuery(
-      `SELECT id_lead, nome, telefone, corretor_id, corretor
-       FROM cvcrm_leads
-       WHERE id_lead = $1 AND workspace_id = $2`,
-      [leadId, workspaceId]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      // Buscar dados do lead (com verificação de tenant)
+      const leadResult = await client.query(
+        `SELECT id_lead, nome, telefone, corretor_id, corretor
+         FROM cvcrm_leads
+         WHERE id_lead = $1 AND workspace_id = $2`,
+        [leadId, workspaceId]
+      );
 
-    if (leadResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });
-    }
-
-    const lead = leadResult.rows[0];
-    const corretor = typeof lead.corretor === 'string' ? JSON.parse(lead.corretor) : lead.corretor;
-
-    // Criar agendamento no banco
-    const visitResult = await dbQuery(
-      `INSERT INTO visitas_agendadas
-       (lead_id, lead_name, lead_phone, scheduled_date, scheduled_time, property_id, notes, created_by, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-       RETURNING id`,
-      [leadId, lead.nome, lead.telefone, date, time, property_id || null, notes || null, (user as any).id]
-    ).catch(async (err) => {
-      // Se tabela não existe, criar
-      if (err.message.includes('does not exist')) {
-        await dbQuery(`
-          CREATE TABLE IF NOT EXISTS visitas_agendadas (
-            id SERIAL PRIMARY KEY,
-            lead_id INTEGER NOT NULL,
-            lead_name VARCHAR(255),
-            lead_phone VARCHAR(50),
-            scheduled_date DATE NOT NULL,
-            scheduled_time TIME NOT NULL,
-            property_id VARCHAR(100),
-            notes TEXT,
-            status VARCHAR(50) DEFAULT 'scheduled',
-            created_by VARCHAR(100),
-            created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW()
-          )
-        `);
-        // Tentar inserir novamente
-        return dbQuery(
-          `INSERT INTO visitas_agendadas
-           (lead_id, lead_name, lead_phone, scheduled_date, scheduled_time, property_id, notes, created_by, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-           RETURNING id`,
-          [leadId, lead.nome, lead.telefone, date, time, property_id || null, notes || null, (user as any).id]
-        );
-      }
-      throw err;
-    });
-
-    // Atualizar estágio do lead para "visita_agendada" (com verificação de tenant)
-    await dbQuery(
-      `UPDATE cvcrm_leads
-       SET situacao_id = 4,
-           situacao_nome = 'Visita Agendada',
-           updated_at = NOW()
-       WHERE id_lead = $1 AND workspace_id = $2`,
-      [leadId, workspaceId]
-    ).catch(err => console.warn('[Visit] Erro ao atualizar estágio:', err.message));
-
-    // Registrar interação
-    await dbQuery(
-      `INSERT INTO interacoes (lead_id, tipo, descricao, user_id, created_at)
-       VALUES ($1, 'visit_scheduled', $2, $3, NOW())`,
-      [leadId, `Visita agendada para ${date} às ${time}`, (user as any).id]
-    ).catch(err => console.warn('[Visit] Erro ao registrar interação:', err.message));
-
-    // TODO: Implementar notificação via WhatsApp com workspace
-    // Tentar notificar corretor via WhatsApp
-    let notificationSent = false;
-    /* Temporariamente desabilitado - precisa adaptação para workspace
-    try {
-      const instances = tenant.evolution_instances || [];
-      const activeInstance = instances.find((i: any) => i.status === 'connected' || i.status === 'open');
-
-      if (activeInstance && corretor?.telefone) {
-        const notificationMsg = [
-          `📅 *Nova visita agendada!*`,
-          ``,
-          `👤 Cliente: ${lead.nome}`,
-          `📞 Telefone: ${lead.telefone}`,
-          `📆 Data: ${date}`,
-          `⏰ Horário: ${time}`,
-          notes ? `📝 Obs: ${notes}` : '',
-        ].filter(Boolean).join('\n');
-
-        await sendTextMessage(activeInstance.instance_name, {
-          number: formatPhoneNumber(corretor.telefone),
-          text: notificationMsg
-        });
-        notificationSent = true;
+      if (leadResult.rows.length === 0) {
+        return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });
       }
 
-    } catch (notifyError) {
-      console.warn('[Visit] Erro ao notificar corretor:', notifyError);
-    }
-    */
+      const lead = leadResult.rows[0];
+      const corretor = typeof lead.corretor === 'string' ? JSON.parse(lead.corretor) : lead.corretor;
 
-    return NextResponse.json({
-      success: true,
-      visit_id: visitResult.rows[0]?.id,
-      lead_id: leadId,
-      date,
-      time,
-      notification_sent: notificationSent
+      // Criar agendamento no banco
+      const visitResult = await client.query(
+        `INSERT INTO visitas_agendadas
+         (lead_id, lead_name, lead_phone, scheduled_date, scheduled_time, property_id, notes, created_by, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+         RETURNING id`,
+        [leadId, lead.nome, lead.telefone, date, time, property_id || null, notes || null, (user as any).id]
+      ).catch(async (err) => {
+        // Se tabela não existe, criar
+        if (err.message.includes('does not exist')) {
+          await client.query(`
+            CREATE TABLE IF NOT EXISTS visitas_agendadas (
+              id SERIAL PRIMARY KEY,
+              lead_id INTEGER NOT NULL,
+              lead_name VARCHAR(255),
+              lead_phone VARCHAR(50),
+              scheduled_date DATE NOT NULL,
+              scheduled_time TIME NOT NULL,
+              property_id VARCHAR(100),
+              notes TEXT,
+              status VARCHAR(50) DEFAULT 'scheduled',
+              created_by VARCHAR(100),
+              created_at TIMESTAMP DEFAULT NOW(),
+              updated_at TIMESTAMP DEFAULT NOW()
+            )
+          `);
+          // Tentar inserir novamente
+          return client.query(
+            `INSERT INTO visitas_agendadas
+             (lead_id, lead_name, lead_phone, scheduled_date, scheduled_time, property_id, notes, created_by, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+             RETURNING id`,
+            [leadId, lead.nome, lead.telefone, date, time, property_id || null, notes || null, (user as any).id]
+          );
+        }
+        throw err;
+      });
+
+      // Atualizar estágio do lead para "visita_agendada" (com verificação de tenant)
+      await client.query(
+        `UPDATE cvcrm_leads
+         SET situacao_id = 4,
+             situacao_nome = 'Visita Agendada',
+             updated_at = NOW()
+         WHERE id_lead = $1 AND workspace_id = $2`,
+        [leadId, workspaceId]
+      ).catch(err => console.warn('[Visit] Erro ao atualizar estágio:', err.message));
+
+      // Registrar interação
+      await client.query(
+        `INSERT INTO interacoes (lead_id, tipo, descricao, user_id, created_at)
+         VALUES ($1, 'visit_scheduled', $2, $3, NOW())`,
+        [leadId, `Visita agendada para ${date} às ${time}`, (user as any).id]
+      ).catch(err => console.warn('[Visit] Erro ao registrar interação:', err.message));
+
+      // TODO: Implementar notificação via WhatsApp com workspace
+      // Tentar notificar corretor via WhatsApp
+      let notificationSent = false;
+      /* Temporariamente desabilitado - precisa adaptação para workspace
+      try {
+        const instances = tenant.evolution_instances || [];
+        const activeInstance = instances.find((i: any) => i.status === 'connected' || i.status === 'open');
+
+        if (activeInstance && corretor?.telefone) {
+          const notificationMsg = [
+            `📅 *Nova visita agendada!*`,
+            ``,
+            `👤 Cliente: ${lead.nome}`,
+            `📞 Telefone: ${lead.telefone}`,
+            `📆 Data: ${date}`,
+            `⏰ Horário: ${time}`,
+            notes ? `📝 Obs: ${notes}` : '',
+          ].filter(Boolean).join('\n');
+
+          await sendTextMessage(activeInstance.instance_name, {
+            number: formatPhoneNumber(corretor.telefone),
+            text: notificationMsg
+          });
+          notificationSent = true;
+        }
+
+      } catch (notifyError) {
+        console.warn('[Visit] Erro ao notificar corretor:', notifyError);
+      }
+      */
+
+      return NextResponse.json({
+        success: true,
+        visit_id: visitResult.rows[0]?.id,
+        lead_id: leadId,
+        date,
+        time,
+        notification_sent: notificationSent
+      });
     });
 
   } catch (error: any) {

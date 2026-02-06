@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/api-auth";
-import { findUserWorkspace } from "@/lib/tenant-context";
+import { findUserWorkspace, withTenant } from "@/lib/tenant-context";
 import { dbQuery } from "@/lib/db";
 import { logoutInstance, deleteInstance } from "@/lib/evolution-api";
 
@@ -23,7 +23,10 @@ export async function POST(request: NextRequest) {
 
     const userId = (user as any).id;
 
-    // Buscar instância do usuário
+    // Buscar workspace do usuário
+    const workspace = await findUserWorkspace(user);
+
+    // Buscar instância do usuário (query sem workspace_id - users table)
     const { rows } = await dbQuery<{ evolution_instance_name: string | null }>(
       `SELECT evolution_instance_name FROM users WHERE id = $1`,
       [userId]
@@ -56,20 +59,32 @@ export async function POST(request: NextRequest) {
       console.warn(`[WhatsApp Logout] Falha ao deletar instância ${instanceName}:`, deleteError.message);
     }
 
-    // Atualizar status do usuário e workspace
+    if (workspace) {
+      return await withTenant(workspace.id, async (client) => {
+        // Atualizar status do usuário
+        await client.query(
+          `UPDATE users SET evolution_connected = false, updated_at = NOW() WHERE id = $1`,
+          [userId]
+        );
+
+        // Atualizar workspace
+        await client.query(
+          `UPDATE workspaces SET evolution_connected = false, updated_at = NOW() WHERE id = $1`,
+          [workspace.id]
+        );
+
+        return NextResponse.json({
+          success: true,
+          message: "WhatsApp desconectado com sucesso"
+        });
+      });
+    }
+
+    // Fallback: workspace não encontrado, atualizar apenas o usuário
     await dbQuery(
       `UPDATE users SET evolution_connected = false, updated_at = NOW() WHERE id = $1`,
       [userId]
     );
-
-    // Atualizar workspace
-    const workspace = await findUserWorkspace(user);
-    if (workspace) {
-      await dbQuery(
-        `UPDATE workspaces SET evolution_connected = false, updated_at = NOW() WHERE id = $1`,
-        [workspace.id]
-      );
-    }
 
     return NextResponse.json({
       success: true,

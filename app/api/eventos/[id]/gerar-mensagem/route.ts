@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { z } from 'zod';
 
 // Schema de validacao
@@ -32,7 +32,7 @@ const SAUDACOES = ['Oi', 'Ola', 'E ai', 'Fala', 'Opa', 'Ei'];
 
 const ABERTURAS = ['tudo bem?', 'tudo certo?', 'como vai?', 'beleza?', 'td bem?', ''];
 
-const EMOJIS_SAUDACAO = ['', ' 👋', ' 😊', ' 🙂'];
+const EMOJIS_SAUDACAO = ['', ' \u{1F44B}', ' \u{1F60A}', ' \u{1F642}'];
 
 const CONECTORES_CONVITE = [
   'Queria te convidar',
@@ -116,7 +116,7 @@ function gerarMensagemConviteLocal(
   // Diferentes estruturas de convite
   const estruturas = [
     // Estrutura 1: Direto
-    `${conector} pro *${evento.nome}*!\n\n📅 ${dataFormatada}\n📍 ${evento.local}`,
+    `${conector} pro *${evento.nome}*!\n\n\u{1F4C5} ${dataFormatada}\n\u{1F4CD} ${evento.local}`,
     // Estrutura 2: Data primeiro
     `${dataFormatada} vai rolar o *${evento.nome}*.\nLocal: ${evento.local}`,
     // Estrutura 3: Pergunta
@@ -265,57 +265,59 @@ export async function POST(
 
     const { nome_convidado, usar_ia } = validationResult.data;
 
-    // Buscar evento
-    const eventoResult = await pool.query<EventoDB>(
-      'SELECT * FROM eventos WHERE id = $1 AND workspace_id = $2',
-      [eventoId, workspaceId]
-    );
-
-    if (eventoResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Evento nao encontrado' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      // Buscar evento
+      const eventoResult = await client.query<EventoDB>(
+        'SELECT * FROM eventos WHERE id = $1 AND workspace_id = $2',
+        [eventoId, workspaceId]
       );
-    }
 
-    const evento = eventoResult.rows[0];
-
-    // Gerar mensagem
-    let mensagem: string;
-
-    if (usar_ia) {
-      mensagem = await gerarMensagemConviteIA(nome_convidado, evento);
-    } else {
-      mensagem = gerarMensagemConviteLocal(nome_convidado, evento);
-    }
-
-    // Gerar algumas variacoes adicionais para preview
-    const variacoes: string[] = [mensagem];
-
-    for (let i = 0; i < 2; i++) {
-      const variacao = usar_ia
-        ? await gerarMensagemConviteIA(nome_convidado, evento)
-        : gerarMensagemConviteLocal(nome_convidado, evento);
-
-      // Evitar duplicatas
-      if (!variacoes.includes(variacao)) {
-        variacoes.push(variacao);
+      if (eventoResult.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Evento nao encontrado' },
+          { status: 404 }
+        );
       }
-    }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        mensagem,
-        variacoes,
-        evento: {
-          nome: evento.nome,
-          data_hora: evento.data_hora,
-          local: evento.local,
+      const evento = eventoResult.rows[0];
+
+      // Gerar mensagem
+      let mensagem: string;
+
+      if (usar_ia) {
+        mensagem = await gerarMensagemConviteIA(nome_convidado, evento);
+      } else {
+        mensagem = gerarMensagemConviteLocal(nome_convidado, evento);
+      }
+
+      // Gerar algumas variacoes adicionais para preview
+      const variacoes: string[] = [mensagem];
+
+      for (let i = 0; i < 2; i++) {
+        const variacao = usar_ia
+          ? await gerarMensagemConviteIA(nome_convidado, evento)
+          : gerarMensagemConviteLocal(nome_convidado, evento);
+
+        // Evitar duplicatas
+        if (!variacoes.includes(variacao)) {
+          variacoes.push(variacao);
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          mensagem,
+          variacoes,
+          evento: {
+            nome: evento.nome,
+            data_hora: evento.data_hora,
+            local: evento.local,
+          },
+          convidado: nome_convidado,
+          gerado_com_ia: usar_ia && !!process.env.OPENAI_API_KEY,
         },
-        convidado: nome_convidado,
-        gerado_com_ia: usar_ia && !!process.env.OPENAI_API_KEY,
-      },
+      });
     });
   } catch (error) {
     console.error('Erro ao gerar mensagem:', error);

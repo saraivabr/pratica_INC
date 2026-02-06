@@ -11,6 +11,7 @@
  */
 
 import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import type {
   SalvaLeadsConversation,
   SalvaLeadsMessage,
@@ -66,21 +67,23 @@ export async function getOrCreateConversation(
     corretorPhone,
   } = params;
 
-  const result = await pool.query(
-    `INSERT INTO salva_leads_conversations (
-      workspace_id, atendimento_id, lead_phone, lead_name,
-      corretor_id, corretor_phone
-    ) VALUES ($1, $2, $3, $4, $5, $6)
-    ON CONFLICT (workspace_id, atendimento_id)
-    DO UPDATE SET
-      lead_name = COALESCE(EXCLUDED.lead_name, salva_leads_conversations.lead_name),
-      corretor_phone = COALESCE(EXCLUDED.corretor_phone, salva_leads_conversations.corretor_phone),
-      updated_at = NOW()
-    RETURNING *`,
-    [workspaceId, atendimentoId, leadPhone, leadName || null, corretorId, corretorPhone || null]
-  );
+  return withTenant(workspaceId, async (client) => {
+    const result = await client.query(
+      `INSERT INTO salva_leads_conversations (
+        workspace_id, atendimento_id, lead_phone, lead_name,
+        corretor_id, corretor_phone
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (workspace_id, atendimento_id)
+      DO UPDATE SET
+        lead_name = COALESCE(EXCLUDED.lead_name, salva_leads_conversations.lead_name),
+        corretor_phone = COALESCE(EXCLUDED.corretor_phone, salva_leads_conversations.corretor_phone),
+        updated_at = NOW()
+      RETURNING *`,
+      [workspaceId, atendimentoId, leadPhone, leadName || null, corretorId, corretorPhone || null]
+    );
 
-  return parseConversation(result.rows[0]);
+    return parseConversation(result.rows[0]);
+  });
 }
 
 /**
@@ -110,21 +113,23 @@ export async function getConversationByPhone(
   workspaceId: number,
   phone: string
 ): Promise<SalvaLeadsConversation | null> {
-  const result = await pool.query(
-    `SELECT * FROM salva_leads_conversations
-     WHERE workspace_id = $1
-       AND lead_phone = $2
-       AND status IN ('pending', 'active')
-     ORDER BY created_at DESC
-     LIMIT 1`,
-    [workspaceId, phone]
-  );
+  return withTenant(workspaceId, async (client) => {
+    const result = await client.query(
+      `SELECT * FROM salva_leads_conversations
+       WHERE workspace_id = $1
+         AND lead_phone = $2
+         AND status IN ('pending', 'active')
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [workspaceId, phone]
+    );
 
-  if (result.rows.length === 0) {
-    return null;
-  }
+    if (result.rows.length === 0) {
+      return null;
+    }
 
-  return parseConversation(result.rows[0]);
+    return parseConversation(result.rows[0]);
+  });
 }
 
 /**
@@ -428,9 +433,10 @@ export async function listConversations(
     LIMIT ${limit} OFFSET ${offset}
   `;
 
-  const result = await pool.query(query, params);
-
-  return result.rows.map(parseConversation);
+  return withTenant(workspaceId, async (client) => {
+    const result = await client.query(query, params);
+    return result.rows.map(parseConversation);
+  });
 }
 
 // ============================================
@@ -443,19 +449,21 @@ export async function listConversations(
 export async function getConversationsReadyToProcess(
   workspaceId: number
 ): Promise<SalvaLeadsConversation[]> {
-  const result = await pool.query(
-    `SELECT * FROM salva_leads_conversations
-     WHERE workspace_id = $1
-       AND status IN ('pending', 'active')
-       AND bot_paused = FALSE
-       AND debounce_until IS NOT NULL
-       AND debounce_until <= NOW()
-       AND jsonb_array_length(pending_messages) > 0
-     ORDER BY debounce_until ASC`,
-    [workspaceId]
-  );
+  return withTenant(workspaceId, async (client) => {
+    const result = await client.query(
+      `SELECT * FROM salva_leads_conversations
+       WHERE workspace_id = $1
+         AND status IN ('pending', 'active')
+         AND bot_paused = FALSE
+         AND debounce_until IS NOT NULL
+         AND debounce_until <= NOW()
+         AND jsonb_array_length(pending_messages) > 0
+       ORDER BY debounce_until ASC`,
+      [workspaceId]
+    );
 
-  return result.rows.map(parseConversation);
+    return result.rows.map(parseConversation);
+  });
 }
 
 /**
@@ -481,17 +489,19 @@ export async function getConversationByAtendimento(
   workspaceId: number,
   atendimentoId: string
 ): Promise<SalvaLeadsConversation | null> {
-  const result = await pool.query(
-    `SELECT * FROM salva_leads_conversations
-     WHERE workspace_id = $1 AND atendimento_id = $2`,
-    [workspaceId, atendimentoId]
-  );
+  return withTenant(workspaceId, async (client) => {
+    const result = await client.query(
+      `SELECT * FROM salva_leads_conversations
+       WHERE workspace_id = $1 AND atendimento_id = $2`,
+      [workspaceId, atendimentoId]
+    );
 
-  if (result.rows.length === 0) {
-    return null;
-  }
+    if (result.rows.length === 0) {
+      return null;
+    }
 
-  return parseConversation(result.rows[0]);
+    return parseConversation(result.rows[0]);
+  });
 }
 
 /**
@@ -501,15 +511,17 @@ export async function countActiveByCorretor(
   workspaceId: number,
   corretorId: string
 ): Promise<number> {
-  const result = await pool.query(
-    `SELECT COUNT(*) as count FROM salva_leads_conversations
-     WHERE workspace_id = $1
-       AND corretor_id = $2
-       AND status IN ('pending', 'active')`,
-    [workspaceId, corretorId]
-  );
+  return withTenant(workspaceId, async (client) => {
+    const result = await client.query(
+      `SELECT COUNT(*) as count FROM salva_leads_conversations
+       WHERE workspace_id = $1
+         AND corretor_id = $2
+         AND status IN ('pending', 'active')`,
+      [workspaceId, corretorId]
+    );
 
-  return parseInt(result.rows[0].count, 10);
+    return parseInt(result.rows[0].count, 10);
+  });
 }
 
 /**
@@ -519,18 +531,20 @@ export async function expireInactiveConversations(
   workspaceId: number,
   hoursInactive: number = 72
 ): Promise<number> {
-  const result = await pool.query(
-    `UPDATE salva_leads_conversations
-     SET status = 'expired',
-         updated_at = NOW()
-     WHERE workspace_id = $1
-       AND status IN ('pending', 'active')
-       AND updated_at < NOW() - INTERVAL '1 hour' * $2
-     RETURNING id`,
-    [workspaceId, hoursInactive]
-  );
+  return withTenant(workspaceId, async (client) => {
+    const result = await client.query(
+      `UPDATE salva_leads_conversations
+       SET status = 'expired',
+           updated_at = NOW()
+       WHERE workspace_id = $1
+         AND status IN ('pending', 'active')
+         AND updated_at < NOW() - INTERVAL '1 hour' * $2
+       RETURNING id`,
+      [workspaceId, hoursInactive]
+    );
 
-  return result.rows.length;
+    return result.rows.length;
+  });
 }
 
 // ============================================

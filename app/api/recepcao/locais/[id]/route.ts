@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { z } from 'zod';
 
 const UpdateLocalSchema = z.object({
@@ -59,21 +59,23 @@ export async function GET(
       );
     }
 
-    const result = await pool.query<LocalDB>(
-      `SELECT * FROM recepcao_locais WHERE id = $1 AND workspace_id = $2`,
-      [id, workspaceId]
-    );
-
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Local não encontrado' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      const result = await client.query<LocalDB>(
+        `SELECT * FROM recepcao_locais WHERE id = $1 AND workspace_id = $2`,
+        [id, workspaceId]
       );
-    }
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows[0],
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Local não encontrado' },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: result.rows[0],
+      });
     });
   } catch (error) {
     console.error('Erro ao buscar local:', error);
@@ -122,73 +124,75 @@ export async function PUT(
 
     const data = validationResult.data;
 
-    // Verificar se local existe
-    const checkResult = await pool.query(
-      'SELECT id FROM recepcao_locais WHERE id = $1 AND workspace_id = $2',
-      [id, workspaceId]
-    );
-
-    if (checkResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Local não encontrado' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      // Verificar se local existe
+      const checkResult = await client.query(
+        'SELECT id FROM recepcao_locais WHERE id = $1 AND workspace_id = $2',
+        [id, workspaceId]
       );
-    }
 
-    // Montar query dinâmica
-    const updates: string[] = [];
-    const values: any[] = [];
-    let paramIndex = 1;
+      if (checkResult.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Local não encontrado' },
+          { status: 404 }
+        );
+      }
 
-    if (data.nome !== undefined) {
-      updates.push(`nome = $${paramIndex++}`);
-      values.push(data.nome);
-    }
-    if (data.endereco !== undefined) {
-      updates.push(`endereco = $${paramIndex++}`);
-      values.push(data.endereco);
-    }
-    if (data.descricao !== undefined) {
-      updates.push(`descricao = $${paramIndex++}`);
-      values.push(data.descricao);
-    }
-    if (data.latitude !== undefined) {
-      updates.push(`latitude = $${paramIndex++}`);
-      values.push(data.latitude);
-    }
-    if (data.longitude !== undefined) {
-      updates.push(`longitude = $${paramIndex++}`);
-      values.push(data.longitude);
-    }
-    if (data.raio_geofence !== undefined) {
-      updates.push(`raio_geofence = $${paramIndex++}`);
-      values.push(data.raio_geofence);
-    }
-    if (data.is_active !== undefined) {
-      updates.push(`is_active = $${paramIndex++}`);
-      values.push(data.is_active);
-    }
+      // Montar query dinâmica
+      const updates: string[] = [];
+      const values: any[] = [];
+      let paramIndex = 1;
 
-    if (updates.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Nenhum campo para atualizar' },
-        { status: 400 }
+      if (data.nome !== undefined) {
+        updates.push(`nome = $${paramIndex++}`);
+        values.push(data.nome);
+      }
+      if (data.endereco !== undefined) {
+        updates.push(`endereco = $${paramIndex++}`);
+        values.push(data.endereco);
+      }
+      if (data.descricao !== undefined) {
+        updates.push(`descricao = $${paramIndex++}`);
+        values.push(data.descricao);
+      }
+      if (data.latitude !== undefined) {
+        updates.push(`latitude = $${paramIndex++}`);
+        values.push(data.latitude);
+      }
+      if (data.longitude !== undefined) {
+        updates.push(`longitude = $${paramIndex++}`);
+        values.push(data.longitude);
+      }
+      if (data.raio_geofence !== undefined) {
+        updates.push(`raio_geofence = $${paramIndex++}`);
+        values.push(data.raio_geofence);
+      }
+      if (data.is_active !== undefined) {
+        updates.push(`is_active = $${paramIndex++}`);
+        values.push(data.is_active);
+      }
+
+      if (updates.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Nenhum campo para atualizar' },
+          { status: 400 }
+        );
+      }
+
+      values.push(id, workspaceId);
+
+      const result = await client.query<LocalDB>(
+        `UPDATE recepcao_locais
+         SET ${updates.join(', ')}, updated_at = NOW()
+         WHERE id = $${paramIndex} AND workspace_id = $${paramIndex + 1}
+         RETURNING *`,
+        values
       );
-    }
 
-    values.push(id, workspaceId);
-
-    const result = await pool.query<LocalDB>(
-      `UPDATE recepcao_locais
-       SET ${updates.join(', ')}, updated_at = NOW()
-       WHERE id = $${paramIndex} AND workspace_id = $${paramIndex + 1}
-       RETURNING *`,
-      values
-    );
-
-    return NextResponse.json({
-      success: true,
-      data: result.rows[0],
+      return NextResponse.json({
+        success: true,
+        data: result.rows[0],
+      });
     });
   } catch (error) {
     console.error('Erro ao atualizar local:', error);
@@ -221,25 +225,27 @@ export async function DELETE(
       );
     }
 
-    const result = await pool.query<LocalDB>(
-      `UPDATE recepcao_locais
-       SET is_active = false, updated_at = NOW()
-       WHERE id = $1 AND workspace_id = $2
-       RETURNING *`,
-      [id, workspaceId]
-    );
-
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Local não encontrado' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      const result = await client.query<LocalDB>(
+        `UPDATE recepcao_locais
+         SET is_active = false, updated_at = NOW()
+         WHERE id = $1 AND workspace_id = $2
+         RETURNING *`,
+        [id, workspaceId]
       );
-    }
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows[0],
-      message: 'Local desativado com sucesso',
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Local não encontrado' },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: result.rows[0],
+        message: 'Local desativado com sucesso',
+      });
     });
   } catch (error) {
     console.error('Erro ao desativar local:', error);

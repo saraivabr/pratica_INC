@@ -6,6 +6,7 @@
  */
 
 import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import {
   WhatsAppSyncedChat,
   RecoveryOpportunity,
@@ -69,13 +70,15 @@ export async function analyzeChats(workspaceId: number): Promise<SyncAnalysisRes
   console.log(`[WhatsApp Analyze] Iniciando analise para tenant ${workspaceId}`);
 
   // Buscar todos os chats sincronizados do tenant (apenas individuais, nao grupos)
-  const chatsResult = await pool.query<WhatsAppSyncedChat>(
-    `SELECT * FROM whatsapp_synced_chats
-     WHERE workspace_id = $1
-       AND is_group = FALSE
-     ORDER BY last_message_at DESC NULLS LAST`,
-    [workspaceId]
-  );
+  const chatsResult = await withTenant(workspaceId, async (client) => {
+    return client.query<WhatsAppSyncedChat>(
+      `SELECT * FROM whatsapp_synced_chats
+       WHERE workspace_id = $1
+         AND is_group = FALSE
+       ORDER BY last_message_at DESC NULLS LAST`,
+      [workspaceId]
+    );
+  });
 
   const chats = chatsResult.rows;
   console.log(`[WhatsApp Analyze] Encontrados ${chats.length} chats individuais`);
@@ -227,78 +230,80 @@ export async function matchChatToLead(
   const lastNineDigits = getLastDigits(normalizedPhone, 9);
   const lastEightDigits = getLastDigits(normalizedPhone, 8);
 
-  // Buscar leads que contenham o telefone
-  // Usamos LIKE com os ultimos digitos para flexibilidade
-  const result = await pool.query<{
-    id_lead: number;
-    nome: string;
-    telefone: string;
-    situacao_nome: any;
-    empreendimento: any;
-  }>(
-    `SELECT
-       id_lead,
-       nome,
-       telefone,
-       situacao_nome,
-       empreendimento
-     FROM cvcrm_leads
-     WHERE workspace_id = $1
-       AND telefone IS NOT NULL
-       AND (
-         REGEXP_REPLACE(telefone, '[^0-9]', '', 'g') LIKE '%' || $2
-         OR REGEXP_REPLACE(telefone, '[^0-9]', '', 'g') LIKE '%' || $3
-       )
-     ORDER BY data_cad DESC NULLS LAST
-     LIMIT 1`,
-    [workspaceId, lastNineDigits, lastEightDigits]
-  );
+  return withTenant(workspaceId, async (client) => {
+    // Buscar leads que contenham o telefone
+    // Usamos LIKE com os ultimos digitos para flexibilidade
+    const result = await client.query<{
+      id_lead: number;
+      nome: string;
+      telefone: string;
+      situacao_nome: any;
+      empreendimento: any;
+    }>(
+      `SELECT
+         id_lead,
+         nome,
+         telefone,
+         situacao_nome,
+         empreendimento
+       FROM cvcrm_leads
+       WHERE workspace_id = $1
+         AND telefone IS NOT NULL
+         AND (
+           REGEXP_REPLACE(telefone, '[^0-9]', '', 'g') LIKE '%' || $2
+           OR REGEXP_REPLACE(telefone, '[^0-9]', '', 'g') LIKE '%' || $3
+         )
+       ORDER BY data_cad DESC NULLS LAST
+       LIMIT 1`,
+      [workspaceId, lastNineDigits, lastEightDigits]
+    );
 
-  if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) return null;
 
-  const lead = result.rows[0];
+    const lead = result.rows[0];
 
-  // Situacao nome is now a plain text column
-  const situacaoNome = lead.situacao_nome || 'Desconhecido';
+    // Situacao nome is now a plain text column
+    const situacaoNome = lead.situacao_nome || 'Desconhecido';
 
-  // Extrair nome do empreendimento do JSONB array
-  let empreendimentoNome: string | undefined;
-  if (lead.empreendimento) {
-    let empArray: any[];
-    if (typeof lead.empreendimento === 'string') {
-      try {
-        empArray = JSON.parse(lead.empreendimento);
-      } catch {
-        empArray = [];
+    // Extrair nome do empreendimento do JSONB array
+    let empreendimentoNome: string | undefined;
+    if (lead.empreendimento) {
+      let empArray: any[];
+      if (typeof lead.empreendimento === 'string') {
+        try {
+          empArray = JSON.parse(lead.empreendimento);
+        } catch {
+          empArray = [];
+        }
+      } else {
+        empArray = lead.empreendimento;
       }
-    } else {
-      empArray = lead.empreendimento;
+      if (Array.isArray(empArray) && empArray.length > 0) {
+        empreendimentoNome = empArray[0]?.nome;
+      }
     }
-    if (Array.isArray(empArray) && empArray.length > 0) {
-      empreendimentoNome = empArray[0]?.nome;
-    }
-  }
 
-  // Buscar ultima interacao
-  const interacaoResult = await pool.query<{ data_cad: string }>(
-    `SELECT data_cad
-     FROM cvcrm_leads_interacoes
-     WHERE workspace_id = $1 AND id_lead = $2
-     ORDER BY data_cad DESC
-     LIMIT 1`,
-    [workspaceId, lead.id_lead]
-  );
+    // Buscar ultima interacao
+    const interacaoResult = await client.query<{ data_cad: string }>(
+      `SELECT data_cad
+       FROM cvcrm_leads_interacoes
+       WHERE workspace_id = $1 AND id_lead = $2
+       ORDER BY data_cad DESC
+       LIMIT 1`,
+      [workspaceId, lead.id_lead]
+    );
 
-  const ultimaInteracao = interacaoResult.rows[0]?.data_cad;
+    const ultimaInteracao = interacaoResult.rows[0]?.data_cad;
 
-  return {
-    id_lead: String(lead.id_lead),
-    nome: lead.nome || 'Lead sem nome',
-    telefone: lead.telefone || phoneNumber,
-    situacao: situacaoNome,
-    empreendimento: empreendimentoNome,
-    ultima_interacao: ultimaInteracao,
-  };
+    return {
+      id_lead: String(lead.id_lead),
+      nome: lead.nome || 'Lead sem nome',
+      telefone: lead.telefone || phoneNumber,
+      situacao: situacaoNome,
+      empreendimento: empreendimentoNome,
+      ultima_interacao: ultimaInteracao,
+    };
+  });
 }
 
 /**
@@ -533,8 +538,10 @@ export async function getRecoveryOpportunities(
   `;
   params.push(limit);
 
-  const result = await pool.query<WhatsAppSyncedChat>(query, params);
-  return result.rows;
+  return withTenant(workspaceId, async (client) => {
+    const result = await client.query<WhatsAppSyncedChat>(query, params);
+    return result.rows;
+  });
 }
 
 /**
@@ -552,29 +559,31 @@ export async function getAnalysisStats(workspaceId: number): Promise<{
     baixo: number;
   };
 }> {
-  const result = await pool.query(
-    `SELECT
-       COUNT(*) as total_chats,
-       COUNT(analyzed_at) as analyzed_chats,
-       COUNT(matched_lead_id) as matched_leads,
-       COUNT(*) FILTER (WHERE recovery_potential = 'alto') as opp_alto,
-       COUNT(*) FILTER (WHERE recovery_potential = 'medio') as opp_medio,
-       COUNT(*) FILTER (WHERE recovery_potential = 'baixo') as opp_baixo
-     FROM whatsapp_synced_chats
-     WHERE workspace_id = $1 AND is_group = FALSE`,
-    [workspaceId]
-  );
+  return withTenant(workspaceId, async (client) => {
+    const result = await client.query(
+      `SELECT
+         COUNT(*) as total_chats,
+         COUNT(analyzed_at) as analyzed_chats,
+         COUNT(matched_lead_id) as matched_leads,
+         COUNT(*) FILTER (WHERE recovery_potential = 'alto') as opp_alto,
+         COUNT(*) FILTER (WHERE recovery_potential = 'medio') as opp_medio,
+         COUNT(*) FILTER (WHERE recovery_potential = 'baixo') as opp_baixo
+       FROM whatsapp_synced_chats
+       WHERE workspace_id = $1 AND is_group = FALSE`,
+      [workspaceId]
+    );
 
-  const row = result.rows[0];
+    const row = result.rows[0];
 
-  return {
-    totalChats: parseInt(row.total_chats) || 0,
-    analyzedChats: parseInt(row.analyzed_chats) || 0,
-    matchedLeads: parseInt(row.matched_leads) || 0,
-    opportunities: {
-      alto: parseInt(row.opp_alto) || 0,
-      medio: parseInt(row.opp_medio) || 0,
-      baixo: parseInt(row.opp_baixo) || 0,
-    },
-  };
+    return {
+      totalChats: parseInt(row.total_chats) || 0,
+      analyzedChats: parseInt(row.analyzed_chats) || 0,
+      matchedLeads: parseInt(row.matched_leads) || 0,
+      opportunities: {
+        alto: parseInt(row.opp_alto) || 0,
+        medio: parseInt(row.opp_medio) || 0,
+        baixo: parseInt(row.opp_baixo) || 0,
+      },
+    };
+  });
 }

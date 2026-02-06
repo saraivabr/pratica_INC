@@ -6,8 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 
 /**
  * GET - Buscar cliente por CPF
@@ -40,40 +40,42 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Busca por CPF exato (limpando o CPF no banco também)
-    const query = `
-      SELECT
-        cvcrm_id as pessoa_id,
-        nome,
-        cpf,
-        email,
-        COALESCE(celular, telefone) as telefone
-      FROM cvcrm_pessoas
-      WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), '/', '') = $1
-      LIMIT 1
-    `;
+    return await withTenant(ctx.workspaceId, async (client) => {
+      // Busca por CPF exato (limpando o CPF no banco também)
+      const query = `
+        SELECT
+          cvcrm_id as pessoa_id,
+          nome,
+          cpf,
+          email,
+          COALESCE(celular, telefone) as telefone
+        FROM cvcrm_pessoas
+        WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), '/', '') = $1
+        LIMIT 1
+      `;
 
-    const { rows } = await dbQuery(query, [cpfLimpo]);
+      const { rows } = await client.query(query, [cpfLimpo]);
 
-    if (rows.length === 0) {
+      if (rows.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: { encontrado: false },
+        });
+      }
+
+      const pessoa = rows[0];
+
       return NextResponse.json({
         success: true,
-        data: { encontrado: false },
+        data: {
+          encontrado: true,
+          pessoa_id: pessoa.pessoa_id,
+          nome: pessoa.nome,
+          cpf: pessoa.cpf,
+          email: pessoa.email,
+          telefone: pessoa.telefone,
+        },
       });
-    }
-
-    const pessoa = rows[0];
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        encontrado: true,
-        pessoa_id: pessoa.pessoa_id,
-        nome: pessoa.nome,
-        cpf: pessoa.cpf,
-        email: pessoa.email,
-        telefone: pessoa.telefone,
-      },
     });
   } catch (error: any) {
     console.error("Erro ao buscar cliente por CPF:", error);

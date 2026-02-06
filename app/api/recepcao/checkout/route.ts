@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { z } from 'zod';
 
 const CheckoutSchema = z.object({
@@ -61,48 +61,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let query: string;
-    let params: any[];
+    return await withTenant(workspaceId, async (client) => {
+      let query: string;
+      let params: any[];
 
-    if (presenca_id) {
-      // Check-out por ID da presença
-      query = `
-        UPDATE recepcao_presencas
-        SET status = 'saiu', checkout_at = NOW()
-        WHERE id = $1 AND user_id = $2 AND workspace_id = $3 AND status = 'presente'
-        RETURNING *
-      `;
-      params = [presenca_id, (user as any).id, workspaceId];
-    } else {
-      // Check-out por ID do plantão
-      query = `
-        UPDATE recepcao_presencas
-        SET status = 'saiu', checkout_at = NOW()
-        WHERE plantao_id = $1 AND user_id = $2 AND workspace_id = $3 AND status = 'presente'
-        RETURNING *
-      `;
-      params = [plantao_id, (user as any).id, workspaceId];
-    }
+      if (presenca_id) {
+        // Check-out por ID da presença
+        query = `
+          UPDATE recepcao_presencas
+          SET status = 'saiu', checkout_at = NOW()
+          WHERE id = $1 AND user_id = $2 AND workspace_id = $3 AND status = 'presente'
+          RETURNING *
+        `;
+        params = [presenca_id, (user as any).id, workspaceId];
+      } else {
+        // Check-out por ID do plantão
+        query = `
+          UPDATE recepcao_presencas
+          SET status = 'saiu', checkout_at = NOW()
+          WHERE plantao_id = $1 AND user_id = $2 AND workspace_id = $3 AND status = 'presente'
+          RETURNING *
+        `;
+        params = [plantao_id, (user as any).id, workspaceId];
+      }
 
-    const result = await pool.query<PresencaDB>(query, params);
+      const result = await client.query<PresencaDB>(query, params);
 
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Presença não encontrada ou já encerrada' },
-        { status: 404 }
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Presença não encontrada ou já encerrada' },
+          { status: 404 }
+        );
+      }
+
+      // Reorganizar fila após saída
+      await client.query(
+        `SELECT mover_corretor_fim_fila($1)`,
+        [result.rows[0].id]
       );
-    }
 
-    // Reorganizar fila após saída
-    await pool.query(
-      `SELECT mover_corretor_fim_fila($1)`,
-      [result.rows[0].id]
-    );
-
-    return NextResponse.json({
-      success: true,
-      data: result.rows[0],
-      message: 'Check-out realizado com sucesso',
+      return NextResponse.json({
+        success: true,
+        data: result.rows[0],
+        message: 'Check-out realizado com sucesso',
+      });
     });
   } catch (error) {
     console.error('Erro ao fazer check-out:', error);

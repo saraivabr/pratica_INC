@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 interface CorretorInfo {
     id?: number;
@@ -100,52 +100,54 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Generate a negative id_lead for manual leads (to avoid conflict with CV CRM sync)
-        const idResult = await pool.query(
-            `SELECT COALESCE(MIN(id_lead), 0) - 1 as next_id FROM cvcrm_leads WHERE id_lead < 0`
-        );
-        const nextId = idResult.rows[0].next_id || -1;
+        return await withTenant(workspaceId, async (client) => {
+            // Generate a negative id_lead for manual leads (to avoid conflict with CV CRM sync)
+            const idResult = await client.query(
+                `SELECT COALESCE(MIN(id_lead), 0) - 1 as next_id FROM cvcrm_leads WHERE id_lead < 0`
+            );
+            const nextId = idResult.rows[0].next_id || -1;
 
-        const insertQuery = `
-            INSERT INTO cvcrm_leads (
-                id_lead, nome, email, telefone, origem, situacao_nome,
-                data_cad, workspace_id, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, NOW(), NOW())
-            RETURNING id_lead, nome, email, telefone, origem, situacao_nome, data_cad
-        `;
+            const insertQuery = `
+                INSERT INTO cvcrm_leads (
+                    id_lead, nome, email, telefone, origem, situacao_nome,
+                    data_cad, workspace_id, created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, NOW(), NOW())
+                RETURNING id_lead, nome, email, telefone, origem, situacao_nome, data_cad
+            `;
 
-        const result = await pool.query(insertQuery, [
-            nextId,
-            nome.trim(),
-            email?.trim() || null,
-            telefone?.trim() || null,
-            origem?.trim() || 'Manual',
-            'Novo',
-            workspaceId,
-        ]);
+            const result = await client.query(insertQuery, [
+                nextId,
+                nome.trim(),
+                email?.trim() || null,
+                telefone?.trim() || null,
+                origem?.trim() || 'Manual',
+                'Novo',
+                workspaceId,
+            ]);
 
-        const lead = result.rows[0];
+            const lead = result.rows[0];
 
-        return NextResponse.json({
-            success: true,
-            lead: normalizeLead({
-                ...lead,
-                midia_principal: null,
-                corretor: null,
-                corretor_id: null,
-                imobiliaria: null,
-                situacao_id: null,
-                empreendimento: null,
-                score: null,
-                valor_negocio: null,
-                renda_familiar: null,
-                cidade: null,
-                estado: null,
-                bairro: null,
-                tags: null,
-                ultima_data_conversao: null,
-                synced_at: null,
-            }),
+            return NextResponse.json({
+                success: true,
+                lead: normalizeLead({
+                    ...lead,
+                    midia_principal: null,
+                    corretor: null,
+                    corretor_id: null,
+                    imobiliaria: null,
+                    situacao_id: null,
+                    empreendimento: null,
+                    score: null,
+                    valor_negocio: null,
+                    renda_familiar: null,
+                    cidade: null,
+                    estado: null,
+                    bairro: null,
+                    tags: null,
+                    ultima_data_conversao: null,
+                    synced_at: null,
+                }),
+            });
         });
     } catch (error) {
         console.error('Erro ao criar lead:', error);
@@ -186,65 +188,67 @@ export async function GET(request: NextRequest) {
             isFiltered = cvcrm_id !== null;
         }
 
-        // Construir query com filtros
-        let whereClause = 'WHERE workspace_id = $1';
-        const params: any[] = [workspaceId];
-        let paramIndex = 2;
+        return await withTenant(workspaceId, async (client) => {
+            // Construir query com filtros
+            let whereClause = 'WHERE workspace_id = $1';
+            const params: any[] = [workspaceId];
+            let paramIndex = 2;
 
-        // Filtro por corretor (se não for admin/gerente)
-        if (cvcrm_id) {
-            whereClause += ` AND corretor_id = $${paramIndex}`;
-            params.push(cvcrm_id);
-            paramIndex++;
-        }
+            // Filtro por corretor (se não for admin/gerente)
+            if (cvcrm_id) {
+                whereClause += ` AND corretor_id = $${paramIndex}`;
+                params.push(cvcrm_id);
+                paramIndex++;
+            }
 
-        // Filtro por busca (nome, email, telefone)
-        if (search) {
-            whereClause += ` AND (
-                LOWER(nome) LIKE LOWER($${paramIndex})
-                OR LOWER(email) LIKE LOWER($${paramIndex})
-                OR telefone LIKE $${paramIndex}
-            )`;
-            params.push(`%${search}%`);
-            paramIndex++;
-        }
+            // Filtro por busca (nome, email, telefone)
+            if (search) {
+                whereClause += ` AND (
+                    LOWER(nome) LIKE LOWER($${paramIndex})
+                    OR LOWER(email) LIKE LOWER($${paramIndex})
+                    OR telefone LIKE $${paramIndex}
+                )`;
+                params.push(`%${search}%`);
+                paramIndex++;
+            }
 
-        // Filtro por situação
-        if (situacaoFilter && situacaoFilter !== 'all') {
-            whereClause += ` AND situacao_id = $${paramIndex}`;
-            params.push(parseInt(situacaoFilter));
-            paramIndex++;
-        }
+            // Filtro por situação
+            if (situacaoFilter && situacaoFilter !== 'all') {
+                whereClause += ` AND situacao_id = $${paramIndex}`;
+                params.push(parseInt(situacaoFilter));
+                paramIndex++;
+            }
 
-        // Buscar total
-        const countQuery = `SELECT COUNT(*) as total FROM cvcrm_leads ${whereClause}`;
-        const countResult = await pool.query(countQuery, params);
-        const total = parseInt(countResult.rows[0].total);
+            // Buscar total
+            const countQuery = `SELECT COUNT(*) as total FROM cvcrm_leads ${whereClause}`;
+            const countResult = await client.query(countQuery, params);
+            const total = parseInt(countResult.rows[0].total);
 
-        // Buscar leads paginados
-        const query = `
-            SELECT
-                id_lead, nome, email, telefone, data_cad, origem, midia_principal,
-                corretor, corretor_id, imobiliaria, situacao_nome, situacao_id,
-                empreendimento, score, valor_negocio, renda_familiar,
-                cidade, estado, bairro, tags, ultima_data_conversao, synced_at
-            FROM cvcrm_leads
-            ${whereClause}
-            ORDER BY data_cad DESC NULLS LAST, id_lead DESC
-            LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-        `;
-        params.push(limit, offset);
+            // Buscar leads paginados
+            const query = `
+                SELECT
+                    id_lead, nome, email, telefone, data_cad, origem, midia_principal,
+                    corretor, corretor_id, imobiliaria, situacao_nome, situacao_id,
+                    empreendimento, score, valor_negocio, renda_familiar,
+                    cidade, estado, bairro, tags, ultima_data_conversao, synced_at
+                FROM cvcrm_leads
+                ${whereClause}
+                ORDER BY data_cad DESC NULLS LAST, id_lead DESC
+                LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+            `;
+            params.push(limit, offset);
 
-        const result = await pool.query<DBLead>(query, params);
-        const normalizedLeads = result.rows.map(normalizeLead);
+            const result = await client.query<DBLead>(query, params);
+            const normalizedLeads = result.rows.map(normalizeLead);
 
-        return NextResponse.json({
-            data: normalizedLeads,
-            total,
-            limit,
-            offset,
-            filtered: isFiltered,
-            source: 'local'
+            return NextResponse.json({
+                data: normalizedLeads,
+                total,
+                limit,
+                offset,
+                filtered: isFiltered,
+                source: 'local'
+            });
         });
     } catch (error) {
         console.error('Erro ao buscar leads:', error);

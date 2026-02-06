@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { validateRequest, LeadCpfSchema } from '@/lib/validation-schemas';
 
 /**
@@ -75,36 +75,38 @@ export async function PATCH(
       return NextResponse.json({ error: 'CPF inválido' }, { status: 400 });
     }
 
-    // Update in database (com verificação de tenant)
-    const result = await dbQuery(
-      `UPDATE cvcrm_leads
-       SET cpf = $1,
-           updated_at = NOW()
-       WHERE id_lead = $2 AND workspace_id = $3
-       RETURNING id_lead, cpf, nome`,
-      [cleanCpf, leadId, workspaceId]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      // Update in database (com verificação de tenant)
+      const result = await client.query(
+        `UPDATE cvcrm_leads
+         SET cpf = $1,
+             updated_at = NOW()
+         WHERE id_lead = $2 AND workspace_id = $3
+         RETURNING id_lead, cpf, nome`,
+        [cleanCpf, leadId, workspaceId]
+      );
 
-    if (result.rows.length === 0) {
-      return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });
-    }
+      if (result.rows.length === 0) {
+        return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });
+      }
 
-    // Log the update
-    console.log(`[CPF] Updated for lead ${leadId}: ${cleanCpf.substring(0, 3)}***`);
+      // Log the update
+      console.log(`[CPF] Updated for lead ${leadId}: ${cleanCpf.substring(0, 3)}***`);
 
-    // Register interaction
-    await dbQuery(
-      `INSERT INTO interacoes (lead_id, tipo, descricao, user_id, created_at)
-       VALUES ($1, 'cpf_update', $2, $3, NOW())`,
-      [leadId, 'CPF atualizado', (user as any).id]
-    ).catch(err => {
-      console.warn('[CPF] Erro ao registrar interação:', err.message);
-    });
+      // Register interaction
+      await client.query(
+        `INSERT INTO interacoes (lead_id, tipo, descricao, user_id, created_at)
+         VALUES ($1, 'cpf_update', $2, $3, NOW())`,
+        [leadId, 'CPF atualizado', (user as any).id]
+      ).catch(err => {
+        console.warn('[CPF] Erro ao registrar interação:', err.message);
+      });
 
-    return NextResponse.json({
-      success: true,
-      lead_id: leadId,
-      cpf: cleanCpf
+      return NextResponse.json({
+        success: true,
+        lead_id: leadId,
+        cpf: cleanCpf
+      });
     });
 
   } catch (error: any) {

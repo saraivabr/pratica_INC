@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { validateRequest, LeadStageSchema } from '@/lib/validation-schemas';
 
 // Mapeamento de estágios do frontend para situação do CV CRM
@@ -53,35 +53,37 @@ export async function POST(
       return NextResponse.json({ error: 'Estágio inválido' }, { status: 400 });
     }
 
-    // Atualizar no banco local (com verificação de tenant)
-    const result = await dbQuery(
-      `UPDATE cvcrm_leads
-       SET situacao_id = $1,
-           situacao_nome = $2,
-           updated_at = NOW()
-       WHERE id_lead = $3 AND workspace_id = $4
-       RETURNING id_lead, situacao_id, situacao_nome`,
-      [situacaoId, stage, leadId, workspaceId]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      // Atualizar no banco local (com verificação de tenant)
+      const result = await client.query(
+        `UPDATE cvcrm_leads
+         SET situacao_id = $1,
+             situacao_nome = $2,
+             updated_at = NOW()
+         WHERE id_lead = $3 AND workspace_id = $4
+         RETURNING id_lead, situacao_id, situacao_nome`,
+        [situacaoId, stage, leadId, workspaceId]
+      );
 
-    if (result.rows.length === 0) {
-      return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });
-    }
+      if (result.rows.length === 0) {
+        return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });
+      }
 
-    // Registrar interação
-    await dbQuery(
-      `INSERT INTO interacoes (lead_id, tipo, descricao, user_id, created_at)
-       VALUES ($1, 'stage_change', $2, $3, NOW())`,
-      [leadId, `Estágio alterado para: ${stage}`, (user as any).id]
-    ).catch(err => {
-      console.warn('[Stage] Erro ao registrar interação:', err.message);
-    });
+      // Registrar interação
+      await client.query(
+        `INSERT INTO interacoes (lead_id, tipo, descricao, user_id, created_at)
+         VALUES ($1, 'stage_change', $2, $3, NOW())`,
+        [leadId, `Estágio alterado para: ${stage}`, (user as any).id]
+      ).catch(err => {
+        console.warn('[Stage] Erro ao registrar interação:', err.message);
+      });
 
-    return NextResponse.json({
-      success: true,
-      lead_id: leadId,
-      stage,
-      situacao_id: situacaoId
+      return NextResponse.json({
+        success: true,
+        lead_id: leadId,
+        stage,
+        situacao_id: situacaoId
+      });
     });
 
   } catch (error: any) {

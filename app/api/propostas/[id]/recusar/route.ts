@@ -3,8 +3,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -34,40 +34,42 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    const { rows: existing } = await dbQuery(
-      `SELECT * FROM propostas WHERE id = $1 AND workspace_id = $2`,
-      [id, ctx.workspaceId]
-    );
-
-    if (existing.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Proposta não encontrada" },
-        { status: 404 }
+    return await withTenant(ctx.workspaceId, async (client) => {
+      const { rows: existing } = await client.query(
+        `SELECT * FROM propostas WHERE id = $1 AND workspace_id = $2`,
+        [id, ctx.workspaceId]
       );
-    }
 
-    if (existing[0].status !== "enviada") {
-      return NextResponse.json(
-        { success: false, error: "Apenas propostas enviadas podem ser recusadas" },
-        { status: 400 }
+      if (existing.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Proposta não encontrada" },
+          { status: 404 }
+        );
+      }
+
+      if (existing[0].status !== "enviada") {
+        return NextResponse.json(
+          { success: false, error: "Apenas propostas enviadas podem ser recusadas" },
+          { status: 400 }
+        );
+      }
+
+      const { rows: updated } = await client.query(
+        `UPDATE propostas SET
+          status = 'recusada',
+          motivo_recusa = $1,
+          aprovado_por = $2,
+          aprovado_em = NOW(),
+          updated_at = NOW()
+         WHERE id = $3 RETURNING *`,
+        [motivo_recusa.trim(), (ctx.user as any).id, id]
       );
-    }
 
-    const { rows: updated } = await dbQuery(
-      `UPDATE propostas SET
-        status = 'recusada',
-        motivo_recusa = $1,
-        aprovado_por = $2,
-        aprovado_em = NOW(),
-        updated_at = NOW()
-       WHERE id = $3 RETURNING *`,
-      [motivo_recusa.trim(), (ctx.user as any).id, id]
-    );
-
-    return NextResponse.json({
-      success: true,
-      data: updated[0],
-      message: "Proposta recusada",
+      return NextResponse.json({
+        success: true,
+        data: updated[0],
+        message: "Proposta recusada",
+      });
     });
   } catch (error: any) {
     console.error("Erro ao recusar proposta:", error);

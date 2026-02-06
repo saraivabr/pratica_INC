@@ -5,6 +5,7 @@
  */
 
 import { dbQuery } from '../db'
+import { withTenant } from '../../tenant-context'
 import { VoiceAgentToolDefinition } from '../types'
 
 /**
@@ -25,61 +26,63 @@ const get_atendimentos_pendentes: VoiceAgentToolDefinition = {
   execute: async (args: Record<string, any>, workspaceId: number) => {
     const { corretor_id } = args
 
-    let query = `
-      SELECT
-        cvcrm_id,
-        protocolo,
-        tipo,
-        assunto,
-        descricao,
-        status,
-        prioridade,
-        data_abertura,
-        cliente_nome,
-        empreendimento_nome,
-        unidade_nome,
-        responsavel_nome
-      FROM cvcrm_atendimentos
-      WHERE workspace_id = $1 AND status != 'concluido'
-    `
-    const params: any[] = [workspaceId]
-    let paramIndex = 2
+    return withTenant(workspaceId, async (client) => {
+      let query = `
+        SELECT
+          cvcrm_id,
+          protocolo,
+          tipo,
+          assunto,
+          descricao,
+          status,
+          prioridade,
+          data_abertura,
+          cliente_nome,
+          empreendimento_nome,
+          unidade_nome,
+          responsavel_nome
+        FROM cvcrm_atendimentos
+        WHERE workspace_id = $1 AND status != 'concluido'
+      `
+      const params: any[] = [workspaceId]
+      let paramIndex = 2
 
-    if (corretor_id) {
-      query += ` AND responsavel_id = $${paramIndex}`
-      params.push(corretor_id)
-      paramIndex++
-    }
+      if (corretor_id) {
+        query += ` AND responsavel_id = $${paramIndex}`
+        params.push(corretor_id)
+        paramIndex++
+      }
 
-    query += ` ORDER BY
-      CASE prioridade
-        WHEN 'alta' THEN 1
-        WHEN 'media' THEN 2
-        WHEN 'baixa' THEN 3
-        ELSE 4
-      END,
-      data_abertura ASC
-      LIMIT 50`
+      query += ` ORDER BY
+        CASE prioridade
+          WHEN 'alta' THEN 1
+          WHEN 'media' THEN 2
+          WHEN 'baixa' THEN 3
+          ELSE 4
+        END,
+        data_abertura ASC
+        LIMIT 50`
 
-    const result = await dbQuery(query, params)
+      const result = await client.query(query, params)
 
-    return {
-      count: result.rows.length,
-      atendimentos: result.rows.map(row => ({
-        id: row.cvcrm_id,
-        protocolo: row.protocolo,
-        tipo: row.tipo,
-        assunto: row.assunto,
-        descricao: row.descricao,
-        status: row.status,
-        prioridade: row.prioridade,
-        data_abertura: row.data_abertura,
-        cliente: row.cliente_nome,
-        empreendimento: row.empreendimento_nome,
-        unidade: row.unidade_nome,
-        responsavel: row.responsavel_nome
-      }))
-    }
+      return {
+        count: result.rows.length,
+        atendimentos: result.rows.map((row: any) => ({
+          id: row.cvcrm_id,
+          protocolo: row.protocolo,
+          tipo: row.tipo,
+          assunto: row.assunto,
+          descricao: row.descricao,
+          status: row.status,
+          prioridade: row.prioridade,
+          data_abertura: row.data_abertura,
+          cliente: row.cliente_nome,
+          empreendimento: row.empreendimento_nome,
+          unidade: row.unidade_nome,
+          responsavel: row.responsavel_nome
+        }))
+      }
+    })
   }
 }
 

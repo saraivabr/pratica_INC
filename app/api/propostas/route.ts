@@ -6,14 +6,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 
-async function gerarCodigoProposta(workspaceId: number): Promise<string> {
+async function gerarCodigoProposta(client: any, workspaceId: number): Promise<string> {
   const now = new Date();
   const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  const { rows } = await dbQuery(
+  const { rows } = await client.query(
     `SELECT codigo FROM propostas
      WHERE codigo LIKE $1 AND workspace_id = $2
      ORDER BY codigo DESC
@@ -43,62 +43,64 @@ export async function GET(request: NextRequest) {
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "20")));
     const offset = (page - 1) * pageSize;
 
-    const conditions: string[] = [`p.workspace_id = $1`];
-    const params: any[] = [ctx.workspaceId];
-    let paramIndex = 2;
+    return await withTenant(ctx.workspaceId, async (client) => {
+      const conditions: string[] = [`p.workspace_id = $1`];
+      const params: any[] = [ctx.workspaceId];
+      let paramIndex = 2;
 
-    // Corretor só vê as próprias propostas
-    const userRole = (ctx.user as any).role || "";
-    if (userRole === "corretor") {
-      conditions.push(`p.corretor_id = $${paramIndex}`);
-      params.push((ctx.user as any).id);
-      paramIndex++;
-    }
+      // Corretor só vê as próprias propostas
+      const userRole = (ctx.user as any).role || "";
+      if (userRole === "corretor") {
+        conditions.push(`p.corretor_id = $${paramIndex}`);
+        params.push((ctx.user as any).id);
+        paramIndex++;
+      }
 
-    if (status.length > 0) {
-      conditions.push(`p.status = ANY($${paramIndex})`);
-      params.push(status);
-      paramIndex++;
-    }
+      if (status.length > 0) {
+        conditions.push(`p.status = ANY($${paramIndex})`);
+        params.push(status);
+        paramIndex++;
+      }
 
-    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+      const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
-    const query = `
-      SELECT
-        p.*,
-        u.nome as corretor_nome,
-        (SELECT COUNT(*) FROM proposta_parcelas pp WHERE pp.proposta_id = p.id) as total_parcelas,
-        (SELECT COUNT(*) FROM proposta_documentos pd WHERE pd.proposta_id = p.id) as total_documentos
-      FROM propostas p
-      LEFT JOIN users u ON u.id = p.corretor_id
-      ${whereClause}
-      ORDER BY p.created_at DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
-    params.push(pageSize, offset);
+      const query = `
+        SELECT
+          p.*,
+          u.nome as corretor_nome,
+          (SELECT COUNT(*) FROM proposta_parcelas pp WHERE pp.proposta_id = p.id) as total_parcelas,
+          (SELECT COUNT(*) FROM proposta_documentos pd WHERE pd.proposta_id = p.id) as total_documentos
+        FROM propostas p
+        LEFT JOIN users u ON u.id = p.corretor_id
+        ${whereClause}
+        ORDER BY p.created_at DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+      params.push(pageSize, offset);
 
-    const countQuery = `SELECT COUNT(*) as total FROM propostas p ${whereClause}`;
-    const countParams = params.slice(0, paramIndex - 1);
+      const countQuery = `SELECT COUNT(*) as total FROM propostas p ${whereClause}`;
+      const countParams = params.slice(0, paramIndex - 1);
 
-    const [{ rows }, { rows: countRows }] = await Promise.all([
-      dbQuery(query, params),
-      dbQuery(countQuery, countParams),
-    ]);
+      const [{ rows }, { rows: countRows }] = await Promise.all([
+        client.query(query, params),
+        client.query(countQuery, countParams),
+      ]);
 
-    return NextResponse.json({
-      success: true,
-      data: rows.map((r: any) => ({
-        ...r,
-        valor_total: r.valor_total ? parseFloat(r.valor_total) : 0,
-        valor_ato: r.valor_ato ? parseFloat(r.valor_ato) : 0,
-        valor_tabela: r.valor_tabela ? parseFloat(r.valor_tabela) : null,
-      })),
-      pagination: {
-        page,
-        pageSize,
-        total: parseInt(countRows[0].total),
-        totalPages: Math.ceil(parseInt(countRows[0].total) / pageSize),
-      },
+      return NextResponse.json({
+        success: true,
+        data: rows.map((r: any) => ({
+          ...r,
+          valor_total: r.valor_total ? parseFloat(r.valor_total) : 0,
+          valor_ato: r.valor_ato ? parseFloat(r.valor_ato) : 0,
+          valor_tabela: r.valor_tabela ? parseFloat(r.valor_tabela) : null,
+        })),
+        pagination: {
+          page,
+          pageSize,
+          total: parseInt(countRows[0].total),
+          totalPages: Math.ceil(parseInt(countRows[0].total) / pageSize),
+        },
+      });
     });
   } catch (error: any) {
     console.error("Erro ao listar propostas:", error);
@@ -141,59 +143,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const codigo = await gerarCodigoProposta(ctx.workspaceId);
+    return await withTenant(ctx.workspaceId, async (client) => {
+      const codigo = await gerarCodigoProposta(client, ctx.workspaceId);
 
-    await dbQuery("BEGIN");
+      await client.query("BEGIN");
 
-    try {
-      const { rows } = await dbQuery(
-        `INSERT INTO propostas (
-          codigo, workspace_id, corretor_id,
-          empreendimento_id, empreendimento_nome,
-          unidade_id, unidade_codigo, unidade_bloco, unidade_andar, valor_tabela,
-          cliente_nome, cliente_cpf, cliente_telefone, cliente_email,
-          valor_total, valor_ato, observacoes
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-        RETURNING *`,
-        [
-          codigo, ctx.workspaceId, (ctx.user as any).id,
-          empreendimento_id, empreendimento_nome,
-          unidade_id, unidade_codigo || null, unidade_bloco || null, unidade_andar || null,
-          valor_tabela || null,
-          cliente_nome, cliente_cpf || null, cliente_telefone || null, cliente_email || null,
-          valor_total, valor_ato || 0, observacoes || null,
-        ]
-      );
+      try {
+        const { rows } = await client.query(
+          `INSERT INTO propostas (
+            codigo, workspace_id, corretor_id,
+            empreendimento_id, empreendimento_nome,
+            unidade_id, unidade_codigo, unidade_bloco, unidade_andar, valor_tabela,
+            cliente_nome, cliente_cpf, cliente_telefone, cliente_email,
+            valor_total, valor_ato, observacoes
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+          RETURNING *`,
+          [
+            codigo, ctx.workspaceId, (ctx.user as any).id,
+            empreendimento_id, empreendimento_nome,
+            unidade_id, unidade_codigo || null, unidade_bloco || null, unidade_andar || null,
+            valor_tabela || null,
+            cliente_nome, cliente_cpf || null, cliente_telefone || null, cliente_email || null,
+            valor_total, valor_ato || 0, observacoes || null,
+          ]
+        );
 
-      const proposta = rows[0];
+        const proposta = rows[0];
 
-      if (parcelas && Array.isArray(parcelas) && parcelas.length > 0) {
-        for (let i = 0; i < parcelas.length; i++) {
-          const p = parcelas[i];
-          await dbQuery(
-            `INSERT INTO proposta_parcelas (
-              proposta_id, tipo, descricao, valor, data_vencimento,
-              quantidade, valor_parcela, ordem
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-            [
-              proposta.id, p.tipo, p.descricao || null, p.valor,
-              p.data_vencimento || null, p.quantidade || 1,
-              p.valor_parcela || null, p.ordem ?? i,
-            ]
-          );
+        if (parcelas && Array.isArray(parcelas) && parcelas.length > 0) {
+          for (let i = 0; i < parcelas.length; i++) {
+            const p = parcelas[i];
+            await client.query(
+              `INSERT INTO proposta_parcelas (
+                proposta_id, tipo, descricao, valor, data_vencimento,
+                quantidade, valor_parcela, ordem
+              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+              [
+                proposta.id, p.tipo, p.descricao || null, p.valor,
+                p.data_vencimento || null, p.quantidade || 1,
+                p.valor_parcela || null, p.ordem ?? i,
+              ]
+            );
+          }
         }
+
+        await client.query("COMMIT");
+
+        return NextResponse.json(
+          { success: true, data: proposta, message: "Proposta criada com sucesso" },
+          { status: 201 }
+        );
+      } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
       }
-
-      await dbQuery("COMMIT");
-
-      return NextResponse.json(
-        { success: true, data: proposta, message: "Proposta criada com sucesso" },
-        { status: 201 }
-      );
-    } catch (err) {
-      await dbQuery("ROLLBACK");
-      throw err;
-    }
+    });
   } catch (error: any) {
     console.error("Erro ao criar proposta:", error);
     return NextResponse.json(

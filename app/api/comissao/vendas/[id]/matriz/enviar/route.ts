@@ -5,8 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 import { z } from "zod";
 
 interface Params {
@@ -44,29 +44,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Verificar se venda existe
-    const { rows: vendaRows } = await dbQuery(
-      `SELECT * FROM comissao_vendas
-       WHERE id = $1 AND workspace_id = $2`,
-      [vendaId, ctx.workspaceId]
-    );
-
-    if (vendaRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Venda nao encontrada" },
-        { status: 404 }
-      );
-    }
-
-    const venda = vendaRows[0];
-
-    if (venda.status !== "calculada") {
-      return NextResponse.json(
-        { success: false, error: "Venda precisa estar calculada antes de enviar" },
-        { status: 400 }
-      );
-    }
-
     const body = await request.json();
 
     // Validar dados
@@ -84,32 +61,57 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const { parcela_ids } = parseResult.data;
 
-    // Marcar como enviadas
-    await dbQuery(
-      `UPDATE comissao_matriz
-       SET enviado_pagadoria = true, data_envio_pagadoria = NOW()
-       WHERE venda_id = $1 AND parcela_id = ANY($2)`,
-      [vendaId, parcela_ids]
-    );
+    return await withTenant(ctx.workspaceId, async (client) => {
+      // Verificar se venda existe
+      const { rows: vendaRows } = await client.query(
+        `SELECT * FROM comissao_vendas
+         WHERE id = $1 AND workspace_id = $2`,
+        [vendaId, ctx.workspaceId]
+      );
 
-    // Verificar se todas as parcelas foram enviadas
-    const { rows: naoEnviadas } = await dbQuery(
-      `SELECT COUNT(*) as total FROM comissao_matriz
-       WHERE venda_id = $1 AND enviado_pagadoria = false`,
-      [vendaId]
-    );
+      if (vendaRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Venda nao encontrada" },
+          { status: 404 }
+        );
+      }
 
-    // Se todas foram enviadas, atualizar status da venda
-    if (parseInt(naoEnviadas[0]?.total || "0") === 0) {
-      await dbQuery(
-        `UPDATE comissao_vendas SET status = 'enviada', updated_at = NOW() WHERE id = $1`,
+      const venda = vendaRows[0];
+
+      if (venda.status !== "calculada") {
+        return NextResponse.json(
+          { success: false, error: "Venda precisa estar calculada antes de enviar" },
+          { status: 400 }
+        );
+      }
+
+      // Marcar como enviadas
+      await client.query(
+        `UPDATE comissao_matriz
+         SET enviado_pagadoria = true, data_envio_pagadoria = NOW()
+         WHERE venda_id = $1 AND parcela_id = ANY($2)`,
+        [vendaId, parcela_ids]
+      );
+
+      // Verificar se todas as parcelas foram enviadas
+      const { rows: naoEnviadas } = await client.query(
+        `SELECT COUNT(*) as total FROM comissao_matriz
+         WHERE venda_id = $1 AND enviado_pagadoria = false`,
         [vendaId]
       );
-    }
 
-    return NextResponse.json({
-      success: true,
-      message: `${parcela_ids.length} parcela(s) marcada(s) como enviada(s) para pagadoria`,
+      // Se todas foram enviadas, atualizar status da venda
+      if (parseInt(naoEnviadas[0]?.total || "0") === 0) {
+        await client.query(
+          `UPDATE comissao_vendas SET status = 'enviada', updated_at = NOW() WHERE id = $1`,
+          [vendaId]
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `${parcela_ids.length} parcela(s) marcada(s) como enviada(s) para pagadoria`,
+      });
     });
   } catch (error: any) {
     console.error("Erro ao marcar como enviado:", error);

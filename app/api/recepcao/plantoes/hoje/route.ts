@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 interface PlantaoHoje {
   id: string;
@@ -44,62 +44,64 @@ export async function GET(request: NextRequest) {
 
     const localId = searchParams.get('local_id');
 
-    let whereClause = `
-      WHERE p.workspace_id = $1
-        AND p.data = CURRENT_DATE
-        AND p.status = 'ativo'
-    `;
-    const params: any[] = [workspaceId];
+    return await withTenant(workspaceId, async (client) => {
+      let whereClause = `
+        WHERE p.workspace_id = $1
+          AND p.data = CURRENT_DATE
+          AND p.status = 'ativo'
+      `;
+      const params: any[] = [workspaceId];
 
-    if (localId) {
-      whereClause += ` AND p.local_id = $2`;
-      params.push(localId);
-    }
+      if (localId) {
+        whereClause += ` AND p.local_id = $2`;
+        params.push(localId);
+      }
 
-    const query = `
-      SELECT
-        p.id,
-        p.workspace_id,
-        p.local_id,
-        p.data,
-        p.hora_inicio,
-        p.hora_fim,
-        p.hora_limite_checkin,
-        p.max_corretores,
-        p.descricao,
-        p.status,
-        COALESCE(p.sorteio_realizado, false) AS sorteio_realizado,
-        p.sorteio_at,
-        COALESCE(p.meta_ofertas, 30) AS meta_ofertas,
-        l.nome AS local_nome,
-        l.endereco AS local_endereco,
-        COALESCE(stats.total_presentes, 0) AS total_presentes,
-        COALESCE(stats.disponiveis, 0) AS disponiveis,
-        COALESCE(stats.em_atendimento, 0) AS em_atendimento,
-        (CURRENT_TIME BETWEEN p.hora_inicio AND p.hora_fim) AS is_current
-      FROM recepcao_plantoes p
-      JOIN recepcao_locais l ON l.id = p.local_id
-      LEFT JOIN LATERAL (
+      const query = `
         SELECT
-          COUNT(*) FILTER (WHERE status = 'presente') AS total_presentes,
-          COUNT(*) FILTER (WHERE status = 'presente' AND NOT em_atendimento AND NOT pausado AND NOT feedback_pendente) AS disponiveis,
-          COUNT(*) FILTER (WHERE em_atendimento = true) AS em_atendimento
-        FROM recepcao_presencas pr
-        WHERE pr.plantao_id = p.id
-      ) stats ON true
-      ${whereClause}
-      ORDER BY p.hora_inicio ASC
-    `;
+          p.id,
+          p.workspace_id,
+          p.local_id,
+          p.data,
+          p.hora_inicio,
+          p.hora_fim,
+          p.hora_limite_checkin,
+          p.max_corretores,
+          p.descricao,
+          p.status,
+          COALESCE(p.sorteio_realizado, false) AS sorteio_realizado,
+          p.sorteio_at,
+          COALESCE(p.meta_ofertas, 30) AS meta_ofertas,
+          l.nome AS local_nome,
+          l.endereco AS local_endereco,
+          COALESCE(stats.total_presentes, 0) AS total_presentes,
+          COALESCE(stats.disponiveis, 0) AS disponiveis,
+          COALESCE(stats.em_atendimento, 0) AS em_atendimento,
+          (CURRENT_TIME BETWEEN p.hora_inicio AND p.hora_fim) AS is_current
+        FROM recepcao_plantoes p
+        JOIN recepcao_locais l ON l.id = p.local_id
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*) FILTER (WHERE status = 'presente') AS total_presentes,
+            COUNT(*) FILTER (WHERE status = 'presente' AND NOT em_atendimento AND NOT pausado AND NOT feedback_pendente) AS disponiveis,
+            COUNT(*) FILTER (WHERE em_atendimento = true) AS em_atendimento
+          FROM recepcao_presencas pr
+          WHERE pr.plantao_id = p.id
+        ) stats ON true
+        ${whereClause}
+        ORDER BY p.hora_inicio ASC
+      `;
 
-    const result = await pool.query<PlantaoHoje>(query, params);
+      const result = await client.query<PlantaoHoje>(query, params);
 
-    // Identificar o plantão atual (horário corrente)
-    const current = result.rows.find(p => p.is_current) || null;
+      // Identificar o plantão atual (horário corrente)
+      const current = result.rows.find(p => p.is_current) || null;
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows,
-      current: current,
+      return NextResponse.json({
+        success: true,
+        data: result.rows,
+        current: current,
+      });
     });
   } catch (error) {
     console.error('Erro ao buscar plantões de hoje:', error);

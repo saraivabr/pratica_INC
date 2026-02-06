@@ -7,6 +7,7 @@
  */
 
 import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { sendActionButtons, sendQuickButtons, sendTextMessage } from '@/lib/whatsapp-sender';
 import { delay } from './persona';
 import type { ConversationContext } from './context';
@@ -476,37 +477,39 @@ export async function criarLeadVendedor(
 ): Promise<{ id: string; sucesso: boolean; mensagem: string }> {
   try {
     // Inserir lead na tabela
-    const { rows } = await dbQuery(
-      `INSERT INTO cvcrm_leads (
-        workspace_id,
-        nome,
-        telefone,
-        celular,
-        origem,
-        situacao_nome,
-        score,
-        empreendimentos,
-        data_cadastro_cvcrm,
-        created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-      RETURNING id`,
-      [
-        workspaceId,
-        lead.nome,
-        lead.whatsapp.replace(/\D/g, ''),
-        lead.whatsapp.replace(/\D/g, ''),
-        'WhatsApp Sofia Vendedor',
-        'Novo Lead - Interesse em Imóvel',
-        lead.score,
-        JSON.stringify([lead.imovelInteressado]),
-      ]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO cvcrm_leads (
+          workspace_id,
+          nome,
+          telefone,
+          celular,
+          origem,
+          situacao_nome,
+          score,
+          empreendimentos,
+          data_cadastro_cvcrm,
+          created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+        RETURNING id`,
+        [
+          workspaceId,
+          lead.nome,
+          lead.whatsapp.replace(/\D/g, ''),
+          lead.whatsapp.replace(/\D/g, ''),
+          'WhatsApp Sofia Vendedor',
+          'Novo Lead - Interesse em Imóvel',
+          lead.score,
+          JSON.stringify([lead.imovelInteressado]),
+        ]
+      );
 
-    return {
-      id: rows[0]?.id || 'unknown',
-      sucesso: true,
-      mensagem: `Lead ${lead.nome} criado com sucesso!`,
-    };
+      return {
+        id: rows[0]?.id || 'unknown',
+        sucesso: true,
+        mensagem: `Lead ${lead.nome} criado com sucesso!`,
+      };
+    });
   } catch (error) {
     console.error('[Sofia Vendedor] Erro ao criar lead:', error);
     return {

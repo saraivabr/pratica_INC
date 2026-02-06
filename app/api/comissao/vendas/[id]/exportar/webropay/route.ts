@@ -9,8 +9,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 import { arredondarValor } from "@/lib/comissao/calculations";
 import { CARGO_LABELS, type TipoDocumento } from "@/lib/comissao/types";
 
@@ -116,115 +116,117 @@ export async function GET(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Buscar venda
-    const { rows: vendaRows } = await dbQuery(
-      `SELECT * FROM comissao_vendas
-       WHERE id = $1 AND workspace_id = $2`,
-      [vendaId, ctx.workspaceId]
-    );
-
-    if (vendaRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Venda nao encontrada" },
-        { status: 404 }
+    return await withTenant(ctx.workspaceId, async (client) => {
+      // Buscar venda
+      const { rows: vendaRows } = await client.query(
+        `SELECT * FROM comissao_vendas
+         WHERE id = $1 AND workspace_id = $2`,
+        [vendaId, ctx.workspaceId]
       );
-    }
 
-    const venda = vendaRows[0];
-
-    // Buscar corretores (beneficiarios)
-    const { rows: corretores } = await dbQuery(
-      `SELECT * FROM comissao_corretores
-       WHERE venda_id = $1
-       ORDER BY grupo NULLS LAST, prioridade DESC, nome`,
-      [vendaId]
-    );
-
-    // Buscar parcelas ordenadas por data
-    const { rows: parcelas } = await dbQuery(
-      `SELECT * FROM comissao_parcelas
-       WHERE venda_id = $1
-       ORDER BY data_prevista, numero`,
-      [vendaId]
-    );
-
-    // Buscar matriz calculada
-    const { rows: matrizRows } = await dbQuery(
-      `SELECT
-        m.*,
-        COALESCE(m.valor_manual, m.valor_calculado) as valor_final
-       FROM comissao_matriz m
-       WHERE m.venda_id = $1`,
-      [vendaId]
-    );
-
-    // ========================================================================
-    // MONTAR CSV NO FORMATO WEBROPAY
-    // ========================================================================
-
-    const linhas: string[] = [];
-
-    // Cabecalho: CARGO,BENEFICIARIO,CPF_CNPJ,TOTAL,DATA_1,DATA_2,...
-    const cabecalho = ["CARGO", "BENEFICIARIO", "CPF_CNPJ", "TOTAL"];
-    for (const parcela of parcelas) {
-      cabecalho.push(formatarDataCSV(parcela.data_prevista));
-    }
-    linhas.push(cabecalho.join(","));
-
-    // Linhas dos beneficiarios
-    for (const corretor of corretores) {
-      const cols: string[] = [];
-
-      // CARGO
-      const cargo = obterLabelCargo(corretor.cargo);
-      cols.push(escaparCSV(cargo));
-
-      // BENEFICIARIO (nome)
-      cols.push(escaparCSV(corretor.nome || ""));
-
-      // CPF_CNPJ
-      const documento = formatarDocumentoCSV(
-        corretor.documento || corretor.cpf,
-        corretor.tipo_documento
-      );
-      cols.push(escaparCSV(documento));
-
-      // Calcular valores por parcela e total
-      let totalBeneficiario = 0;
-      const valoresParcelas: number[] = [];
-
-      for (const parcela of parcelas) {
-        const item = matrizRows.find(
-          (m: any) => m.corretor_id === corretor.id && m.parcela_id === parcela.id
+      if (vendaRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Venda nao encontrada" },
+          { status: 404 }
         );
-        const valor = item ? parseFloat(item.valor_final) : 0;
-        valoresParcelas.push(valor);
-        totalBeneficiario += valor;
       }
 
-      // TOTAL
-      cols.push(escaparCSV(formatarValorCSV(totalBeneficiario)));
+      const venda = vendaRows[0];
 
-      // Valores por data/parcela
-      for (const valor of valoresParcelas) {
-        cols.push(escaparCSV(formatarValorCSV(valor)));
+      // Buscar corretores (beneficiarios)
+      const { rows: corretores } = await client.query(
+        `SELECT * FROM comissao_corretores
+         WHERE venda_id = $1
+         ORDER BY grupo NULLS LAST, prioridade DESC, nome`,
+        [vendaId]
+      );
+
+      // Buscar parcelas ordenadas por data
+      const { rows: parcelas } = await client.query(
+        `SELECT * FROM comissao_parcelas
+         WHERE venda_id = $1
+         ORDER BY data_prevista, numero`,
+        [vendaId]
+      );
+
+      // Buscar matriz calculada
+      const { rows: matrizRows } = await client.query(
+        `SELECT
+          m.*,
+          COALESCE(m.valor_manual, m.valor_calculado) as valor_final
+         FROM comissao_matriz m
+         WHERE m.venda_id = $1`,
+        [vendaId]
+      );
+
+      // ========================================================================
+      // MONTAR CSV NO FORMATO WEBROPAY
+      // ========================================================================
+
+      const linhas: string[] = [];
+
+      // Cabecalho: CARGO,BENEFICIARIO,CPF_CNPJ,TOTAL,DATA_1,DATA_2,...
+      const cabecalho = ["CARGO", "BENEFICIARIO", "CPF_CNPJ", "TOTAL"];
+      for (const parcela of parcelas) {
+        cabecalho.push(formatarDataCSV(parcela.data_prevista));
+      }
+      linhas.push(cabecalho.join(","));
+
+      // Linhas dos beneficiarios
+      for (const corretor of corretores) {
+        const cols: string[] = [];
+
+        // CARGO
+        const cargo = obterLabelCargo(corretor.cargo);
+        cols.push(escaparCSV(cargo));
+
+        // BENEFICIARIO (nome)
+        cols.push(escaparCSV(corretor.nome || ""));
+
+        // CPF_CNPJ
+        const documento = formatarDocumentoCSV(
+          corretor.documento || corretor.cpf,
+          corretor.tipo_documento
+        );
+        cols.push(escaparCSV(documento));
+
+        // Calcular valores por parcela e total
+        let totalBeneficiario = 0;
+        const valoresParcelas: number[] = [];
+
+        for (const parcela of parcelas) {
+          const item = matrizRows.find(
+            (m: any) => m.corretor_id === corretor.id && m.parcela_id === parcela.id
+          );
+          const valor = item ? parseFloat(item.valor_final) : 0;
+          valoresParcelas.push(valor);
+          totalBeneficiario += valor;
+        }
+
+        // TOTAL
+        cols.push(escaparCSV(formatarValorCSV(totalBeneficiario)));
+
+        // Valores por data/parcela
+        for (const valor of valoresParcelas) {
+          cols.push(escaparCSV(formatarValorCSV(valor)));
+        }
+
+        linhas.push(cols.join(","));
       }
 
-      linhas.push(cols.join(","));
-    }
+      // Montar CSV final
+      const csv = linhas.join("\n");
 
-    // Montar CSV final
-    const csv = linhas.join("\n");
+      // Retornar arquivo para download
+      const codigoVenda = venda.codigo || `venda-${vendaId}`;
+      const filename = `comissao-${codigoVenda}-webropay.csv`;
 
-    // Retornar arquivo para download
-    const codigoVenda = venda.codigo || `venda-${vendaId}`;
-    const filename = `comissao-${codigoVenda}-webropay.csv`;
-
-    return new Response(csv, {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-      },
+      return new Response(csv, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+        },
+      });
     });
   } catch (error: any) {
     console.error("Erro ao exportar Webropay:", error);

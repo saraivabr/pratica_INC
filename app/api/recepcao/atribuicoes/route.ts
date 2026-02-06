@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 interface AtribuicaoWithDetails {
   id: string;
@@ -52,63 +52,65 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
     const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
-    let whereClause = 'WHERE a.workspace_id = $1';
-    const params: any[] = [workspaceId];
-    let paramIndex = 2;
+    return await withTenant(workspaceId, async (client) => {
+      let whereClause = 'WHERE a.workspace_id = $1';
+      const params: any[] = [workspaceId];
+      let paramIndex = 2;
 
-    if (plantaoId) {
-      whereClause += ` AND a.plantao_id = $${paramIndex++}`;
-      params.push(plantaoId);
-    }
+      if (plantaoId) {
+        whereClause += ` AND a.plantao_id = $${paramIndex++}`;
+        params.push(plantaoId);
+      }
 
-    if (meus) {
-      whereClause += ` AND a.user_id = $${paramIndex++}`;
-      params.push((user as any).id);
-    } else if (userId) {
-      whereClause += ` AND a.user_id = $${paramIndex++}`;
-      params.push(userId);
-    }
+      if (meus) {
+        whereClause += ` AND a.user_id = $${paramIndex++}`;
+        params.push((user as any).id);
+      } else if (userId) {
+        whereClause += ` AND a.user_id = $${paramIndex++}`;
+        params.push(userId);
+      }
 
-    if (pendentes) {
-      whereClause += ' AND a.feedback_status IS NULL';
-    }
+      if (pendentes) {
+        whereClause += ' AND a.feedback_status IS NULL';
+      }
 
-    const countQuery = `SELECT COUNT(*) AS total FROM recepcao_atribuicoes a ${whereClause}`;
-    const countResult = await pool.query(countQuery, params);
-    const total = parseInt(countResult.rows[0].total);
+      const countQuery = `SELECT COUNT(*) AS total FROM recepcao_atribuicoes a ${whereClause}`;
+      const countResult = await client.query(countQuery, params);
+      const total = parseInt(countResult.rows[0].total);
 
-    const query = `
-      SELECT
-        a.*,
-        u.nome AS corretor_nome,
-        u.telefone AS corretor_telefone,
-        ab.nome AS atribuido_por_nome,
-        cl.empreendimentos AS lead_empreendimentos,
-        cl.origem AS lead_crm_origem,
-        cl.score AS lead_score,
-        cl.situacao_nome AS lead_situacao,
-        cl.ultima_data_conversao AS lead_ultima_conversao,
-        cl.telefone AS lead_crm_telefone,
-        cl.celular AS lead_celular,
-        cl.created_at AS lead_created_at
-      FROM recepcao_atribuicoes a
-      JOIN users u ON u.id = a.user_id
-      LEFT JOIN users ab ON ab.id = a.atribuido_por
-      LEFT JOIN cvcrm_leads cl ON cl.cvcrm_id = a.cvcrm_lead_id
-      ${whereClause}
-      ORDER BY a.atribuido_at DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
-    params.push(limit, offset);
+      const query = `
+        SELECT
+          a.*,
+          u.nome AS corretor_nome,
+          u.telefone AS corretor_telefone,
+          ab.nome AS atribuido_por_nome,
+          cl.empreendimentos AS lead_empreendimentos,
+          cl.origem AS lead_crm_origem,
+          cl.score AS lead_score,
+          cl.situacao_nome AS lead_situacao,
+          cl.ultima_data_conversao AS lead_ultima_conversao,
+          cl.telefone AS lead_crm_telefone,
+          cl.celular AS lead_celular,
+          cl.created_at AS lead_created_at
+        FROM recepcao_atribuicoes a
+        JOIN users u ON u.id = a.user_id
+        LEFT JOIN users ab ON ab.id = a.atribuido_por
+        LEFT JOIN cvcrm_leads cl ON cl.cvcrm_id = a.cvcrm_lead_id
+        ${whereClause}
+        ORDER BY a.atribuido_at DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+      params.push(limit, offset);
 
-    const result = await pool.query<AtribuicaoWithDetails>(query, params);
+      const result = await client.query<AtribuicaoWithDetails>(query, params);
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows,
-      total,
-      limit,
-      offset,
+      return NextResponse.json({
+        success: true,
+        data: result.rows,
+        total,
+        limit,
+        offset,
+      });
     });
   } catch (error) {
     console.error('Erro ao listar atribuições:', error);

@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { z } from 'zod';
 
 // Schema de validacao para criacao de evento
@@ -62,57 +62,59 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 20 : rawLimit), 100);
     const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
-    // Query base com estatisticas de convidados
-    let whereClause = 'WHERE e.workspace_id = $1';
-    const params: any[] = [workspaceId];
-    let paramIndex = 2;
+    return await withTenant(workspaceId, async (client) => {
+      // Query base com estatisticas de convidados
+      let whereClause = 'WHERE e.workspace_id = $1';
+      const params: any[] = [workspaceId];
+      let paramIndex = 2;
 
-    // Filtro por status
-    if (status !== 'all') {
-      whereClause += ` AND e.status = $${paramIndex}`;
-      params.push(status);
-      paramIndex++;
-    }
+      // Filtro por status
+      if (status !== 'all') {
+        whereClause += ` AND e.status = $${paramIndex}`;
+        params.push(status);
+        paramIndex++;
+      }
 
-    // Contar total
-    const countQuery = `SELECT COUNT(*) as total FROM eventos e ${whereClause}`;
-    const countResult = await pool.query(countQuery, params);
-    const total = parseInt(countResult.rows[0].total);
+      // Contar total
+      const countQuery = `SELECT COUNT(*) as total FROM eventos e ${whereClause}`;
+      const countResult = await client.query(countQuery, params);
+      const total = parseInt(countResult.rows[0].total);
 
-    // Buscar eventos com estatisticas
-    const query = `
-      SELECT
-        e.*,
-        COALESCE(stats.total_convidados, 0) as total_convidados,
-        COALESCE(stats.confirmados, 0) as confirmados,
-        COALESCE(stats.recusados, 0) as recusados,
-        COALESCE(stats.talvez, 0) as talvez,
-        COALESCE(stats.pendentes, 0) as pendentes
-      FROM eventos e
-      LEFT JOIN LATERAL (
+      // Buscar eventos com estatisticas
+      const query = `
         SELECT
-          COUNT(*) as total_convidados,
-          COUNT(*) FILTER (WHERE status = 'confirmado') as confirmados,
-          COUNT(*) FILTER (WHERE status = 'recusado') as recusados,
-          COUNT(*) FILTER (WHERE status = 'talvez') as talvez,
-          COUNT(*) FILTER (WHERE status = 'pendente') as pendentes
-        FROM evento_convidados ec
-        WHERE ec.evento_id = e.id
-      ) stats ON true
-      ${whereClause}
-      ORDER BY e.data_hora DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
-    params.push(limit, offset);
+          e.*,
+          COALESCE(stats.total_convidados, 0) as total_convidados,
+          COALESCE(stats.confirmados, 0) as confirmados,
+          COALESCE(stats.recusados, 0) as recusados,
+          COALESCE(stats.talvez, 0) as talvez,
+          COALESCE(stats.pendentes, 0) as pendentes
+        FROM eventos e
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*) as total_convidados,
+            COUNT(*) FILTER (WHERE status = 'confirmado') as confirmados,
+            COUNT(*) FILTER (WHERE status = 'recusado') as recusados,
+            COUNT(*) FILTER (WHERE status = 'talvez') as talvez,
+            COUNT(*) FILTER (WHERE status = 'pendente') as pendentes
+          FROM evento_convidados ec
+          WHERE ec.evento_id = e.id
+        ) stats ON true
+        ${whereClause}
+        ORDER BY e.data_hora DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+      params.push(limit, offset);
 
-    const result = await pool.query<EventoWithStats>(query, params);
+      const result = await client.query<EventoWithStats>(query, params);
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows,
-      total,
-      limit,
-      offset,
+      return NextResponse.json({
+        success: true,
+        data: result.rows,
+        total,
+        limit,
+        offset,
+      });
     });
   } catch (error) {
     console.error('Erro ao listar eventos:', error);
@@ -152,30 +154,32 @@ export async function POST(request: NextRequest) {
 
     const { nome, descricao, data_hora, local, lembrete_horas } = validationResult.data;
 
-    // Inserir evento
-    const result = await pool.query<EventoDB>(
-      `INSERT INTO eventos (workspace_id, nome, descricao, data_hora, local, lembrete_horas, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'rascunho')
-       RETURNING *`,
-      [workspaceId, nome, descricao || null, data_hora, local, lembrete_horas]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      // Inserir evento
+      const result = await client.query<EventoDB>(
+        `INSERT INTO eventos (workspace_id, nome, descricao, data_hora, local, lembrete_horas, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'rascunho')
+         RETURNING *`,
+        [workspaceId, nome, descricao || null, data_hora, local, lembrete_horas]
+      );
 
-    const evento = result.rows[0];
+      const evento = result.rows[0];
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          ...evento,
-          total_convidados: 0,
-          confirmados: 0,
-          recusados: 0,
-          talvez: 0,
-          pendentes: 0,
+      return NextResponse.json(
+        {
+          success: true,
+          data: {
+            ...evento,
+            total_convidados: 0,
+            confirmados: 0,
+            recusados: 0,
+            talvez: 0,
+            pendentes: 0,
+          },
         },
-      },
-      { status: 201 }
-    );
+        { status: 201 }
+      );
+    });
   } catch (error) {
     console.error('Erro ao criar evento:', error);
     return NextResponse.json(

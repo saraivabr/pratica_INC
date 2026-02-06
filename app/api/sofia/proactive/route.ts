@@ -13,8 +13,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { PoolClient } from "pg";
 import { dbQuery } from "@/lib/db";
-import { getWorkspace, listTenants, Tenant } from "@/lib/tenant-context";
+import { getWorkspace, listTenants, Tenant, withTenant } from "@/lib/tenant-context";
 import {
   sendTextMessage,
   formatPhoneNumber,
@@ -90,12 +91,18 @@ function isAuthorized(request: NextRequest): boolean {
 // DATA FETCHERS
 // ============================================================================
 
+/** Helper: execute query using client (withTenant) or dbQuery fallback */
+async function execQuery(sql: string, params: any[], client?: PoolClient) {
+  if (client) return client.query(sql, params);
+  return dbQuery(sql, params);
+}
+
 /**
  * Busca leads quentes de um usuario
  */
-async function fetchUserLeads(userId: string): Promise<Lead[]> {
+async function fetchUserLeads(userId: string, client?: PoolClient): Promise<Lead[]> {
   try {
-    const { rows } = await dbQuery(
+    const { rows } = await execQuery(
       `SELECT
         id,
         name as nome,
@@ -131,14 +138,14 @@ async function fetchUserLeads(userId: string): Promise<Lead[]> {
 /**
  * Busca informacoes de meta do usuario
  */
-async function fetchUserMeta(userId: string): Promise<MetaInfo | undefined> {
+async function fetchUserMeta(userId: string, client?: PoolClient): Promise<MetaInfo | undefined> {
   try {
     // Buscar meta do mes atual
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-    const { rows } = await dbQuery(
+    const { rows } = await execQuery(
       `SELECT
         COALESCE(g.target_value, 0) as valor,
         COALESCE(g.current_value, 0) as atingido,
@@ -173,9 +180,9 @@ async function fetchUserMeta(userId: string): Promise<MetaInfo | undefined> {
 /**
  * Busca atividades agendadas para as proximas horas
  */
-async function fetchUserAtividades(userId: string): Promise<Atividade[]> {
+async function fetchUserAtividades(userId: string, client?: PoolClient): Promise<Atividade[]> {
   try {
-    const { rows } = await dbQuery(
+    const { rows } = await execQuery(
       `SELECT
         a.id,
         a.title as titulo,
@@ -211,9 +218,9 @@ async function fetchUserAtividades(userId: string): Promise<Atividade[]> {
 /**
  * Busca vendas recentes para follow-up
  */
-async function fetchUserVendas(userId: string): Promise<Venda[]> {
+async function fetchUserVendas(userId: string, client?: PoolClient): Promise<Venda[]> {
   try {
-    const { rows } = await dbQuery(
+    const { rows } = await execQuery(
       `SELECT
         r.id,
         l.name as cliente_nome,
@@ -250,7 +257,7 @@ async function fetchUserVendas(userId: string): Promise<Venda[]> {
  */
 async function fetchLancamentosHoje(): Promise<Empreendimento[]> {
   try {
-    const { rows } = await dbQuery(
+    const { rows } = await execQuery(
       `SELECT
         id,
         name as nome,
@@ -282,10 +289,11 @@ async function fetchLancamentosHoje(): Promise<Empreendimento[]> {
  * Busca ultimo tempo de trigger para controle de cooldown
  */
 async function fetchLastTriggerTimes(
-  userId: string
+  userId: string,
+  client?: PoolClient
 ): Promise<Record<string, Date>> {
   try {
-    const { rows } = await dbQuery(
+    const { rows } = await execQuery(
       `SELECT
         data->>'triggerId' as trigger_id,
         MAX(created_at) as last_time
@@ -360,10 +368,11 @@ async function sendProactiveWhatsApp(
 async function logProactiveSent(
   userId: string,
   triggerId: string,
-  message: ProactiveMessage
+  message: ProactiveMessage,
+  client?: PoolClient
 ): Promise<void> {
   try {
-    await dbQuery(
+    await execQuery(
       `INSERT INTO tracking_events (user_id, event_type, page, data, created_at)
        VALUES ($1, $2, $3, $4, NOW())`,
       [
@@ -395,7 +404,8 @@ async function processUserProactive(
   tenant: Tenant,
   instanceName: string,
   lancamentos: Empreendimento[],
-  dryRun: boolean = false
+  dryRun: boolean = false,
+  client?: PoolClient
 ): Promise<ProactiveResult> {
   const result: ProactiveResult = {
     userId: user.id,
@@ -409,11 +419,11 @@ async function processUserProactive(
   try {
     // Buscar todos os dados necessarios em paralelo
     const [leads, meta, atividades, vendas, lastTriggerTime] = await Promise.all([
-      fetchUserLeads(user.id),
-      fetchUserMeta(user.id),
-      fetchUserAtividades(user.id),
-      fetchUserVendas(user.id),
-      fetchLastTriggerTimes(user.id),
+      fetchUserLeads(user.id, client),
+      fetchUserMeta(user.id, client),
+      fetchUserAtividades(user.id, client),
+      fetchUserVendas(user.id, client),
+      fetchLastTriggerTimes(user.id, client),
     ]);
 
     // Montar dados para verificacao
@@ -459,7 +469,7 @@ async function processUserProactive(
           await sendProactiveWhatsApp(instanceName, user.telefone, message);
 
           // Registrar envio
-          await logProactiveSent(user.id, trigger.triggerId, message);
+          await logProactiveSent(user.id, trigger.triggerId, message, client);
 
           // Marcar trigger como exibido (cooldown)
           await markTriggerShown(user.id, trigger.triggerId);
@@ -490,10 +500,11 @@ async function processUserProactive(
  * Busca usuarios ativos de um tenant para envio de proativas
  */
 async function getActiveUsersForTenant(
-  workspaceId: number
+  workspaceId: number,
+  client?: PoolClient
 ): Promise<Array<{ id: string; nome: string; telefone: string }>> {
   try {
-    const { rows } = await dbQuery<{ id: string; nome: string; telefone: string }>(
+    const { rows } = await execQuery(
       `SELECT u.id, u.nome, u.telefone
        FROM users u
        JOIN imobiliarias i ON u.imobiliaria_id = i.id

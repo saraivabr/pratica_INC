@@ -5,8 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 
 /**
  * GET - Listar imobiliarias disponiveis
@@ -20,32 +20,34 @@ export async function GET(request: NextRequest) {
     const busca = searchParams.get("busca");
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
 
-    // Buscar em cvcrm_imobiliarias
-    let query = `
-      SELECT
-        id,
-        nome,
-        cnpj
-      FROM cvcrm_imobiliarias
-      WHERE workspace_id = $1
-    `;
-    const params: any[] = [ctx.workspaceId];
-    let paramIndex = 2;
+    return await withTenant(ctx.workspaceId, async (client) => {
+      // Buscar em cvcrm_imobiliarias
+      let query = `
+        SELECT
+          id,
+          nome,
+          cnpj
+        FROM cvcrm_imobiliarias
+        WHERE workspace_id = $1
+      `;
+      const params: any[] = [ctx.workspaceId];
+      let paramIndex = 2;
 
-    if (busca) {
-      query += ` AND (nome ILIKE $${paramIndex} OR cnpj ILIKE $${paramIndex})`;
-      params.push(`%${busca}%`);
-      paramIndex++;
-    }
+      if (busca) {
+        query += ` AND (nome ILIKE $${paramIndex} OR cnpj ILIKE $${paramIndex})`;
+        params.push(`%${busca}%`);
+        paramIndex++;
+      }
 
-    query += ` ORDER BY nome LIMIT $${paramIndex}`;
-    params.push(limit);
+      query += ` ORDER BY nome LIMIT $${paramIndex}`;
+      params.push(limit);
 
-    const { rows } = await dbQuery(query, params);
+      const { rows } = await client.query(query, params);
 
-    return NextResponse.json({
-      success: true,
-      data: rows,
+      return NextResponse.json({
+        success: true,
+        data: rows,
+      });
     });
   } catch (error: any) {
     console.error("Erro ao buscar imobiliarias:", error);

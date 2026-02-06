@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { z } from 'zod';
 
 const CreateLocalSchema = z.object({
@@ -48,23 +48,25 @@ export async function GET(request: NextRequest) {
 
     const includeInactive = searchParams.get('includeInactive') === 'true';
 
-    let query = `
-      SELECT * FROM recepcao_locais
-      WHERE workspace_id = $1
-    `;
-    const params: any[] = [workspaceId];
+    return await withTenant(workspaceId, async (client) => {
+      let query = `
+        SELECT * FROM recepcao_locais
+        WHERE workspace_id = $1
+      `;
+      const params: any[] = [workspaceId];
 
-    if (!includeInactive) {
-      query += ' AND is_active = true';
-    }
+      if (!includeInactive) {
+        query += ' AND is_active = true';
+      }
 
-    query += ' ORDER BY nome ASC';
+      query += ' ORDER BY nome ASC';
 
-    const result = await pool.query<LocalDB>(query, params);
+      const result = await client.query<LocalDB>(query, params);
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows,
+      return NextResponse.json({
+        success: true,
+        data: result.rows,
+      });
     });
   } catch (error) {
     console.error('Erro ao listar locais:', error);
@@ -104,28 +106,30 @@ export async function POST(request: NextRequest) {
     const { nome, endereco, descricao, latitude, longitude, raio_geofence } =
       validationResult.data;
 
-    const result = await pool.query<LocalDB>(
-      `INSERT INTO recepcao_locais (workspace_id, nome, endereco, descricao, latitude, longitude, raio_geofence)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [
-        workspaceId,
-        nome,
-        endereco || null,
-        descricao || null,
-        latitude || null,
-        longitude || null,
-        raio_geofence,
-      ]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      const result = await client.query<LocalDB>(
+        `INSERT INTO recepcao_locais (workspace_id, nome, endereco, descricao, latitude, longitude, raio_geofence)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [
+          workspaceId,
+          nome,
+          endereco || null,
+          descricao || null,
+          latitude || null,
+          longitude || null,
+          raio_geofence,
+        ]
+      );
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: result.rows[0],
-      },
-      { status: 201 }
-    );
+      return NextResponse.json(
+        {
+          success: true,
+          data: result.rows[0],
+        },
+        { status: 201 }
+      );
+    });
   } catch (error) {
     console.error('Erro ao criar local:', error);
     return NextResponse.json(

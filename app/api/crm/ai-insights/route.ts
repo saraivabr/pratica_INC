@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 
 // Cache para insights por tenant (1 hora)
 const insightsCache = new Map<number, { data: any; timestamp: number }>();
@@ -165,182 +165,184 @@ export async function GET(request: NextRequest) {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-    // Métricas principais
-    const leadsRes = await dbQuery(`
-      SELECT
-        COUNT(*) FILTER (WHERE data_cad >= $1) as this_month,
-        COUNT(*) FILTER (WHERE data_cad >= $2 AND data_cad < $1) as last_month
-      FROM cvcrm_leads
-      WHERE workspace_id = $3
-    `, [startOfMonth.toISOString(), startOfLastMonth.toISOString(), workspaceId]);
+    return await withTenant(workspaceId, async (client) => {
+      // Métricas principais
+      const leadsRes = await client.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE data_cad >= $1) as this_month,
+          COUNT(*) FILTER (WHERE data_cad >= $2 AND data_cad < $1) as last_month
+        FROM cvcrm_leads
+        WHERE workspace_id = $3
+      `, [startOfMonth.toISOString(), startOfLastMonth.toISOString(), workspaceId]);
 
-    const thisMonth = parseInt(leadsRes.rows[0]?.this_month || 0);
-    const lastMonth = parseInt(leadsRes.rows[0]?.last_month || 0);
-    const leadsVariation = lastMonth > 0 ? Math.round(((thisMonth - lastMonth) / lastMonth) * 100) : 0;
+      const thisMonth = parseInt(leadsRes.rows[0]?.this_month || 0);
+      const lastMonth = parseInt(leadsRes.rows[0]?.last_month || 0);
+      const leadsVariation = lastMonth > 0 ? Math.round(((thisMonth - lastMonth) / lastMonth) * 100) : 0;
 
-    // Conversão
-    const conversionRes = await dbQuery(`
-      SELECT
-        COUNT(*) FILTER (WHERE
-          LOWER(situacao_nome) LIKE '%ganho%'
-          OR LOWER(situacao_nome) LIKE '%fechado%'
-          OR LOWER(situacao_nome) LIKE '%vend%'
-        ) as won,
-        COUNT(*) as total,
-        COALESCE(SUM(valor_negocio) FILTER (WHERE
-          LOWER(situacao_nome) LIKE '%ganho%'
-          OR LOWER(situacao_nome) LIKE '%fechado%'
-          OR LOWER(situacao_nome) LIKE '%vend%'
-        ), 0) as revenue
-      FROM cvcrm_leads
-      WHERE workspace_id = $1 AND data_cad >= $2
-    `, [workspaceId, startOfMonth.toISOString()]);
+      // Conversão
+      const conversionRes = await client.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE
+            LOWER(situacao_nome) LIKE '%ganho%'
+            OR LOWER(situacao_nome) LIKE '%fechado%'
+            OR LOWER(situacao_nome) LIKE '%vend%'
+          ) as won,
+          COUNT(*) as total,
+          COALESCE(SUM(valor_negocio) FILTER (WHERE
+            LOWER(situacao_nome) LIKE '%ganho%'
+            OR LOWER(situacao_nome) LIKE '%fechado%'
+            OR LOWER(situacao_nome) LIKE '%vend%'
+          ), 0) as revenue
+        FROM cvcrm_leads
+        WHERE workspace_id = $1 AND data_cad >= $2
+      `, [workspaceId, startOfMonth.toISOString()]);
 
-    const won = parseInt(conversionRes.rows[0]?.won || 0);
-    const total = parseInt(conversionRes.rows[0]?.total || 0);
-    const revenue = parseFloat(conversionRes.rows[0]?.revenue || 0);
+      const won = parseInt(conversionRes.rows[0]?.won || 0);
+      const total = parseInt(conversionRes.rows[0]?.total || 0);
+      const revenue = parseFloat(conversionRes.rows[0]?.revenue || 0);
 
-    // Score médio
-    const scoreRes = await dbQuery(`
-      SELECT AVG(score) as avg_score
-      FROM cvcrm_leads
-      WHERE workspace_id = $1 AND score > 0
-    `, [workspaceId]);
+      // Score médio
+      const scoreRes = await client.query(`
+        SELECT AVG(score) as avg_score
+        FROM cvcrm_leads
+        WHERE workspace_id = $1 AND score > 0
+      `, [workspaceId]);
 
-    // Origens com conversão
-    const originsRes = await dbQuery(`
-      SELECT
-        COALESCE(origem, midia_principal, 'Outros') as origem,
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE
-          LOWER(situacao_nome) LIKE '%ganho%'
-          OR LOWER(situacao_nome) LIKE '%fechado%'
-        ) as converted,
-        COALESCE(AVG(valor_negocio) FILTER (WHERE
-          LOWER(situacao_nome) LIKE '%ganho%'
-          OR LOWER(situacao_nome) LIKE '%fechado%'
-        ), 0) as avg_ticket
-      FROM cvcrm_leads
-      WHERE workspace_id = $1
-      GROUP BY COALESCE(origem, midia_principal, 'Outros')
-      ORDER BY total DESC
-      LIMIT 10
-    `, [workspaceId]);
+      // Origens com conversão
+      const originsRes = await client.query(`
+        SELECT
+          COALESCE(origem, midia_principal, 'Outros') as origem,
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE
+            LOWER(situacao_nome) LIKE '%ganho%'
+            OR LOWER(situacao_nome) LIKE '%fechado%'
+          ) as converted,
+          COALESCE(AVG(valor_negocio) FILTER (WHERE
+            LOWER(situacao_nome) LIKE '%ganho%'
+            OR LOWER(situacao_nome) LIKE '%fechado%'
+          ), 0) as avg_ticket
+        FROM cvcrm_leads
+        WHERE workspace_id = $1
+        GROUP BY COALESCE(origem, midia_principal, 'Outros')
+        ORDER BY total DESC
+        LIMIT 10
+      `, [workspaceId]);
 
-    const originStats = originsRes.rows.map(row => ({
-      origem: row.origem,
-      total: parseInt(row.total),
-      converted: parseInt(row.converted),
-      conversionRate: row.total > 0 ? Math.round((row.converted / row.total) * 100) : 0,
-      avgTicket: parseFloat(row.avg_ticket) || 0
-    }));
+      const originStats = originsRes.rows.map(row => ({
+        origem: row.origem,
+        total: parseInt(row.total),
+        converted: parseInt(row.converted),
+        conversionRate: row.total > 0 ? Math.round((row.converted / row.total) * 100) : 0,
+        avgTicket: parseFloat(row.avg_ticket) || 0
+      }));
 
-    // Melhor dia
-    const bestDayRes = await dbQuery(`
-      SELECT
-        EXTRACT(DOW FROM data_cad) as day_of_week,
-        COUNT(*) FILTER (WHERE
-          LOWER(situacao_nome) LIKE '%ganho%'
-          OR LOWER(situacao_nome) LIKE '%fechado%'
-        ) as converted
-      FROM cvcrm_leads
-      WHERE workspace_id = $1 AND data_cad IS NOT NULL
-      GROUP BY EXTRACT(DOW FROM data_cad)
-      ORDER BY converted DESC
-      LIMIT 1
-    `, [workspaceId]);
+      // Melhor dia
+      const bestDayRes = await client.query(`
+        SELECT
+          EXTRACT(DOW FROM data_cad) as day_of_week,
+          COUNT(*) FILTER (WHERE
+            LOWER(situacao_nome) LIKE '%ganho%'
+            OR LOWER(situacao_nome) LIKE '%fechado%'
+          ) as converted
+        FROM cvcrm_leads
+        WHERE workspace_id = $1 AND data_cad IS NOT NULL
+        GROUP BY EXTRACT(DOW FROM data_cad)
+        ORDER BY converted DESC
+        LIMIT 1
+      `, [workspaceId]);
 
-    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-    const bestDay = bestDayRes.rows[0]
-      ? { day: dayNames[parseInt(bestDayRes.rows[0].day_of_week)], conversions: parseInt(bestDayRes.rows[0].converted) }
-      : null;
+      const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+      const bestDay = bestDayRes.rows[0]
+        ? { day: dayNames[parseInt(bestDayRes.rows[0].day_of_week)], conversions: parseInt(bestDayRes.rows[0].converted) }
+        : null;
 
-    // Horário de pico
-    const peakHourRes = await dbQuery(`
-      SELECT EXTRACT(HOUR FROM data_cad) as hour, COUNT(*) as count
-      FROM cvcrm_leads
-      WHERE workspace_id = $1 AND data_cad IS NOT NULL
-      GROUP BY EXTRACT(HOUR FROM data_cad)
-      ORDER BY count DESC
-      LIMIT 1
-    `, [workspaceId]);
+      // Horário de pico
+      const peakHourRes = await client.query(`
+        SELECT EXTRACT(HOUR FROM data_cad) as hour, COUNT(*) as count
+        FROM cvcrm_leads
+        WHERE workspace_id = $1 AND data_cad IS NOT NULL
+        GROUP BY EXTRACT(HOUR FROM data_cad)
+        ORDER BY count DESC
+        LIMIT 1
+      `, [workspaceId]);
 
-    const peakHour = peakHourRes.rows[0] ? parseInt(peakHourRes.rows[0].hour) : null;
+      const peakHour = peakHourRes.rows[0] ? parseInt(peakHourRes.rows[0].hour) : null;
 
-    // Leads quentes sem contato
-    const hotLeadsRes = await dbQuery(`
-      SELECT COUNT(*) as count
-      FROM cvcrm_leads
-      WHERE workspace_id = $1
-      AND score >= 70
-      AND (ultima_data_conversao IS NULL OR ultima_data_conversao < NOW() - INTERVAL '24 hours')
-    `, [workspaceId]);
+      // Leads quentes sem contato
+      const hotLeadsRes = await client.query(`
+        SELECT COUNT(*) as count
+        FROM cvcrm_leads
+        WHERE workspace_id = $1
+        AND score >= 70
+        AND (ultima_data_conversao IS NULL OR ultima_data_conversao < NOW() - INTERVAL '24 hours')
+      `, [workspaceId]);
 
-    const hotLeadsNoContact = parseInt(hotLeadsRes.rows[0]?.count || 0);
+      const hotLeadsNoContact = parseInt(hotLeadsRes.rows[0]?.count || 0);
 
-    // Montar dados para análise
-    const statsData = {
-      totalLeads: thisMonth,
-      leadsVariation,
-      avgScore: Math.round(scoreRes.rows[0]?.avg_score || 0),
-      conversion: {
-        won,
-        total,
-        rate: total > 0 ? Math.round((won / total) * 100) : 0
-      },
-      revenue: { current: revenue },
-      originStats,
-      insights: {
-        bestDay,
-        peakHour,
-        hotLeadsNoContact,
-        bestOrigin: originStats.length > 0
-          ? originStats.reduce((best, curr) => curr.conversionRate > best.conversionRate ? curr : best)
-          : null
-      }
-    };
-
-    // Tentar gerar insights com Gemini
-    let aiInsights = null;
-    const geminiResponse = await generateGeminiInsight(statsData);
-
-    if (geminiResponse) {
-      try {
-        aiInsights = JSON.parse(geminiResponse);
-      } catch (e) {
-        console.error("Erro ao parsear resposta do Gemini:", e);
-      }
-    }
-
-    // Fallback para insights estáticos
-    const finalInsights = aiInsights || generateStaticInsights(statsData);
-
-    // Adicionar métricas calculadas
-    const result = {
-      ...finalInsights,
-      metrics: {
+      // Montar dados para análise
+      const statsData = {
         totalLeads: thisMonth,
         leadsVariation,
-        conversionRate: statsData.conversion.rate,
-        revenue: revenue,
-        avgScore: statsData.avgScore,
-        hotLeadsNoContact,
-        bestOrigin: statsData.insights.bestOrigin?.origem || null,
-        bestOriginRate: statsData.insights.bestOrigin?.conversionRate || 0,
-        bestDay: bestDay?.day || null,
-        peakHour
-      },
-      generatedBy: aiInsights ? 'gemini' : 'static',
-      generatedAt: new Date().toISOString()
-    };
+        avgScore: Math.round(scoreRes.rows[0]?.avg_score || 0),
+        conversion: {
+          won,
+          total,
+          rate: total > 0 ? Math.round((won / total) * 100) : 0
+        },
+        revenue: { current: revenue },
+        originStats,
+        insights: {
+          bestDay,
+          peakHour,
+          hotLeadsNoContact,
+          bestOrigin: originStats.length > 0
+            ? originStats.reduce((best, curr) => curr.conversionRate > best.conversionRate ? curr : best)
+            : null
+        }
+      };
 
-    // Salvar no cache para este tenant
-    insightsCache.set(workspaceId, {
-      data: result,
-      timestamp: Date.now()
+      // Tentar gerar insights com Gemini
+      let aiInsights = null;
+      const geminiResponse = await generateGeminiInsight(statsData);
+
+      if (geminiResponse) {
+        try {
+          aiInsights = JSON.parse(geminiResponse);
+        } catch (e) {
+          console.error("Erro ao parsear resposta do Gemini:", e);
+        }
+      }
+
+      // Fallback para insights estáticos
+      const finalInsights = aiInsights || generateStaticInsights(statsData);
+
+      // Adicionar métricas calculadas
+      const result = {
+        ...finalInsights,
+        metrics: {
+          totalLeads: thisMonth,
+          leadsVariation,
+          conversionRate: statsData.conversion.rate,
+          revenue: revenue,
+          avgScore: statsData.avgScore,
+          hotLeadsNoContact,
+          bestOrigin: statsData.insights.bestOrigin?.origem || null,
+          bestOriginRate: statsData.insights.bestOrigin?.conversionRate || 0,
+          bestDay: bestDay?.day || null,
+          peakHour
+        },
+        generatedBy: aiInsights ? 'gemini' : 'static',
+        generatedAt: new Date().toISOString()
+      };
+
+      // Salvar no cache para este tenant
+      insightsCache.set(workspaceId, {
+        data: result,
+        timestamp: Date.now()
+      });
+
+      return NextResponse.json(result);
     });
-
-    return NextResponse.json(result);
   } catch (error) {
     console.error("AI Insights Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { z } from 'zod';
 
 // Schema para adicionar convidados
@@ -95,82 +95,84 @@ export async function GET(
     const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 200);
     const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
-    // Verificar se evento existe e pertence ao tenant
-    const eventoCheck = await pool.query(
-      'SELECT id FROM eventos WHERE id = $1 AND workspace_id = $2',
-      [eventoId, workspaceId]
-    );
-
-    if (eventoCheck.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Evento nao encontrado' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      // Verificar se evento existe e pertence ao tenant
+      const eventoCheck = await client.query(
+        'SELECT id FROM eventos WHERE id = $1 AND workspace_id = $2',
+        [eventoId, workspaceId]
       );
-    }
 
-    // Montar query
-    let whereClause = 'WHERE evento_id = $1 AND workspace_id = $2';
-    const queryParams: any[] = [eventoId, workspaceId];
-    let paramIndex = 3;
+      if (eventoCheck.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Evento nao encontrado' },
+          { status: 404 }
+        );
+      }
 
-    // Filtro por status
-    if (status !== 'all') {
-      whereClause += ` AND status = $${paramIndex}`;
-      queryParams.push(status);
-      paramIndex++;
-    }
+      // Montar query
+      let whereClause = 'WHERE evento_id = $1 AND workspace_id = $2';
+      const queryParams: any[] = [eventoId, workspaceId];
+      let paramIndex = 3;
 
-    // Filtro por busca (nome ou celular)
-    if (search) {
-      whereClause += ` AND (LOWER(nome) LIKE LOWER($${paramIndex}) OR celular LIKE $${paramIndex})`;
-      queryParams.push(`%${search}%`);
-      paramIndex++;
-    }
+      // Filtro por status
+      if (status !== 'all') {
+        whereClause += ` AND status = $${paramIndex}`;
+        queryParams.push(status);
+        paramIndex++;
+      }
 
-    // Contar total
-    const countQuery = `SELECT COUNT(*) as total FROM evento_convidados ${whereClause}`;
-    const countResult = await pool.query(countQuery, queryParams);
-    const total = parseInt(countResult.rows[0].total);
+      // Filtro por busca (nome ou celular)
+      if (search) {
+        whereClause += ` AND (LOWER(nome) LIKE LOWER($${paramIndex}) OR celular LIKE $${paramIndex})`;
+        queryParams.push(`%${search}%`);
+        paramIndex++;
+      }
 
-    // Buscar convidados
-    const query = `
-      SELECT *
-      FROM evento_convidados
-      ${whereClause}
-      ORDER BY nome ASC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
-    queryParams.push(limit, offset);
+      // Contar total
+      const countQuery = `SELECT COUNT(*) as total FROM evento_convidados ${whereClause}`;
+      const countResult = await client.query(countQuery, queryParams);
+      const total = parseInt(countResult.rows[0].total);
 
-    const result = await pool.query<ConvidadoDB>(query, queryParams);
+      // Buscar convidados
+      const query = `
+        SELECT *
+        FROM evento_convidados
+        ${whereClause}
+        ORDER BY nome ASC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+      queryParams.push(limit, offset);
 
-    // Estatisticas
-    const statsQuery = `
-      SELECT
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'pendente') as pendentes,
-        COUNT(*) FILTER (WHERE status = 'confirmado') as confirmados,
-        COUNT(*) FILTER (WHERE status = 'recusado') as recusados,
-        COUNT(*) FILTER (WHERE status = 'talvez') as talvez
-      FROM evento_convidados
-      WHERE evento_id = $1 AND workspace_id = $2
-    `;
-    const statsResult = await pool.query(statsQuery, [eventoId, workspaceId]);
-    const stats = statsResult.rows[0];
+      const result = await client.query<ConvidadoDB>(query, queryParams);
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows,
-      total,
-      limit,
-      offset,
-      stats: {
-        total: parseInt(stats.total),
-        pendentes: parseInt(stats.pendentes),
-        confirmados: parseInt(stats.confirmados),
-        recusados: parseInt(stats.recusados),
-        talvez: parseInt(stats.talvez),
-      },
+      // Estatisticas
+      const statsQuery = `
+        SELECT
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE status = 'pendente') as pendentes,
+          COUNT(*) FILTER (WHERE status = 'confirmado') as confirmados,
+          COUNT(*) FILTER (WHERE status = 'recusado') as recusados,
+          COUNT(*) FILTER (WHERE status = 'talvez') as talvez
+        FROM evento_convidados
+        WHERE evento_id = $1 AND workspace_id = $2
+      `;
+      const statsResult = await client.query(statsQuery, [eventoId, workspaceId]);
+      const stats = statsResult.rows[0];
+
+      return NextResponse.json({
+        success: true,
+        data: result.rows,
+        total,
+        limit,
+        offset,
+        stats: {
+          total: parseInt(stats.total),
+          pendentes: parseInt(stats.pendentes),
+          confirmados: parseInt(stats.confirmados),
+          recusados: parseInt(stats.recusados),
+          talvez: parseInt(stats.talvez),
+        },
+      });
     });
   } catch (error) {
     console.error('Erro ao listar convidados:', error);
@@ -224,90 +226,92 @@ export async function POST(
 
     const { convidados } = validationResult.data;
 
-    // Verificar se evento existe e pertence ao tenant
-    const eventoCheck = await pool.query(
-      'SELECT id, status FROM eventos WHERE id = $1 AND workspace_id = $2',
-      [eventoId, workspaceId]
-    );
-
-    if (eventoCheck.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Evento nao encontrado' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      // Verificar se evento existe e pertence ao tenant
+      const eventoCheck = await client.query(
+        'SELECT id, status FROM eventos WHERE id = $1 AND workspace_id = $2',
+        [eventoId, workspaceId]
       );
-    }
 
-    // Nao permitir adicionar convidados em evento cancelado
-    if (eventoCheck.rows[0].status === 'cancelado') {
-      return NextResponse.json(
-        { success: false, error: 'Nao e possivel adicionar convidados em evento cancelado' },
-        { status: 400 }
+      if (eventoCheck.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Evento nao encontrado' },
+          { status: 404 }
+        );
+      }
+
+      // Nao permitir adicionar convidados em evento cancelado
+      if (eventoCheck.rows[0].status === 'cancelado') {
+        return NextResponse.json(
+          { success: false, error: 'Nao e possivel adicionar convidados em evento cancelado' },
+          { status: 400 }
+        );
+      }
+
+      // Buscar celulares ja cadastrados para evitar duplicatas
+      const celularesNormalizados = convidados.map((c) => normalizeCelular(c.celular));
+      const existingCheck = await client.query(
+        `SELECT celular FROM evento_convidados
+         WHERE evento_id = $1 AND celular = ANY($2)`,
+        [eventoId, celularesNormalizados]
       );
-    }
 
-    // Buscar celulares ja cadastrados para evitar duplicatas
-    const celularesNormalizados = convidados.map((c) => normalizeCelular(c.celular));
-    const existingCheck = await pool.query(
-      `SELECT celular FROM evento_convidados
-       WHERE evento_id = $1 AND celular = ANY($2)`,
-      [eventoId, celularesNormalizados]
-    );
+      const existingCelulares = new Set(existingCheck.rows.map((r) => r.celular));
 
-    const existingCelulares = new Set(existingCheck.rows.map((r) => r.celular));
+      // Filtrar convidados novos
+      const novosConvidados = convidados.filter(
+        (c) => !existingCelulares.has(normalizeCelular(c.celular))
+      );
 
-    // Filtrar convidados novos
-    const novosConvidados = convidados.filter(
-      (c) => !existingCelulares.has(normalizeCelular(c.celular))
-    );
+      if (novosConvidados.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          message: 'Todos os convidados ja estavam cadastrados',
+          added: 0,
+          skipped: convidados.length,
+        });
+      }
 
-    if (novosConvidados.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: [],
-        message: 'Todos os convidados ja estavam cadastrados',
-        added: 0,
-        skipped: convidados.length,
-      });
-    }
+      // Inserir novos convidados
+      const insertValues: any[][] = novosConvidados.map((c) => [
+        eventoId,
+        workspaceId,
+        c.nome,
+        normalizeCelular(c.celular),
+        c.origem || 'cvcrm',
+        c.cvcrm_id || null,
+        'pendente',
+      ]);
 
-    // Inserir novos convidados
-    const insertValues: any[][] = novosConvidados.map((c) => [
-      eventoId,
-      workspaceId,
-      c.nome,
-      normalizeCelular(c.celular),
-      c.origem || 'cvcrm',
-      c.cvcrm_id || null,
-      'pendente',
-    ]);
+      const placeholders = insertValues
+        .map(
+          (_, i) =>
+            `($${i * 7 + 1}, $${i * 7 + 2}, $${i * 7 + 3}, $${i * 7 + 4}, $${i * 7 + 5}, $${i * 7 + 6}, $${i * 7 + 7})`
+        )
+        .join(', ');
 
-    const placeholders = insertValues
-      .map(
-        (_, i) =>
-          `($${i * 7 + 1}, $${i * 7 + 2}, $${i * 7 + 3}, $${i * 7 + 4}, $${i * 7 + 5}, $${i * 7 + 6}, $${i * 7 + 7})`
-      )
-      .join(', ');
+      const flatValues = insertValues.flat();
 
-    const flatValues = insertValues.flat();
+      const insertQuery = `
+        INSERT INTO evento_convidados (evento_id, workspace_id, nome, celular, origem, cvcrm_id, status)
+        VALUES ${placeholders}
+        RETURNING *
+      `;
 
-    const insertQuery = `
-      INSERT INTO evento_convidados (evento_id, workspace_id, nome, celular, origem, cvcrm_id, status)
-      VALUES ${placeholders}
-      RETURNING *
-    `;
+      const result = await client.query<ConvidadoDB>(insertQuery, flatValues);
 
-    const result = await pool.query<ConvidadoDB>(insertQuery, flatValues);
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: result.rows,
-        added: result.rows.length,
-        skipped: convidados.length - result.rows.length,
-        message: `${result.rows.length} convidado(s) adicionado(s)`,
-      },
-      { status: 201 }
-    );
+      return NextResponse.json(
+        {
+          success: true,
+          data: result.rows,
+          added: result.rows.length,
+          skipped: convidados.length - result.rows.length,
+          message: `${result.rows.length} convidado(s) adicionado(s)`,
+        },
+        { status: 201 }
+      );
+    });
   } catch (error) {
     console.error('Erro ao adicionar convidados:', error);
     return NextResponse.json(
@@ -351,31 +355,33 @@ export async function DELETE(
       );
     }
 
-    // Verificar se evento existe e pertence ao tenant
-    const eventoCheck = await pool.query(
-      'SELECT id FROM eventos WHERE id = $1 AND workspace_id = $2',
-      [eventoId, workspaceId]
-    );
-
-    if (eventoCheck.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Evento nao encontrado' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      // Verificar se evento existe e pertence ao tenant
+      const eventoCheck = await client.query(
+        'SELECT id FROM eventos WHERE id = $1 AND workspace_id = $2',
+        [eventoId, workspaceId]
       );
-    }
 
-    // Remover convidados
-    const result = await pool.query(
-      `DELETE FROM evento_convidados
-       WHERE evento_id = $1 AND workspace_id = $2 AND id = ANY($3)
-       RETURNING id`,
-      [eventoId, workspaceId, convidado_ids]
-    );
+      if (eventoCheck.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Evento nao encontrado' },
+          { status: 404 }
+        );
+      }
 
-    return NextResponse.json({
-      success: true,
-      removed: result.rowCount || 0,
-      message: `${result.rowCount} convidado(s) removido(s)`,
+      // Remover convidados
+      const result = await client.query(
+        `DELETE FROM evento_convidados
+         WHERE evento_id = $1 AND workspace_id = $2 AND id = ANY($3)
+         RETURNING id`,
+        [eventoId, workspaceId, convidado_ids]
+      );
+
+      return NextResponse.json({
+        success: true,
+        removed: result.rowCount || 0,
+        message: `${result.rowCount} convidado(s) removido(s)`,
+      });
     });
   } catch (error) {
     console.error('Erro ao remover convidados:', error);

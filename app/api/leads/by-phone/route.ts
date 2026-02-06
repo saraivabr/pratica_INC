@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 /**
  * Helper para limpar formatação de telefone
@@ -136,161 +136,163 @@ export async function GET(request: NextRequest) {
 
     const phoneVariants = getPhoneVariants(cleanPhone);
 
-    // Buscar lead no cvcrm_leads
-    // Usar LIKE para comparar versões limpas do telefone
-    const leadQuery = `
-      SELECT
-        id_lead, nome, email, telefone, celular, cpf,
-        origem, midia_principal, situacao_nome, situacao_id,
-        corretor, corretor_id, empreendimento, imobiliaria,
-        score, valor_negocio, renda_familiar,
-        cidade, estado, bairro, tags,
-        data_cad, ultima_data_conversao, cvcrm_data
-      FROM cvcrm_leads
-      WHERE workspace_id = $1
-        AND (
-          REGEXP_REPLACE(COALESCE(telefone, ''), '[^0-9]', '', 'g') = ANY($2::text[])
-          OR REGEXP_REPLACE(COALESCE(celular, ''), '[^0-9]', '', 'g') = ANY($2::text[])
-        )
-      ORDER BY data_cad DESC NULLS LAST
-      LIMIT 1
-    `;
-
-    const leadResult = await pool.query<LeadResult>(leadQuery, [workspaceId, phoneVariants]);
-    const lead = leadResult.rows[0] || null;
-
-    // Buscar contato WhatsApp
-    const whatsappQuery = `
-      SELECT
-        id, phone_number, name, profile_picture_url,
-        is_business, is_group, lead_id,
-        total_messages_received, total_messages_sent,
-        last_message_at, last_interaction_at
-      FROM whatsapp_contacts
-      WHERE workspace_id = $1
-        AND REGEXP_REPLACE(phone_number, '[^0-9]', '', 'g') = ANY($2::text[])
-      LIMIT 1
-    `;
-
-    const whatsappResult = await pool.query<WhatsAppContact>(whatsappQuery, [workspaceId, phoneVariants]);
-    const whatsappContact = whatsappResult.rows[0] || null;
-
-    // Determinar source
-    let source: 'cvcrm' | 'whatsapp' | 'both' | 'none';
-    if (lead && whatsappContact) {
-      source = 'both';
-    } else if (lead) {
-      source = 'cvcrm';
-    } else if (whatsappContact) {
-      source = 'whatsapp';
-    } else {
-      source = 'none';
-    }
-
-    // Buscar interações se tiver lead
-    let interacoes: Interacao[] = [];
-    if (lead) {
-      const interacoesQuery = `
+    return await withTenant(workspaceId, async (client) => {
+      // Buscar lead no cvcrm_leads
+      // Usar LIKE para comparar versões limpas do telefone
+      const leadQuery = `
         SELECT
-          id, cvcrm_id, tipo, descricao, data_cadastro, usuario_nome
-        FROM cvcrm_lead_interacoes
-        WHERE workspace_id = $1 AND cvcrm_lead_id = $2
-        ORDER BY data_cadastro DESC
-        LIMIT 10
+          id_lead, nome, email, telefone, celular, cpf,
+          origem, midia_principal, situacao_nome, situacao_id,
+          corretor, corretor_id, empreendimento, imobiliaria,
+          score, valor_negocio, renda_familiar,
+          cidade, estado, bairro, tags,
+          data_cad, ultima_data_conversao, cvcrm_data
+        FROM cvcrm_leads
+        WHERE workspace_id = $1
+          AND (
+            REGEXP_REPLACE(COALESCE(telefone, ''), '[^0-9]', '', 'g') = ANY($2::text[])
+            OR REGEXP_REPLACE(COALESCE(celular, ''), '[^0-9]', '', 'g') = ANY($2::text[])
+          )
+        ORDER BY data_cad DESC NULLS LAST
+        LIMIT 1
       `;
-      const interacoesResult = await pool.query<Interacao>(interacoesQuery, [workspaceId, lead.id_lead]);
-      interacoes = interacoesResult.rows;
-    }
 
-    // Extrair tags e pipeline_stage
-    let tags: string[] = [];
-    let pipelineStage: string | null = null;
+      const leadResult = await client.query<LeadResult>(leadQuery, [workspaceId, phoneVariants]);
+      const lead = leadResult.rows[0] || null;
 
-    if (lead) {
-      // Parse tags
-      if (lead.tags) {
-        try {
-          tags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags;
-        } catch {
-          tags = [];
+      // Buscar contato WhatsApp
+      const whatsappQuery = `
+        SELECT
+          id, phone_number, name, profile_picture_url,
+          is_business, is_group, lead_id,
+          total_messages_received, total_messages_sent,
+          last_message_at, last_interaction_at
+        FROM whatsapp_contacts
+        WHERE workspace_id = $1
+          AND REGEXP_REPLACE(phone_number, '[^0-9]', '', 'g') = ANY($2::text[])
+        LIMIT 1
+      `;
+
+      const whatsappResult = await client.query<WhatsAppContact>(whatsappQuery, [workspaceId, phoneVariants]);
+      const whatsappContact = whatsappResult.rows[0] || null;
+
+      // Determinar source
+      let source: 'cvcrm' | 'whatsapp' | 'both' | 'none';
+      if (lead && whatsappContact) {
+        source = 'both';
+      } else if (lead) {
+        source = 'cvcrm';
+      } else if (whatsappContact) {
+        source = 'whatsapp';
+      } else {
+        source = 'none';
+      }
+
+      // Buscar interações se tiver lead
+      let interacoes: Interacao[] = [];
+      if (lead) {
+        const interacoesQuery = `
+          SELECT
+            id, cvcrm_id, tipo, descricao, data_cadastro, usuario_nome
+          FROM cvcrm_lead_interacoes
+          WHERE workspace_id = $1 AND cvcrm_lead_id = $2
+          ORDER BY data_cadastro DESC
+          LIMIT 10
+        `;
+        const interacoesResult = await client.query<Interacao>(interacoesQuery, [workspaceId, lead.id_lead]);
+        interacoes = interacoesResult.rows;
+      }
+
+      // Extrair tags e pipeline_stage
+      let tags: string[] = [];
+      let pipelineStage: string | null = null;
+
+      if (lead) {
+        // Parse tags
+        if (lead.tags) {
+          try {
+            tags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags;
+          } catch {
+            tags = [];
+          }
+        }
+
+        // Pipeline stage baseado na situação
+        if (lead.situacao_nome) {
+          pipelineStage = lead.situacao_nome;
         }
       }
 
-      // Pipeline stage baseado na situação
-      if (lead.situacao_nome) {
-        pipelineStage = lead.situacao_nome;
+      // Normalizar dados do lead
+      let normalizedLead = null;
+      if (lead) {
+        const parseJsonField = (field: any) => {
+          if (!field) return null;
+          try {
+            return typeof field === 'string' ? JSON.parse(field) : field;
+          } catch {
+            return null;
+          }
+        };
+
+        normalizedLead = {
+          id: lead.id_lead,
+          nome: lead.nome || 'Sem nome',
+          email: lead.email,
+          telefone: lead.telefone || lead.celular,
+          cpf: lead.cpf,
+          origem: lead.origem || lead.midia_principal,
+          situacao: lead.situacao_nome,
+          situacao_id: lead.situacao_id,
+          corretor: parseJsonField(lead.corretor),
+          corretor_id: lead.corretor_id,
+          empreendimento: parseJsonField(lead.empreendimento),
+          imobiliaria: parseJsonField(lead.imobiliaria),
+          score: lead.score,
+          valor_negocio: lead.valor_negocio,
+          renda_familiar: lead.renda_familiar,
+          cidade: lead.cidade,
+          estado: lead.estado,
+          bairro: lead.bairro,
+          data_cadastro: lead.data_cad,
+          ultima_conversao: lead.ultima_data_conversao,
+        };
       }
-    }
 
-    // Normalizar dados do lead
-    let normalizedLead = null;
-    if (lead) {
-      const parseJsonField = (field: any) => {
-        if (!field) return null;
-        try {
-          return typeof field === 'string' ? JSON.parse(field) : field;
-        } catch {
-          return null;
-        }
-      };
+      // Normalizar dados do WhatsApp contact
+      let normalizedWhatsappContact = null;
+      if (whatsappContact) {
+        normalizedWhatsappContact = {
+          id: whatsappContact.id,
+          phone_number: whatsappContact.phone_number,
+          name: whatsappContact.name,
+          profile_picture_url: whatsappContact.profile_picture_url,
+          is_business: whatsappContact.is_business,
+          is_group: whatsappContact.is_group,
+          lead_id: whatsappContact.lead_id,
+          total_messages: whatsappContact.total_messages_received + whatsappContact.total_messages_sent,
+          messages_received: whatsappContact.total_messages_received,
+          messages_sent: whatsappContact.total_messages_sent,
+          last_message_at: whatsappContact.last_message_at,
+          last_interaction_at: whatsappContact.last_interaction_at,
+        };
+      }
 
-      normalizedLead = {
-        id: lead.id_lead,
-        nome: lead.nome || 'Sem nome',
-        email: lead.email,
-        telefone: lead.telefone || lead.celular,
-        cpf: lead.cpf,
-        origem: lead.origem || lead.midia_principal,
-        situacao: lead.situacao_nome,
-        situacao_id: lead.situacao_id,
-        corretor: parseJsonField(lead.corretor),
-        corretor_id: lead.corretor_id,
-        empreendimento: parseJsonField(lead.empreendimento),
-        imobiliaria: parseJsonField(lead.imobiliaria),
-        score: lead.score,
-        valor_negocio: lead.valor_negocio,
-        renda_familiar: lead.renda_familiar,
-        cidade: lead.cidade,
-        estado: lead.estado,
-        bairro: lead.bairro,
-        data_cadastro: lead.data_cad,
-        ultima_conversao: lead.ultima_data_conversao,
-      };
-    }
-
-    // Normalizar dados do WhatsApp contact
-    let normalizedWhatsappContact = null;
-    if (whatsappContact) {
-      normalizedWhatsappContact = {
-        id: whatsappContact.id,
-        phone_number: whatsappContact.phone_number,
-        name: whatsappContact.name,
-        profile_picture_url: whatsappContact.profile_picture_url,
-        is_business: whatsappContact.is_business,
-        is_group: whatsappContact.is_group,
-        lead_id: whatsappContact.lead_id,
-        total_messages: whatsappContact.total_messages_received + whatsappContact.total_messages_sent,
-        messages_received: whatsappContact.total_messages_received,
-        messages_sent: whatsappContact.total_messages_sent,
-        last_message_at: whatsappContact.last_message_at,
-        last_interaction_at: whatsappContact.last_interaction_at,
-      };
-    }
-
-    return NextResponse.json({
-      source,
-      lead: normalizedLead,
-      whatsapp_contact: normalizedWhatsappContact,
-      pipeline_stage: pipelineStage,
-      interacoes: interacoes.map(i => ({
-        id: i.id,
-        cvcrm_id: i.cvcrm_id,
-        tipo: i.tipo,
-        descricao: i.descricao,
-        data: i.data_cadastro,
-        usuario: i.usuario_nome,
-      })),
-      tags,
+      return NextResponse.json({
+        source,
+        lead: normalizedLead,
+        whatsapp_contact: normalizedWhatsappContact,
+        pipeline_stage: pipelineStage,
+        interacoes: interacoes.map(i => ({
+          id: i.id,
+          cvcrm_id: i.cvcrm_id,
+          tipo: i.tipo,
+          descricao: i.descricao,
+          data: i.data_cadastro,
+          usuario: i.usuario_nome,
+        })),
+        tags,
+      });
     });
 
   } catch (error) {

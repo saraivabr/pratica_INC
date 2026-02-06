@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { z } from 'zod';
 
 const AnotacaoSchema = z.object({
@@ -26,18 +26,20 @@ export async function GET(
     const { workspaceId } = ctx;
     const { id: atribuicaoId } = await params;
 
-    const result = await dbQuery(
-      `SELECT la.*, u.nome as user_nome
-       FROM lead_anotacoes la
-       JOIN users u ON u.id = la.user_id
-       WHERE la.atribuicao_id = $1 AND la.workspace_id = $2
-       ORDER BY la.created_at ASC`,
-      [atribuicaoId, workspaceId]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      const result = await client.query(
+        `SELECT la.*, u.nome as user_nome
+         FROM lead_anotacoes la
+         JOIN users u ON u.id = la.user_id
+         WHERE la.atribuicao_id = $1 AND la.workspace_id = $2
+         ORDER BY la.created_at ASC`,
+        [atribuicaoId, workspaceId]
+      );
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows,
+      return NextResponse.json({
+        success: true,
+        data: result.rows,
+      });
     });
   } catch (error) {
     console.error('Erro ao listar anotações:', error);
@@ -72,42 +74,44 @@ export async function POST(
 
     const { tipo, conteudo } = validation.data;
 
-    // Verify atribuição belongs to user and workspace
-    const atribCheck = await dbQuery(
-      `SELECT id, cvcrm_lead_id FROM recepcao_atribuicoes
-       WHERE id = $1 AND workspace_id = $2 AND user_id = $3`,
-      [atribuicaoId, workspaceId, userId]
-    );
-
-    if (atribCheck.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Atribuição não encontrada' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      // Verify atribuição belongs to user and workspace
+      const atribCheck = await client.query(
+        `SELECT id, cvcrm_lead_id FROM recepcao_atribuicoes
+         WHERE id = $1 AND workspace_id = $2 AND user_id = $3`,
+        [atribuicaoId, workspaceId, userId]
       );
-    }
 
-    const result = await dbQuery(
-      `INSERT INTO lead_anotacoes (workspace_id, atribuicao_id, cvcrm_lead_id, user_id, tipo, conteudo)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [
-        workspaceId,
-        atribuicaoId,
-        atribCheck.rows[0].cvcrm_lead_id,
-        userId,
-        tipo,
-        conteudo,
-      ]
-    );
+      if (atribCheck.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Atribuição não encontrada' },
+          { status: 404 }
+        );
+      }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: result.rows[0],
-        message: 'Anotação salva',
-      },
-      { status: 201 }
-    );
+      const result = await client.query(
+        `INSERT INTO lead_anotacoes (workspace_id, atribuicao_id, cvcrm_lead_id, user_id, tipo, conteudo)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+          workspaceId,
+          atribuicaoId,
+          atribCheck.rows[0].cvcrm_lead_id,
+          userId,
+          tipo,
+          conteudo,
+        ]
+      );
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: result.rows[0],
+          message: 'Anotação salva',
+        },
+        { status: 201 }
+      );
+    });
   } catch (error) {
     console.error('Erro ao criar anotação:', error);
     return NextResponse.json(

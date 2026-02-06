@@ -6,6 +6,7 @@
  */
 
 import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { getUnidadesCVCRM, getEmpreendimentosCVCRM } from '@/lib/cvcrm-client';
 import {
   sendPresence,
@@ -371,30 +372,34 @@ async function executePostVisita(
     // 1. Registrar interesse/agendamento no banco
     const { cod_imovel, data_sugerida, periodo, observacao } = args;
 
-    await dbQuery(
-      `INSERT INTO salva_leads_visitas
-       (workspace_id, lead_phone, lead_name, cod_imovel, data_sugerida, periodo, observacao, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-      [
-        workspaceId,
-        context.lead_phone,
-        context.lead_name || null,
-        cod_imovel,
-        data_sugerida || null,
-        periodo || null,
-        observacao || null
-      ]
-    ).catch(err => {
+    await withTenant(workspaceId, async (client) => {
+      await client.query(
+        `INSERT INTO salva_leads_visitas
+         (workspace_id, lead_phone, lead_name, cod_imovel, data_sugerida, periodo, observacao, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+        [
+          workspaceId,
+          context.lead_phone,
+          context.lead_name || null,
+          cod_imovel,
+          data_sugerida || null,
+          periodo || null,
+          observacao || null
+        ]
+      );
+    }).catch(err => {
       // Tabela pode nao existir ainda, log mas nao falha
       console.warn('[Salva-Leads] Tabela salva_leads_visitas nao existe:', err.message);
     });
 
     // 2. Notificar corretor se configurado (via Z-API - sistema→corretor)
     if (context.corretor_id) {
-      const corretorResult = await dbQuery(
-        `SELECT telefone FROM users WHERE id = $1`,
-        [context.corretor_id]
-      ).catch(() => ({ rows: [] }));
+      const corretorResult = await withTenant(workspaceId, async (client) => {
+        return client.query(
+          `SELECT telefone FROM users WHERE id = $1`,
+          [context.corretor_id]
+        );
+      }).catch(() => ({ rows: [] }));
 
       const corretorPhone = corretorResult.rows[0]?.telefone || context.corretor_phone;
 
@@ -484,23 +489,27 @@ async function executeTransferToCorretor(
 
   try {
     // 1. Marcar conversa como transferida no banco
-    await dbQuery(
-      `UPDATE salva_leads_conversations
-       SET bot_paused = true,
-           bot_paused_at = NOW(),
-           status = 'paused_by_corretor'
-       WHERE id = $1`,
-      [context.id]
-    ).catch(err => {
+    await withTenant(workspaceId, async (client) => {
+      await client.query(
+        `UPDATE salva_leads_conversations
+         SET bot_paused = true,
+             bot_paused_at = NOW(),
+             status = 'paused_by_corretor'
+         WHERE id = $1`,
+        [context.id]
+      );
+    }).catch(err => {
       console.warn('[Salva-Leads] Erro ao atualizar conversa:', err.message);
     });
 
     // 2. Notificar corretor (via Z-API - sistema→corretor)
     if (context.corretor_id) {
-      const corretorResult = await dbQuery(
-        `SELECT telefone FROM users WHERE id = $1`,
-        [context.corretor_id]
-      ).catch(() => ({ rows: [] }));
+      const corretorResult = await withTenant(workspaceId, async (client) => {
+        return client.query(
+          `SELECT telefone FROM users WHERE id = $1`,
+          [context.corretor_id]
+        );
+      }).catch(() => ({ rows: [] }));
 
       const corretorPhone = corretorResult.rows[0]?.telefone || context.corretor_phone;
 
@@ -572,38 +581,42 @@ async function executeGetConhecimento(
 
   try {
     // Buscar documentos de conhecimento do tenant
-    const result = await dbQuery(
-      `SELECT titulo, conteudo, categoria
-       FROM conhecimento_base
-       WHERE workspace_id = $1
-         AND (
-           titulo ILIKE $2
-           OR conteudo ILIKE $2
-           OR categoria ILIKE $2
-         )
-       ORDER BY
-         CASE WHEN titulo ILIKE $2 THEN 0
-              WHEN categoria ILIKE $2 THEN 1
-              ELSE 2 END,
-         created_at DESC
-       LIMIT 5`,
-      [workspaceId, `%${args.pergunta}%`]
-    ).catch(() => ({ rows: [] }));
+    const result = await withTenant(workspaceId, async (client) => {
+      return client.query(
+        `SELECT titulo, conteudo, categoria
+         FROM conhecimento_base
+         WHERE workspace_id = $1
+           AND (
+             titulo ILIKE $2
+             OR conteudo ILIKE $2
+             OR categoria ILIKE $2
+           )
+         ORDER BY
+           CASE WHEN titulo ILIKE $2 THEN 0
+                WHEN categoria ILIKE $2 THEN 1
+                ELSE 2 END,
+           created_at DESC
+         LIMIT 5`,
+        [workspaceId, `%${args.pergunta}%`]
+      );
+    }).catch(() => ({ rows: [] }));
 
     if (result.rows.length === 0) {
-      // Fallback: buscar informacoes do tenant/empresa
-      const tenantResult = await dbQuery(
-        `SELECT nome, configuracoes FROM tenants WHERE id = $1`,
-        [workspaceId]
-      ).catch(() => ({ rows: [] }));
+      // Fallback: buscar informacoes do workspace/empresa
+      const workspaceResult = await withTenant(workspaceId, async (client) => {
+        return client.query(
+          `SELECT name FROM workspaces WHERE id = $1`,
+          [workspaceId]
+        );
+      }).catch(() => ({ rows: [] }));
 
-      const tenant = tenantResult.rows[0];
-      if (tenant) {
+      const workspace = workspaceResult.rows[0];
+      if (workspace) {
         return {
           found: 1,
           conhecimentos: [{
             titulo: 'Informacoes da Empresa',
-            conteudo: `Empresa: ${tenant.nome}. Para informacoes mais detalhadas, consulte o corretor.`,
+            conteudo: `Empresa: ${workspace.name}. Para informacoes mais detalhadas, consulte o corretor.`,
             categoria: 'empresa'
           }],
           message: 'Informacoes basicas da empresa encontradas.'

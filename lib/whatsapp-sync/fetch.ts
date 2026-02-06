@@ -7,6 +7,7 @@
 
 import 'dotenv/config';
 import pool from '../db';
+import { withTenant } from '@/lib/tenant-context';
 import { EvolutionChat, EvolutionContact } from './types';
 
 const EVOLUTION_BASE_URL = process.env.EVOLUTION_BASE_URL || 'https://pratica-evolution-api.robuvi.easypanel.host';
@@ -323,64 +324,66 @@ export async function syncChatsToDatabase(
   try {
     const chats = await fetchAllChats(workspaceId, instanceName);
 
-    for (const chat of chats) {
-      try {
-        const phoneNumber = extractPhoneFromJid(chat.remoteJid);
-        const isGroup = isGroupJid(chat.remoteJid);
-        const contactName = chat.name || chat.pushName || null;
+    await withTenant(workspaceId, async (client) => {
+      for (const chat of chats) {
+        try {
+          const phoneNumber = extractPhoneFromJid(chat.remoteJid);
+          const isGroup = isGroupJid(chat.remoteJid);
+          const contactName = chat.name || chat.pushName || null;
 
-        // Extrai dados da ultima mensagem
-        const lastMessageText = chat.lastMessage?.message
-          ? extractMessageText(chat.lastMessage.message)
-          : null;
-        const lastMessageFromMe = chat.lastMessage?.key?.fromMe || false;
-        const lastMessageAt = chat.lastMessage?.messageTimestamp
-          ? new Date(chat.lastMessage.messageTimestamp * 1000).toISOString()
-          : null;
-        const unreadCount = chat.unreadCount || 0;
+          // Extrai dados da ultima mensagem
+          const lastMessageText = chat.lastMessage?.message
+            ? extractMessageText(chat.lastMessage.message)
+            : null;
+          const lastMessageFromMe = chat.lastMessage?.key?.fromMe || false;
+          const lastMessageAt = chat.lastMessage?.messageTimestamp
+            ? new Date(chat.lastMessage.messageTimestamp * 1000).toISOString()
+            : null;
+          const unreadCount = chat.unreadCount || 0;
 
-        // UPSERT no banco de dados
-        await pool.query(`
-          INSERT INTO whatsapp_synced_chats (
-            workspace_id,
-            remote_jid,
-            phone_number,
-            contact_name,
-            is_group,
-            last_message_at,
-            last_message_text,
-            last_message_from_me,
-            unread_count,
-            synced_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-          ON CONFLICT (workspace_id, remote_jid) DO UPDATE SET
-            phone_number = EXCLUDED.phone_number,
-            contact_name = EXCLUDED.contact_name,
-            is_group = EXCLUDED.is_group,
-            last_message_at = EXCLUDED.last_message_at,
-            last_message_text = EXCLUDED.last_message_text,
-            last_message_from_me = EXCLUDED.last_message_from_me,
-            unread_count = EXCLUDED.unread_count,
-            synced_at = NOW()
-        `, [
-          workspaceId,
-          chat.remoteJid,
-          phoneNumber,
-          contactName,
-          isGroup,
-          lastMessageAt,
-          lastMessageText,
-          lastMessageFromMe,
-          unreadCount
-        ]);
+          // UPSERT no banco de dados
+          await client.query(`
+            INSERT INTO whatsapp_synced_chats (
+              workspace_id,
+              remote_jid,
+              phone_number,
+              contact_name,
+              is_group,
+              last_message_at,
+              last_message_text,
+              last_message_from_me,
+              unread_count,
+              synced_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+            ON CONFLICT (workspace_id, remote_jid) DO UPDATE SET
+              phone_number = EXCLUDED.phone_number,
+              contact_name = EXCLUDED.contact_name,
+              is_group = EXCLUDED.is_group,
+              last_message_at = EXCLUDED.last_message_at,
+              last_message_text = EXCLUDED.last_message_text,
+              last_message_from_me = EXCLUDED.last_message_from_me,
+              unread_count = EXCLUDED.unread_count,
+              synced_at = NOW()
+          `, [
+            workspaceId,
+            chat.remoteJid,
+            phoneNumber,
+            contactName,
+            isGroup,
+            lastMessageAt,
+            lastMessageText,
+            lastMessageFromMe,
+            unreadCount
+          ]);
 
-        synced++;
-      } catch (error: any) {
-        const errorMsg = `Error syncing chat ${chat.remoteJid}: ${error.message}`;
-        console.error(`[WhatsApp Sync] ${errorMsg}`);
-        errors.push(errorMsg);
+          synced++;
+        } catch (error: any) {
+          const errorMsg = `Error syncing chat ${chat.remoteJid}: ${error.message}`;
+          console.error(`[WhatsApp Sync] ${errorMsg}`);
+          errors.push(errorMsg);
+        }
       }
-    }
+    });
 
     console.log(`[WhatsApp Sync] Chat sync completed: ${synced} synced, ${errors.length} errors`);
     return { synced, errors };

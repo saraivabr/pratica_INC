@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbQuery } from '@/lib/db';
+import pool from '@/lib/db';
 import { sendToClient } from '@/lib/evolution-helpers';
 import { validateRequest, AcaoSimulacaoSchema } from '@/lib/validation-schemas';
 
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       enviar_whatsapp,
     } = validation.data;
 
-    const { rows: leadRows } = await dbQuery(
+    const { rows: leadRows } = await pool.query(
       `SELECT id, name, phone FROM leads WHERE id = $1`,
       [lead_id]
     );
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     const valor_total = entrada + parcela_mensal * n;
     const juros_totais = valor_total - valor_imovel;
 
-    const { rows: simulacaoRows } = await dbQuery(
+    const { rows: simulacaoRows } = await pool.query(
       `
       INSERT INTO simulacoes (
         lead_id, corretor_id, imovel_id, imovel_nome,
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
           `Gostou? Vamos agendar uma visita? 🏡`;
 
         whatsapp_enviado = await sendToClient(lead.phone, mensagem, corretor_id);
-        await dbQuery(
+        await pool.query(
           `UPDATE simulacoes SET enviada_whatsapp = TRUE, enviada_em = NOW() WHERE id = $1`,
           [simulacao.id]
         );

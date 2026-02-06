@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 interface ConvidadoDB {
   id: string;
@@ -143,27 +143,7 @@ export async function POST(
       );
     }
 
-    // Verificar se evento existe e pertence ao tenant
-    const eventoCheck = await pool.query(
-      'SELECT id, status FROM eventos WHERE id = $1 AND workspace_id = $2',
-      [eventoId, workspaceId]
-    );
-
-    if (eventoCheck.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Evento nao encontrado' },
-        { status: 404 }
-      );
-    }
-
-    if (eventoCheck.rows[0].status === 'cancelado') {
-      return NextResponse.json(
-        { success: false, error: 'Nao e possivel importar convidados em evento cancelado' },
-        { status: 400 }
-      );
-    }
-
-    // Processar form data
+    // Processar form data (before withTenant since it doesn't need DB)
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
@@ -311,70 +291,92 @@ export async function POST(
       );
     }
 
-    // Verificar duplicatas no banco
-    const celulares = convidados.map((c) => c.celular);
-    const existingCheck = await pool.query(
-      `SELECT celular FROM evento_convidados
-       WHERE evento_id = $1 AND celular = ANY($2)`,
-      [eventoId, celulares]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      // Verificar se evento existe e pertence ao tenant
+      const eventoCheck = await client.query(
+        'SELECT id, status FROM eventos WHERE id = $1 AND workspace_id = $2',
+        [eventoId, workspaceId]
+      );
 
-    const existingCelulares = new Set(existingCheck.rows.map((r) => r.celular));
+      if (eventoCheck.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Evento nao encontrado' },
+          { status: 404 }
+        );
+      }
 
-    // Filtrar convidados novos
-    const novosConvidados = convidados.filter((c) => !existingCelulares.has(c.celular));
-    const duplicados = convidados.length - novosConvidados.length;
+      if (eventoCheck.rows[0].status === 'cancelado') {
+        return NextResponse.json(
+          { success: false, error: 'Nao e possivel importar convidados em evento cancelado' },
+          { status: 400 }
+        );
+      }
 
-    if (novosConvidados.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: [],
-        message: 'Todos os convidados ja estavam cadastrados',
-        added: 0,
-        skipped: duplicados,
-        erros: erros.slice(0, 10),
-      });
-    }
+      // Verificar duplicatas no banco
+      const celulares = convidados.map((c) => c.celular);
+      const existingCheck = await client.query(
+        `SELECT celular FROM evento_convidados
+         WHERE evento_id = $1 AND celular = ANY($2)`,
+        [eventoId, celulares]
+      );
 
-    // Inserir novos convidados
-    const insertValues: any[][] = novosConvidados.map((c) => [
-      eventoId,
-      workspaceId,
-      c.nome,
-      c.celular,
-      'importado',
-      null, // cvcrm_id
-      'pendente',
-    ]);
+      const existingCelulares = new Set(existingCheck.rows.map((r) => r.celular));
 
-    const placeholders = insertValues
-      .map(
-        (_, i) =>
-          `($${i * 7 + 1}, $${i * 7 + 2}, $${i * 7 + 3}, $${i * 7 + 4}, $${i * 7 + 5}, $${i * 7 + 6}, $${i * 7 + 7})`
-      )
-      .join(', ');
+      // Filtrar convidados novos
+      const novosConvidados = convidados.filter((c) => !existingCelulares.has(c.celular));
+      const duplicados = convidados.length - novosConvidados.length;
 
-    const flatValues = insertValues.flat();
+      if (novosConvidados.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          message: 'Todos os convidados ja estavam cadastrados',
+          added: 0,
+          skipped: duplicados,
+          erros: erros.slice(0, 10),
+        });
+      }
 
-    const insertQuery = `
-      INSERT INTO evento_convidados (evento_id, workspace_id, nome, celular, origem, cvcrm_id, status)
-      VALUES ${placeholders}
-      RETURNING *
-    `;
+      // Inserir novos convidados
+      const insertValues: any[][] = novosConvidados.map((c) => [
+        eventoId,
+        workspaceId,
+        c.nome,
+        c.celular,
+        'importado',
+        null, // cvcrm_id
+        'pendente',
+      ]);
 
-    const result = await pool.query<ConvidadoDB>(insertQuery, flatValues);
+      const placeholders = insertValues
+        .map(
+          (_, i) =>
+            `($${i * 7 + 1}, $${i * 7 + 2}, $${i * 7 + 3}, $${i * 7 + 4}, $${i * 7 + 5}, $${i * 7 + 6}, $${i * 7 + 7})`
+        )
+        .join(', ');
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: result.rows,
-        added: result.rows.length,
-        skipped: duplicados,
-        erros: erros.slice(0, 10),
-        message: `${result.rows.length} convidado(s) importado(s) com sucesso`,
-      },
-      { status: 201 }
-    );
+      const flatValues = insertValues.flat();
+
+      const insertQuery = `
+        INSERT INTO evento_convidados (evento_id, workspace_id, nome, celular, origem, cvcrm_id, status)
+        VALUES ${placeholders}
+        RETURNING *
+      `;
+
+      const result = await client.query<ConvidadoDB>(insertQuery, flatValues);
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: result.rows,
+          added: result.rows.length,
+          skipped: duplicados,
+          erros: erros.slice(0, 10),
+          message: `${result.rows.length} convidado(s) importado(s) com sucesso`,
+        },
+        { status: 201 }
+      );
+    });
   } catch (error) {
     console.error('Erro ao importar convidados:', error);
     return NextResponse.json(

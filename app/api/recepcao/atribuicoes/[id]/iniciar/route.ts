@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 interface AtribuicaoDB {
   id: string;
@@ -38,51 +38,53 @@ export async function POST(
       );
     }
 
-    // Verificar se atribuição existe e pertence ao corretor
-    const checkResult = await pool.query<AtribuicaoDB>(
-      `SELECT id, user_id, atendimento_iniciado_at FROM recepcao_atribuicoes
-       WHERE id = $1 AND workspace_id = $2`,
-      [id, workspaceId]
-    );
-
-    if (checkResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Atribuição não encontrada' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      // Verificar se atribuição existe e pertence ao corretor
+      const checkResult = await client.query<AtribuicaoDB>(
+        `SELECT id, user_id, atendimento_iniciado_at FROM recepcao_atribuicoes
+         WHERE id = $1 AND workspace_id = $2`,
+        [id, workspaceId]
       );
-    }
 
-    const atribuicao = checkResult.rows[0];
+      if (checkResult.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Atribuição não encontrada' },
+          { status: 404 }
+        );
+      }
 
-    // Verificar se é o corretor correto
-    if (atribuicao.user_id !== (user as any).id) {
-      return NextResponse.json(
-        { success: false, error: 'Esta atribuição pertence a outro corretor' },
-        { status: 403 }
+      const atribuicao = checkResult.rows[0];
+
+      // Verificar se é o corretor correto
+      if (atribuicao.user_id !== (user as any).id) {
+        return NextResponse.json(
+          { success: false, error: 'Esta atribuição pertence a outro corretor' },
+          { status: 403 }
+        );
+      }
+
+      // Verificar se já foi iniciado
+      if (atribuicao.atendimento_iniciado_at) {
+        return NextResponse.json(
+          { success: false, error: 'Atendimento já foi iniciado' },
+          { status: 400 }
+        );
+      }
+
+      // Marcar início
+      const result = await client.query(
+        `UPDATE recepcao_atribuicoes
+         SET atendimento_iniciado_at = NOW(), updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [id]
       );
-    }
 
-    // Verificar se já foi iniciado
-    if (atribuicao.atendimento_iniciado_at) {
-      return NextResponse.json(
-        { success: false, error: 'Atendimento já foi iniciado' },
-        { status: 400 }
-      );
-    }
-
-    // Marcar início
-    const result = await pool.query(
-      `UPDATE recepcao_atribuicoes
-       SET atendimento_iniciado_at = NOW(), updated_at = NOW()
-       WHERE id = $1
-       RETURNING *`,
-      [id]
-    );
-
-    return NextResponse.json({
-      success: true,
-      data: result.rows[0],
-      message: 'Atendimento iniciado',
+      return NextResponse.json({
+        success: true,
+        data: result.rows[0],
+        message: 'Atendimento iniciado',
+      });
     });
   } catch (error) {
     console.error('Erro ao iniciar atendimento:', error);

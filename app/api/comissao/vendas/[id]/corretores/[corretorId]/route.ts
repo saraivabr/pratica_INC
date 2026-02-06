@@ -5,8 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 
 interface Params {
   params: Promise<{ id: string; corretorId: string }>;
@@ -40,55 +40,57 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Verificar se venda existe e pode ser editada
-    const { rows: vendaRows } = await dbQuery(
-      `SELECT * FROM comissao_vendas
-       WHERE id = $1 AND workspace_id = $2`,
-      [vendaId, ctx.workspaceId]
-    );
-
-    if (vendaRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Venda nao encontrada" },
-        { status: 404 }
+    return await withTenant(ctx.workspaceId, async (client) => {
+      // Verificar se venda existe e pode ser editada
+      const { rows: vendaRows } = await client.query(
+        `SELECT * FROM comissao_vendas
+         WHERE id = $1 AND workspace_id = $2`,
+        [vendaId, ctx.workspaceId]
       );
-    }
 
-    if (vendaRows[0].status === "cancelada" || vendaRows[0].status === "enviada") {
-      return NextResponse.json(
-        { success: false, error: "Venda nao pode ser editada" },
-        { status: 400 }
+      if (vendaRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Venda nao encontrada" },
+          { status: 404 }
+        );
+      }
+
+      if (vendaRows[0].status === "cancelada" || vendaRows[0].status === "enviada") {
+        return NextResponse.json(
+          { success: false, error: "Venda nao pode ser editada" },
+          { status: 400 }
+        );
+      }
+
+      // Verificar se corretor existe
+      const { rows: corretorRows } = await client.query(
+        `SELECT * FROM comissao_corretores WHERE id = $1 AND venda_id = $2`,
+        [corretorIdNum, vendaId]
       );
-    }
 
-    // Verificar se corretor existe
-    const { rows: corretorRows } = await dbQuery(
-      `SELECT * FROM comissao_corretores WHERE id = $1 AND venda_id = $2`,
-      [corretorIdNum, vendaId]
-    );
+      if (corretorRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Corretor nao encontrado" },
+          { status: 404 }
+        );
+      }
 
-    if (corretorRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Corretor nao encontrado" },
-        { status: 404 }
+      // Remover corretor
+      await client.query(`DELETE FROM comissao_corretores WHERE id = $1`, [corretorIdNum]);
+
+      // Limpar matriz calculada
+      await client.query(`DELETE FROM comissao_matriz WHERE venda_id = $1`, [vendaId]);
+
+      // Atualizar status da venda
+      await client.query(
+        `UPDATE comissao_vendas SET status = 'ativa', updated_at = NOW() WHERE id = $1`,
+        [vendaId]
       );
-    }
 
-    // Remover corretor
-    await dbQuery(`DELETE FROM comissao_corretores WHERE id = $1`, [corretorIdNum]);
-
-    // Limpar matriz calculada
-    await dbQuery(`DELETE FROM comissao_matriz WHERE venda_id = $1`, [vendaId]);
-
-    // Atualizar status da venda
-    await dbQuery(
-      `UPDATE comissao_vendas SET status = 'ativa', updated_at = NOW() WHERE id = $1`,
-      [vendaId]
-    );
-
-    return NextResponse.json({
-      success: true,
-      message: "Corretor removido com sucesso",
+      return NextResponse.json({
+        success: true,
+        message: "Corretor removido com sucesso",
+      });
     });
   } catch (error: any) {
     console.error("Erro ao remover corretor:", error);

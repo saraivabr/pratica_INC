@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 
 // Definição das etapas do funil na ordem correta
 const PIPELINE_STAGES = [
@@ -56,134 +56,136 @@ export async function GET(req: NextRequest) {
       effectiveCorretorId = (user as any).cvcrm_id || null;
     }
 
-    // Buscar leads do CV CRM
-    let query = `
-      SELECT
-        id_lead as id,
-        nome as name,
-        email,
-        telefone as phone,
-        origem as source,
-        score,
-        valor_negocio,
-        renda_familiar,
-        data_cad as created_at,
-        ultima_data_conversao as last_interaction_at,
-        situacao_nome,
-        corretor,
-        empreendimento,
-        tags,
-        qtde_simulacoes_associadas as simulacoes,
-        qtde_reservas_associadas as reservas,
-        possibilidade_venda
-      FROM cvcrm_leads
-      WHERE workspace_id = $1
-    `;
+    return await withTenant(workspaceId, async (client) => {
+      // Buscar leads do CV CRM
+      let query = `
+        SELECT
+          id_lead as id,
+          nome as name,
+          email,
+          telefone as phone,
+          origem as source,
+          score,
+          valor_negocio,
+          renda_familiar,
+          data_cad as created_at,
+          ultima_data_conversao as last_interaction_at,
+          situacao_nome,
+          corretor,
+          empreendimento,
+          tags,
+          qtde_simulacoes_associadas as simulacoes,
+          qtde_reservas_associadas as reservas,
+          possibilidade_venda
+        FROM cvcrm_leads
+        WHERE workspace_id = $1
+      `;
 
-    const params: any[] = [workspaceId];
-    let paramIndex = 2;
+      const params: any[] = [workspaceId];
+      let paramIndex = 2;
 
-    if (effectiveCorretorId) {
-      query += ` AND corretor_id = $${paramIndex}`;
-      params.push(effectiveCorretorId);
-      paramIndex++;
-    }
+      if (effectiveCorretorId) {
+        query += ` AND corretor_id = $${paramIndex}`;
+        params.push(effectiveCorretorId);
+        paramIndex++;
+      }
 
-    query += ` ORDER BY data_cad DESC NULLS LAST LIMIT $${paramIndex}`;
-    params.push(limit);
+      query += ` ORDER BY data_cad DESC NULLS LAST LIMIT $${paramIndex}`;
+      params.push(limit);
 
-    const leadsRes = await dbQuery(query, params);
+      const leadsRes = await client.query(query, params);
 
-    // Processar leads e mapear para stages
-    const leads = leadsRes.rows.map((row) => {
-      const corretor = typeof row.corretor === 'string' ? JSON.parse(row.corretor) : row.corretor;
-      const empreendimento = typeof row.empreendimento === 'string' ? JSON.parse(row.empreendimento) : row.empreendimento;
-      const tags = typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags;
+      // Processar leads e mapear para stages
+      const leads = leadsRes.rows.map((row) => {
+        const corretor = typeof row.corretor === 'string' ? JSON.parse(row.corretor) : row.corretor;
+        const empreendimento = typeof row.empreendimento === 'string' ? JSON.parse(row.empreendimento) : row.empreendimento;
+        const tags = typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags;
 
-      const situacaoNome = row.situacao_nome || null;
-      const stageId = getStageIdFromSituacao(situacaoNome);
+        const situacaoNome = row.situacao_nome || null;
+        const stageId = getStageIdFromSituacao(situacaoNome);
 
-      // Determinar temperatura baseado no score
-      let temperature: "cold" | "warm" | "hot" = "cold";
-      if (row.score >= 70) temperature = "hot";
-      else if (row.score >= 40) temperature = "warm";
+        // Determinar temperatura baseado no score
+        let temperature: "cold" | "warm" | "hot" = "cold";
+        if (row.score >= 70) temperature = "hot";
+        else if (row.score >= 40) temperature = "warm";
 
-      // Garantir que valor_negocio seja um número válido
-      let valorNegocio = 0;
-      if (row.valor_negocio) {
-        const parsed = parseFloat(String(row.valor_negocio));
-        if (!isNaN(parsed) && isFinite(parsed)) {
-          valorNegocio = parsed;
+        // Garantir que valor_negocio seja um número válido
+        let valorNegocio = 0;
+        if (row.valor_negocio) {
+          const parsed = parseFloat(String(row.valor_negocio));
+          if (!isNaN(parsed) && isFinite(parsed)) {
+            valorNegocio = parsed;
+          }
         }
-      }
 
-      // Parse renda_familiar
-      let rendaFamiliar = 0;
-      if (row.renda_familiar) {
-        const parsed = parseFloat(String(row.renda_familiar));
-        if (!isNaN(parsed) && isFinite(parsed)) rendaFamiliar = parsed;
-      }
+        // Parse renda_familiar
+        let rendaFamiliar = 0;
+        if (row.renda_familiar) {
+          const parsed = parseFloat(String(row.renda_familiar));
+          if (!isNaN(parsed) && isFinite(parsed)) rendaFamiliar = parsed;
+        }
 
-      return {
-        id: String(row.id),
-        stage_id: stageId,
-        name: row.name || "Sem nome",
-        email: row.email || null,
-        phone: row.phone || null,
-        source: row.source || "Não informada",
-        score: row.score || 0,
-        temperature,
-        valor_negocio: valorNegocio,
-        renda_familiar: rendaFamiliar,
-        created_at: row.created_at,
-        last_interaction_at: row.last_interaction_at,
-        situacao: situacaoNome,
-        corretor: corretor?.nome || null,
-        corretor_id: corretor?.id || null,
-        empreendimento: Array.isArray(empreendimento) ? empreendimento[0]?.nome : empreendimento?.nome || null,
-        tags: tags || [],
-        simulacoes: row.simulacoes || 0,
-        reservas: row.reservas || 0,
-        possibilidade_venda: row.possibilidade_venda || 0,
-      };
-    });
+        return {
+          id: String(row.id),
+          stage_id: stageId,
+          name: row.name || "Sem nome",
+          email: row.email || null,
+          phone: row.phone || null,
+          source: row.source || "Não informada",
+          score: row.score || 0,
+          temperature,
+          valor_negocio: valorNegocio,
+          renda_familiar: rendaFamiliar,
+          created_at: row.created_at,
+          last_interaction_at: row.last_interaction_at,
+          situacao: situacaoNome,
+          corretor: corretor?.nome || null,
+          corretor_id: corretor?.id || null,
+          empreendimento: Array.isArray(empreendimento) ? empreendimento[0]?.nome : empreendimento?.nome || null,
+          tags: tags || [],
+          simulacoes: row.simulacoes || 0,
+          reservas: row.reservas || 0,
+          possibilidade_venda: row.possibilidade_venda || 0,
+        };
+      });
 
-    // Contar leads por stage
-    const stagesWithCount = PIPELINE_STAGES.map((stage) => {
-      const stageLeads = leads.filter((l) => l.stage_id === stage.id);
-      const totalValor = stageLeads.reduce((sum, l) => {
+      // Contar leads por stage
+      const stagesWithCount = PIPELINE_STAGES.map((stage) => {
+        const stageLeads = leads.filter((l) => l.stage_id === stage.id);
+        const totalValor = stageLeads.reduce((sum, l) => {
+          const val = l.valor_negocio || 0;
+          return sum + (isFinite(val) ? val : 0);
+        }, 0);
+
+        return {
+          ...stage,
+          count: stageLeads.length,
+          totalValor: isFinite(totalValor) ? totalValor : 0,
+        };
+      });
+
+      // Estatísticas gerais
+      const totalLeads = leads.length;
+      const totalValor = leads.reduce((sum, l) => {
         const val = l.valor_negocio || 0;
         return sum + (isFinite(val) ? val : 0);
       }, 0);
+      const vendasRealizadas = leads.filter((l) => l.stage_id === "venda_realizada").length;
+      const perdidos = leads.filter((l) => l.stage_id === "perdido").length;
+      const conversionRate = totalLeads > 0 ? Math.round((vendasRealizadas / totalLeads) * 100) : 0;
 
-      return {
-        ...stage,
-        count: stageLeads.length,
-        totalValor: isFinite(totalValor) ? totalValor : 0,
-      };
-    });
-
-    // Estatísticas gerais
-    const totalLeads = leads.length;
-    const totalValor = leads.reduce((sum, l) => {
-      const val = l.valor_negocio || 0;
-      return sum + (isFinite(val) ? val : 0);
-    }, 0);
-    const vendasRealizadas = leads.filter((l) => l.stage_id === "venda_realizada").length;
-    const perdidos = leads.filter((l) => l.stage_id === "perdido").length;
-    const conversionRate = totalLeads > 0 ? Math.round((vendasRealizadas / totalLeads) * 100) : 0;
-
-    return NextResponse.json({
-      stages: stagesWithCount,
-      leads,
-      stats: {
-        totalLeads,
-        totalValor,
-        vendasRealizadas,
-        perdidos,
-        conversionRate,
-        emAndamento: totalLeads - vendasRealizadas - perdidos,
-      },
+      return NextResponse.json({
+        stages: stagesWithCount,
+        leads,
+        stats: {
+          totalLeads,
+          totalValor,
+          vendasRealizadas,
+          perdidos,
+          conversionRate,
+          emAndamento: totalLeads - vendasRealizadas - perdidos,
+        },
+      });
     });
   } catch (error) {
     console.error("Pipeline CV CRM API Error:", error);

@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { z } from 'zod';
 
 const CreatePlantaoSchema = z.object({
@@ -59,61 +59,63 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
     const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0);
 
-    let whereClause = 'WHERE p.workspace_id = $1';
-    const params: any[] = [workspaceId];
-    let paramIndex = 2;
+    return await withTenant(workspaceId, async (client) => {
+      let whereClause = 'WHERE p.workspace_id = $1';
+      const params: any[] = [workspaceId];
+      let paramIndex = 2;
 
-    if (data) {
-      whereClause += ` AND p.data = $${paramIndex++}`;
-      params.push(data);
-    }
+      if (data) {
+        whereClause += ` AND p.data = $${paramIndex++}`;
+        params.push(data);
+      }
 
-    if (localId) {
-      whereClause += ` AND p.local_id = $${paramIndex++}`;
-      params.push(localId);
-    }
+      if (localId) {
+        whereClause += ` AND p.local_id = $${paramIndex++}`;
+        params.push(localId);
+      }
 
-    if (status !== 'all') {
-      whereClause += ` AND p.status = $${paramIndex++}`;
-      params.push(status);
-    }
+      if (status !== 'all') {
+        whereClause += ` AND p.status = $${paramIndex++}`;
+        params.push(status);
+      }
 
-    const countQuery = `SELECT COUNT(*) as total FROM recepcao_plantoes p ${whereClause}`;
-    const countResult = await pool.query(countQuery, params);
-    const total = parseInt(countResult.rows[0].total);
+      const countQuery = `SELECT COUNT(*) as total FROM recepcao_plantoes p ${whereClause}`;
+      const countResult = await client.query(countQuery, params);
+      const total = parseInt(countResult.rows[0].total);
 
-    const query = `
-      SELECT
-        p.*,
-        l.nome AS local_nome,
-        l.endereco AS local_endereco,
-        COALESCE(stats.total_presentes, 0) AS total_presentes,
-        COALESCE(stats.disponiveis, 0) AS disponiveis,
-        COALESCE(stats.em_atendimento, 0) AS em_atendimento
-      FROM recepcao_plantoes p
-      JOIN recepcao_locais l ON l.id = p.local_id
-      LEFT JOIN LATERAL (
+      const query = `
         SELECT
-          COUNT(*) FILTER (WHERE status = 'presente') AS total_presentes,
-          COUNT(*) FILTER (WHERE status = 'presente' AND NOT em_atendimento AND NOT pausado AND NOT feedback_pendente) AS disponiveis,
-          COUNT(*) FILTER (WHERE em_atendimento = true) AS em_atendimento
-        FROM recepcao_presencas pr
-        WHERE pr.plantao_id = p.id
-      ) stats ON true
-      ${whereClause}
-      ORDER BY p.data DESC, p.hora_inicio ASC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
-    params.push(limit, offset);
+          p.*,
+          l.nome AS local_nome,
+          l.endereco AS local_endereco,
+          COALESCE(stats.total_presentes, 0) AS total_presentes,
+          COALESCE(stats.disponiveis, 0) AS disponiveis,
+          COALESCE(stats.em_atendimento, 0) AS em_atendimento
+        FROM recepcao_plantoes p
+        JOIN recepcao_locais l ON l.id = p.local_id
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*) FILTER (WHERE status = 'presente') AS total_presentes,
+            COUNT(*) FILTER (WHERE status = 'presente' AND NOT em_atendimento AND NOT pausado AND NOT feedback_pendente) AS disponiveis,
+            COUNT(*) FILTER (WHERE em_atendimento = true) AS em_atendimento
+          FROM recepcao_presencas pr
+          WHERE pr.plantao_id = p.id
+        ) stats ON true
+        ${whereClause}
+        ORDER BY p.data DESC, p.hora_inicio ASC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+      params.push(limit, offset);
 
-    const result = await pool.query<PlantaoWithLocal>(query, params);
+      const result = await client.query<PlantaoWithLocal>(query, params);
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows,
-      total,
-      limit,
-      offset,
+      return NextResponse.json({
+        success: true,
+        data: result.rows,
+        total,
+        limit,
+        offset,
+      });
     });
   } catch (error) {
     console.error('Erro ao listar plantões:', error);
@@ -153,19 +155,6 @@ export async function POST(request: NextRequest) {
     const { local_id, data, hora_inicio, hora_fim, max_corretores, descricao } =
       validationResult.data;
 
-    // Verificar se local existe e pertence ao workspace
-    const localCheck = await pool.query(
-      'SELECT id FROM recepcao_locais WHERE id = $1 AND workspace_id = $2 AND is_active = true',
-      [local_id, workspaceId]
-    );
-
-    if (localCheck.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Local não encontrado' },
-        { status: 404 }
-      );
-    }
-
     // Validar que hora_fim > hora_inicio
     if (hora_fim <= hora_inicio) {
       return NextResponse.json(
@@ -174,20 +163,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await pool.query<PlantaoDB>(
-      `INSERT INTO recepcao_plantoes (workspace_id, local_id, data, hora_inicio, hora_fim, max_corretores, descricao)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [workspaceId, local_id, data, hora_inicio, hora_fim, max_corretores || null, descricao || null]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      // Verificar se local existe e pertence ao workspace
+      const localCheck = await client.query(
+        'SELECT id FROM recepcao_locais WHERE id = $1 AND workspace_id = $2 AND is_active = true',
+        [local_id, workspaceId]
+      );
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: result.rows[0],
-      },
-      { status: 201 }
-    );
+      if (localCheck.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Local não encontrado' },
+          { status: 404 }
+        );
+      }
+
+      const result = await client.query<PlantaoDB>(
+        `INSERT INTO recepcao_plantoes (workspace_id, local_id, data, hora_inicio, hora_fim, max_corretores, descricao)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [workspaceId, local_id, data, hora_inicio, hora_fim, max_corretores || null, descricao || null]
+      );
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: result.rows[0],
+        },
+        { status: 201 }
+      );
+    });
   } catch (error: any) {
     console.error('Erro ao criar plantão:', error);
 

@@ -6,6 +6,7 @@
  */
 
 import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import type { SalvaLeadsConversation } from './types';
 
 // ============================================================================
@@ -291,12 +292,14 @@ export async function scheduleProactiveJob(
 ): Promise<string> {
   const id = `proactive_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-  await dbQuery(
-    `INSERT INTO salva_leads_proactive_jobs
-     (id, trigger_id, lead_phone, corretor_id, workspace_id, scheduled_for, status, attempts)
-     VALUES ($1, $2, $3, $4, $5, $6, 'pending', 0)`,
-    [id, job.triggerId, job.leadPhone, job.corretorId, job.workspaceId, job.scheduledFor]
-  ).catch(err => {
+  await withTenant(job.workspaceId, async (client) => {
+    await client.query(
+      `INSERT INTO salva_leads_proactive_jobs
+       (id, trigger_id, lead_phone, corretor_id, workspace_id, scheduled_for, status, attempts)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', 0)`,
+      [id, job.triggerId, job.leadPhone, job.corretorId, job.workspaceId, job.scheduledFor]
+    );
+  }).catch(err => {
     console.warn('[Luna Proactive] Table may not exist:', err.message);
   });
 
@@ -307,13 +310,19 @@ export async function scheduleProactiveJob(
  * Get pending proactive jobs
  */
 export async function getPendingProactiveJobs(workspaceId?: number): Promise<ProactiveJob[]> {
-  const query = workspaceId
-    ? `SELECT * FROM salva_leads_proactive_jobs WHERE status = 'pending' AND scheduled_for <= NOW() AND workspace_id = $1`
-    : `SELECT * FROM salva_leads_proactive_jobs WHERE status = 'pending' AND scheduled_for <= NOW()`;
+  if (workspaceId) {
+    return withTenant(workspaceId, async (client) => {
+      const result = await client.query(
+        `SELECT * FROM salva_leads_proactive_jobs WHERE status = 'pending' AND scheduled_for <= NOW() AND workspace_id = $1`,
+        [workspaceId]
+      ).catch(() => ({ rows: [] }));
+      return result.rows as ProactiveJob[];
+    });
+  }
 
-  const params = workspaceId ? [workspaceId] : [];
-
-  const result = await dbQuery(query, params).catch(() => ({ rows: [] }));
+  const result = await dbQuery(
+    `SELECT * FROM salva_leads_proactive_jobs WHERE status = 'pending' AND scheduled_for <= NOW()`
+  ).catch(() => ({ rows: [] }));
   return result.rows as ProactiveJob[];
 }
 

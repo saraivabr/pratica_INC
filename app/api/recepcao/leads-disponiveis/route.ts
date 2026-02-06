@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,25 +15,27 @@ export async function GET(request: NextRequest) {
 
     const { workspaceId } = ctx;
 
-    const result = await dbQuery(
-      `SELECT
-         COUNT(*) FILTER (WHERE motivo = 'sem_corretor') AS sem_corretor,
-         COUNT(*) FILTER (WHERE motivo = 'abandonado') AS abandonados,
-         COUNT(*) AS total
-       FROM v_leads_para_distribuir
-       WHERE workspace_id = $1`,
-      [workspaceId]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      const result = await client.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE motivo = 'sem_corretor') AS sem_corretor,
+           COUNT(*) FILTER (WHERE motivo = 'abandonado') AS abandonados,
+           COUNT(*) AS total
+         FROM v_leads_para_distribuir
+         WHERE workspace_id = $1`,
+        [workspaceId]
+      );
 
-    const row = result.rows[0] || { total: 0, sem_corretor: 0, abandonados: 0 };
+      const row = result.rows[0] || { total: 0, sem_corretor: 0, abandonados: 0 };
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        total: parseInt(row.total) || 0,
-        sem_corretor: parseInt(row.sem_corretor) || 0,
-        abandonados: parseInt(row.abandonados) || 0,
-      },
+      return NextResponse.json({
+        success: true,
+        data: {
+          total: parseInt(row.total) || 0,
+          sem_corretor: parseInt(row.sem_corretor) || 0,
+          abandonados: parseInt(row.abandonados) || 0,
+        },
+      });
     });
   } catch (error) {
     console.error('Erro ao contar leads disponíveis:', error);

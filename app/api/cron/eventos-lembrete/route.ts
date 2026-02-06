@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { getWorkspace, Tenant } from '@/lib/tenant-context';
 import { sendTextMessage, formatPhoneNumber, isInstanceConnected } from '@/lib/evolution-api';
 import { gerarMensagemLembrete, gerarDelayEnvio } from '@/lib/eventos/message-generator';
@@ -92,7 +93,7 @@ function validateCronAuth(request: NextRequest): boolean {
 
   // SECURITY: Sempre exigir CRON_SECRET, mesmo em dev.
   if (!cronSecret) {
-    console.error('[Cron Auth] CRON_SECRET não configurado. Rejeitando request.');
+    console.error('[Cron Auth] CRON_SECRET nao configurado. Rejeitando request.');
     return false;
   }
 
@@ -116,9 +117,7 @@ function validateCronAuth(request: NextRequest): boolean {
 
 /**
  * Busca eventos ativos com lembrete dentro da margem de tempo
- *
- * Query: eventos onde (data_hora - lembrete_horas) esta entre (agora - 5min) e (agora + 5min)
- * Isso significa que o momento de enviar o lembrete eh agora.
+ * NOTE: Cross-workspace query - uses pool directly (no RLS context)
  */
 async function getEventosParaLembrete(): Promise<EventoComLembrete[]> {
   const { rows } = await pool.query<EventoComLembrete>(`
@@ -138,43 +137,8 @@ async function getEventosParaLembrete(): Promise<EventoComLembrete[]> {
 }
 
 /**
- * Busca convidados elegíveis para receber lembrete
- *
- * Criterios:
- * - Status 'confirmado' ou 'talvez'
- * - Ainda não recebeu lembrete (lembrete_enviado_at IS NULL)
- */
-async function getConvidadosParaLembrete(
-  eventoId: string,
-  workspaceId: number
-): Promise<ConvidadoParaLembrete[]> {
-  const { rows } = await pool.query<ConvidadoParaLembrete>(`
-    SELECT id, evento_id, workspace_id, nome, celular, status, lembrete_enviado_at
-    FROM evento_convidados
-    WHERE evento_id = $1
-      AND workspace_id = $2
-      AND status IN ('confirmado', 'talvez')
-      AND lembrete_enviado_at IS NULL
-      AND convite_enviado_at IS NOT NULL
-    ORDER BY nome ASC
-  `, [eventoId, workspaceId]);
-
-  return rows;
-}
-
-/**
- * Atualiza lembrete_enviado_at do convidado
- */
-async function marcarLembreteEnviado(convidadoId: string): Promise<void> {
-  await pool.query(`
-    UPDATE evento_convidados
-    SET lembrete_enviado_at = NOW()
-    WHERE id = $1
-  `, [convidadoId]);
-}
-
-/**
  * Busca tenants ativos com Evolution API configurada
+ * NOTE: Cross-workspace query - uses pool directly
  */
 async function getWorkspacesAtivosComEvolution(): Promise<Array<{ id: number; name: string }>> {
   const { rows } = await pool.query<{ id: number; name: string }>(`
@@ -227,6 +191,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Processa lembretes para um evento especifico
+ * Uses withTenant for workspace-scoped queries
  */
 async function processarEventoLembretes(
   evento: EventoComLembrete,
@@ -241,66 +206,82 @@ async function processarEventoLembretes(
     detalhes: [],
   };
 
-  // Buscar convidados elegiveis
-  const convidados = await getConvidadosParaLembrete(evento.id, evento.workspace_id);
-  result.convidadosProcessados = convidados.length;
+  return await withTenant(evento.workspace_id, async (client) => {
+    // Buscar convidados elegiveis
+    const { rows: convidados } = await client.query<ConvidadoParaLembrete>(`
+      SELECT id, evento_id, workspace_id, nome, celular, status, lembrete_enviado_at
+      FROM evento_convidados
+      WHERE evento_id = $1
+        AND workspace_id = $2
+        AND status IN ('confirmado', 'talvez')
+        AND lembrete_enviado_at IS NULL
+        AND convite_enviado_at IS NOT NULL
+      ORDER BY nome ASC
+    `, [evento.id, evento.workspace_id]);
 
-  if (convidados.length === 0) {
-    console.log(`[Eventos-Lembrete] Evento ${evento.id}: nenhum convidado para lembrete`);
-    return result;
-  }
+    result.convidadosProcessados = convidados.length;
 
-  console.log(`[Eventos-Lembrete] Evento ${evento.id} "${evento.nome}": ${convidados.length} convidado(s) para lembrete`);
-
-  // Processar cada convidado
-  for (let i = 0; i < convidados.length; i++) {
-    const convidado = convidados[i];
-
-    try {
-      // Gerar mensagem de lembrete unica (anti-spam)
-      const mensagem = gerarMensagemLembrete({
-        evento: evento as Evento,
-        convidadoNome: convidado.nome,
-      });
-
-      // Enviar via Evolution API
-      await sendTextMessage(instanceName, {
-        number: formatPhoneNumber(convidado.celular),
-        text: mensagem,
-      });
-
-      // Marcar lembrete como enviado
-      await marcarLembreteEnviado(convidado.id);
-
-      result.lembretesEnviados++;
-      result.detalhes.push({
-        convidadoId: convidado.id,
-        nome: convidado.nome,
-        status: 'enviado',
-      });
-
-      console.log(`[Eventos-Lembrete] Lembrete enviado para ${convidado.nome} (${convidado.celular})`);
-
-      // Delay aleatorio entre envios (anti-spam) - exceto no ultimo
-      if (i < convidados.length - 1) {
-        const delay = gerarDelayEnvio();
-        console.log(`[Eventos-Lembrete] Aguardando ${Math.round(delay / 1000)}s antes do proximo envio...`);
-        await sleep(delay);
-      }
-    } catch (error) {
-      result.erros++;
-      result.detalhes.push({
-        convidadoId: convidado.id,
-        nome: convidado.nome,
-        status: 'falha',
-        erro: error instanceof Error ? error.message : 'Erro desconhecido',
-      });
-
-      console.error(`[Eventos-Lembrete] Erro ao enviar lembrete para ${convidado.nome}:`, error);
+    if (convidados.length === 0) {
+      console.log(`[Eventos-Lembrete] Evento ${evento.id}: nenhum convidado para lembrete`);
+      return result;
     }
-  }
 
-  return result;
+    console.log(`[Eventos-Lembrete] Evento ${evento.id} "${evento.nome}": ${convidados.length} convidado(s) para lembrete`);
+
+    // Processar cada convidado
+    for (let i = 0; i < convidados.length; i++) {
+      const convidado = convidados[i];
+
+      try {
+        // Gerar mensagem de lembrete unica (anti-spam)
+        const mensagem = gerarMensagemLembrete({
+          evento: evento as Evento,
+          convidadoNome: convidado.nome,
+        });
+
+        // Enviar via Evolution API
+        await sendTextMessage(instanceName, {
+          number: formatPhoneNumber(convidado.celular),
+          text: mensagem,
+        });
+
+        // Marcar lembrete como enviado
+        await client.query(`
+          UPDATE evento_convidados
+          SET lembrete_enviado_at = NOW()
+          WHERE id = $1
+        `, [convidado.id]);
+
+        result.lembretesEnviados++;
+        result.detalhes.push({
+          convidadoId: convidado.id,
+          nome: convidado.nome,
+          status: 'enviado',
+        });
+
+        console.log(`[Eventos-Lembrete] Lembrete enviado para ${convidado.nome} (${convidado.celular})`);
+
+        // Delay aleatorio entre envios (anti-spam) - exceto no ultimo
+        if (i < convidados.length - 1) {
+          const delay = gerarDelayEnvio();
+          console.log(`[Eventos-Lembrete] Aguardando ${Math.round(delay / 1000)}s antes do proximo envio...`);
+          await sleep(delay);
+        }
+      } catch (error) {
+        result.erros++;
+        result.detalhes.push({
+          convidadoId: convidado.id,
+          nome: convidado.nome,
+          status: 'falha',
+          erro: error instanceof Error ? error.message : 'Erro desconhecido',
+        });
+
+        console.error(`[Eventos-Lembrete] Erro ao enviar lembrete para ${convidado.nome}:`, error);
+      }
+    }
+
+    return result;
+  });
 }
 
 /**
@@ -341,20 +322,22 @@ async function processarTenantLembretes(
       return result;
     }
 
-    // Buscar eventos do tenant que precisam de lembrete
-    const eventos = await pool.query<EventoComLembrete>(`
-      SELECT e.*
-      FROM eventos e
-      WHERE e.workspace_id = $1
-        AND e.status = 'ativo'
-        AND e.lembrete_horas IS NOT NULL
-        AND e.lembrete_horas > 0
-        AND e.data_hora > NOW()
-        AND (e.data_hora - (e.lembrete_horas || ' hours')::INTERVAL)
-            BETWEEN NOW() - INTERVAL '5 minutes'
-                AND NOW() + INTERVAL '5 minutes'
-      ORDER BY e.data_hora ASC
-    `, [workspaceId]);
+    // Buscar eventos do tenant que precisam de lembrete (workspace-scoped via withTenant)
+    const eventos = await withTenant(workspaceId, async (client) => {
+      return client.query<EventoComLembrete>(`
+        SELECT e.*
+        FROM eventos e
+        WHERE e.workspace_id = $1
+          AND e.status = 'ativo'
+          AND e.lembrete_horas IS NOT NULL
+          AND e.lembrete_horas > 0
+          AND e.data_hora > NOW()
+          AND (e.data_hora - (e.lembrete_horas || ' hours')::INTERVAL)
+              BETWEEN NOW() - INTERVAL '5 minutes'
+                  AND NOW() + INTERVAL '5 minutes'
+        ORDER BY e.data_hora ASC
+      `, [workspaceId]);
+    });
 
     if (eventos.rows.length === 0) {
       console.log(`[Eventos-Lembrete] Tenant ${workspaceId}: nenhum evento para lembrete`);

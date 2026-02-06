@@ -6,6 +6,7 @@
  */
 
 import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import type { Evento, EventoConvidado, EventoContext, ConvidadoStatus } from './types';
 
 // ============================================
@@ -31,41 +32,43 @@ export async function buscarConvidadoPorTelefone(
     `+55${telefoneLimpo.startsWith('55') ? telefoneLimpo.slice(2) : telefoneLimpo}`,
   ];
 
-  // Busca convidado com convite enviado em evento ativo
-  const { rows } = await dbQuery(
-    `SELECT
-      ec.*,
-      e.id as evento_id,
-      e.nome as evento_nome,
-      e.descricao as evento_descricao,
-      e.data_hora as evento_data_hora,
-      e.local as evento_local,
-      e.lembrete_horas as evento_lembrete_horas,
-      e.status as evento_status,
-      COALESCE(e.com_sofia, true) as evento_com_sofia
-    FROM evento_convidados ec
-    JOIN eventos e ON e.id = ec.evento_id
-    WHERE ec.workspace_id = $1
-      AND e.status = 'ativo'
-      AND ec.convite_enviado_at IS NOT NULL
-      AND (
-        ec.celular = $2
-        OR ec.celular = $3
-        OR ec.celular = $4
-        OR ec.celular = $5
-        OR ec.celular LIKE $6
-      )
-    ORDER BY ec.convite_enviado_at DESC
-    LIMIT 1`,
-    [
-      workspaceId,
-      formatos[0],
-      formatos[1],
-      formatos[2],
-      formatos[3],
-      `%${telefoneLimpo.slice(-9)}`, // Ultimos 9 digitos
-    ]
-  );
+  // Busca convidado com convite enviado em evento ativo (workspace-scoped via withTenant)
+  const { rows } = await withTenant(workspaceId, async (client) => {
+    return client.query(
+      `SELECT
+        ec.*,
+        e.id as evento_id,
+        e.nome as evento_nome,
+        e.descricao as evento_descricao,
+        e.data_hora as evento_data_hora,
+        e.local as evento_local,
+        e.lembrete_horas as evento_lembrete_horas,
+        e.status as evento_status,
+        COALESCE(e.com_sofia, true) as evento_com_sofia
+      FROM evento_convidados ec
+      JOIN eventos e ON e.id = ec.evento_id
+      WHERE ec.workspace_id = $1
+        AND e.status = 'ativo'
+        AND ec.convite_enviado_at IS NOT NULL
+        AND (
+          ec.celular = $2
+          OR ec.celular = $3
+          OR ec.celular = $4
+          OR ec.celular = $5
+          OR ec.celular LIKE $6
+        )
+      ORDER BY ec.convite_enviado_at DESC
+      LIMIT 1`,
+      [
+        workspaceId,
+        formatos[0],
+        formatos[1],
+        formatos[2],
+        formatos[3],
+        `%${telefoneLimpo.slice(-9)}`, // Ultimos 9 digitos
+      ]
+    );
+  });
 
   if (rows.length === 0) {
     return null;
@@ -265,15 +268,17 @@ export async function getEstatisticasEvento(
 export async function listarEventosParaLembrete(
   workspaceId: number
 ): Promise<Evento[]> {
-  const { rows } = await dbQuery(
-    `SELECT * FROM eventos
-     WHERE workspace_id = $1
-       AND status = 'ativo'
-       AND data_hora > NOW()
-       AND data_hora <= NOW() + (lembrete_horas || ' hours')::interval
-     ORDER BY data_hora`,
-    [workspaceId]
-  );
+  const { rows } = await withTenant(workspaceId, async (client) => {
+    return client.query(
+      `SELECT * FROM eventos
+       WHERE workspace_id = $1
+         AND status = 'ativo'
+         AND data_hora > NOW()
+         AND data_hora <= NOW() + (lembrete_horas || ' hours')::interval
+       ORDER BY data_hora`,
+      [workspaceId]
+    );
+  });
 
   return rows as Evento[];
 }
@@ -302,23 +307,25 @@ export async function isConvidadoDeEventoAtivo(
 ): Promise<boolean> {
   const telefoneLimpo = telefone.replace(/\D/g, '');
 
-  const { rows } = await dbQuery(
-    `SELECT 1 FROM evento_convidados ec
-     JOIN eventos e ON e.id = ec.evento_id
-     WHERE ec.workspace_id = $1
-       AND e.status = 'ativo'
-       AND ec.convite_enviado_at IS NOT NULL
-       AND (
-         ec.celular LIKE $2
-         OR ec.celular LIKE $3
-       )
-     LIMIT 1`,
-    [
-      workspaceId,
-      `%${telefoneLimpo.slice(-9)}`,
-      `%${telefoneLimpo}`,
-    ]
-  );
+  const { rows } = await withTenant(workspaceId, async (client) => {
+    return client.query(
+      `SELECT 1 FROM evento_convidados ec
+       JOIN eventos e ON e.id = ec.evento_id
+       WHERE ec.workspace_id = $1
+         AND e.status = 'ativo'
+         AND ec.convite_enviado_at IS NOT NULL
+         AND (
+           ec.celular LIKE $2
+           OR ec.celular LIKE $3
+         )
+       LIMIT 1`,
+      [
+        workspaceId,
+        `%${telefoneLimpo.slice(-9)}`,
+        `%${telefoneLimpo}`,
+      ]
+    );
+  });
 
   return rows.length > 0;
 }

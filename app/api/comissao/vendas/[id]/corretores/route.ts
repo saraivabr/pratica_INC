@@ -7,8 +7,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 import {
   comissaoCorretorCreateSchema,
   comissaoCorretoresArraySchema,
@@ -36,31 +36,33 @@ export async function GET(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Verificar se venda existe e pertence ao workspace
-    const { rows: vendaRows } = await dbQuery(
-      `SELECT id FROM comissao_vendas
-       WHERE id = $1 AND workspace_id = $2`,
-      [vendaId, ctx.workspaceId]
-    );
-
-    if (vendaRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Venda nao encontrada" },
-        { status: 404 }
+    return await withTenant(ctx.workspaceId, async (client) => {
+      // Verificar se venda existe e pertence ao workspace
+      const { rows: vendaRows } = await client.query(
+        `SELECT id FROM comissao_vendas
+         WHERE id = $1 AND workspace_id = $2`,
+        [vendaId, ctx.workspaceId]
       );
-    }
 
-    // Buscar corretores
-    const { rows } = await dbQuery(
-      `SELECT * FROM comissao_corretores
-       WHERE venda_id = $1
-       ORDER BY prioridade DESC, nome`,
-      [vendaId]
-    );
+      if (vendaRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Venda nao encontrada" },
+          { status: 404 }
+        );
+      }
 
-    return NextResponse.json({
-      success: true,
-      data: rows,
+      // Buscar corretores
+      const { rows } = await client.query(
+        `SELECT * FROM comissao_corretores
+         WHERE venda_id = $1
+         ORDER BY prioridade DESC, nome`,
+        [vendaId]
+      );
+
+      return NextResponse.json({
+        success: true,
+        data: rows,
+      });
     });
   } catch (error: any) {
     console.error("Erro ao listar corretores:", error);
@@ -98,27 +100,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Verificar se venda existe e pode ser editada
-    const { rows: vendaRows } = await dbQuery(
-      `SELECT * FROM comissao_vendas
-       WHERE id = $1 AND workspace_id = $2`,
-      [vendaId, ctx.workspaceId]
-    );
-
-    if (vendaRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Venda nao encontrada" },
-        { status: 404 }
-      );
-    }
-
-    if (vendaRows[0].status === "cancelada" || vendaRows[0].status === "enviada") {
-      return NextResponse.json(
-        { success: false, error: "Venda nao pode ser editada" },
-        { status: 400 }
-      );
-    }
-
     const body = await request.json();
 
     // Validar dados
@@ -136,42 +117,65 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const data = parseResult.data;
 
-    // Inserir corretor
-    const { rows } = await dbQuery(
-      `INSERT INTO comissao_corretores (
-        venda_id, beneficiario_id, nome, cpf,
-        percentual_participacao, valor_comissao, prioridade, observacoes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *`,
-      [
-        vendaId,
-        data.beneficiario_id || null,
-        data.nome,
-        data.cpf || null,
-        data.percentual_participacao,
-        data.valor_comissao,
-        data.prioridade || 0,
-        data.observacoes || null,
-      ]
-    );
+    return await withTenant(ctx.workspaceId, async (client) => {
+      // Verificar se venda existe e pode ser editada
+      const { rows: vendaRows } = await client.query(
+        `SELECT * FROM comissao_vendas
+         WHERE id = $1 AND workspace_id = $2`,
+        [vendaId, ctx.workspaceId]
+      );
 
-    // Limpar matriz calculada (precisa recalcular)
-    await dbQuery(`DELETE FROM comissao_matriz WHERE venda_id = $1`, [vendaId]);
+      if (vendaRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Venda nao encontrada" },
+          { status: 404 }
+        );
+      }
 
-    // Atualizar status da venda para 'ativa' (removendo 'calculada')
-    await dbQuery(
-      `UPDATE comissao_vendas SET status = 'ativa', updated_at = NOW() WHERE id = $1`,
-      [vendaId]
-    );
+      if (vendaRows[0].status === "cancelada" || vendaRows[0].status === "enviada") {
+        return NextResponse.json(
+          { success: false, error: "Venda nao pode ser editada" },
+          { status: 400 }
+        );
+      }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: rows[0],
-        message: "Corretor adicionado com sucesso",
-      },
-      { status: 201 }
-    );
+      // Inserir corretor
+      const { rows } = await client.query(
+        `INSERT INTO comissao_corretores (
+          venda_id, beneficiario_id, nome, cpf,
+          percentual_participacao, valor_comissao, prioridade, observacoes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *`,
+        [
+          vendaId,
+          data.beneficiario_id || null,
+          data.nome,
+          data.cpf || null,
+          data.percentual_participacao,
+          data.valor_comissao,
+          data.prioridade || 0,
+          data.observacoes || null,
+        ]
+      );
+
+      // Limpar matriz calculada (precisa recalcular)
+      await client.query(`DELETE FROM comissao_matriz WHERE venda_id = $1`, [vendaId]);
+
+      // Atualizar status da venda para 'ativa' (removendo 'calculada')
+      await client.query(
+        `UPDATE comissao_vendas SET status = 'ativa', updated_at = NOW() WHERE id = $1`,
+        [vendaId]
+      );
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: rows[0],
+          message: "Corretor adicionado com sucesso",
+        },
+        { status: 201 }
+      );
+    });
   } catch (error: any) {
     console.error("Erro ao adicionar corretor:", error);
     return NextResponse.json(
@@ -209,27 +213,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Verificar se venda existe e pode ser editada
-    const { rows: vendaRows } = await dbQuery(
-      `SELECT * FROM comissao_vendas
-       WHERE id = $1 AND workspace_id = $2`,
-      [vendaId, ctx.workspaceId]
-    );
-
-    if (vendaRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Venda nao encontrada" },
-        { status: 404 }
-      );
-    }
-
-    if (vendaRows[0].status === "cancelada" || vendaRows[0].status === "enviada") {
-      return NextResponse.json(
-        { success: false, error: "Venda nao pode ser editada" },
-        { status: 400 }
-      );
-    }
-
     const body = await request.json();
     const { corretores } = body;
 
@@ -246,58 +229,81 @@ export async function PUT(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Transacao para substituir todos os corretores
-    await dbQuery("BEGIN");
-
-    try {
-      // Remover corretores existentes
-      await dbQuery(`DELETE FROM comissao_corretores WHERE venda_id = $1`, [
-        vendaId,
-      ]);
-
-      // Inserir novos corretores
-      const novosCorretores = [];
-      for (const corretor of parseResult.data) {
-        const { rows } = await dbQuery(
-          `INSERT INTO comissao_corretores (
-            venda_id, beneficiario_id, nome, cpf,
-            percentual_participacao, valor_comissao, prioridade, observacoes
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-          RETURNING *`,
-          [
-            vendaId,
-            corretor.beneficiario_id || null,
-            corretor.nome,
-            corretor.cpf || null,
-            corretor.percentual_participacao,
-            corretor.valor_comissao,
-            corretor.prioridade || 0,
-            corretor.observacoes || null,
-          ]
-        );
-        novosCorretores.push(rows[0]);
-      }
-
-      // Limpar matriz calculada
-      await dbQuery(`DELETE FROM comissao_matriz WHERE venda_id = $1`, [vendaId]);
-
-      // Atualizar status da venda
-      await dbQuery(
-        `UPDATE comissao_vendas SET status = 'ativa', updated_at = NOW() WHERE id = $1`,
-        [vendaId]
+    return await withTenant(ctx.workspaceId, async (client) => {
+      // Verificar se venda existe e pode ser editada
+      const { rows: vendaRows } = await client.query(
+        `SELECT * FROM comissao_vendas
+         WHERE id = $1 AND workspace_id = $2`,
+        [vendaId, ctx.workspaceId]
       );
 
-      await dbQuery("COMMIT");
+      if (vendaRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Venda nao encontrada" },
+          { status: 404 }
+        );
+      }
 
-      return NextResponse.json({
-        success: true,
-        data: novosCorretores,
-        message: "Corretores sincronizados com sucesso",
-      });
-    } catch (error) {
-      await dbQuery("ROLLBACK");
-      throw error;
-    }
+      if (vendaRows[0].status === "cancelada" || vendaRows[0].status === "enviada") {
+        return NextResponse.json(
+          { success: false, error: "Venda nao pode ser editada" },
+          { status: 400 }
+        );
+      }
+
+      // Transacao para substituir todos os corretores
+      await client.query("BEGIN");
+
+      try {
+        // Remover corretores existentes
+        await client.query(`DELETE FROM comissao_corretores WHERE venda_id = $1`, [
+          vendaId,
+        ]);
+
+        // Inserir novos corretores
+        const novosCorretores = [];
+        for (const corretor of parseResult.data) {
+          const { rows } = await client.query(
+            `INSERT INTO comissao_corretores (
+              venda_id, beneficiario_id, nome, cpf,
+              percentual_participacao, valor_comissao, prioridade, observacoes
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *`,
+            [
+              vendaId,
+              corretor.beneficiario_id || null,
+              corretor.nome,
+              corretor.cpf || null,
+              corretor.percentual_participacao,
+              corretor.valor_comissao,
+              corretor.prioridade || 0,
+              corretor.observacoes || null,
+            ]
+          );
+          novosCorretores.push(rows[0]);
+        }
+
+        // Limpar matriz calculada
+        await client.query(`DELETE FROM comissao_matriz WHERE venda_id = $1`, [vendaId]);
+
+        // Atualizar status da venda
+        await client.query(
+          `UPDATE comissao_vendas SET status = 'ativa', updated_at = NOW() WHERE id = $1`,
+          [vendaId]
+        );
+
+        await client.query("COMMIT");
+
+        return NextResponse.json({
+          success: true,
+          data: novosCorretores,
+          message: "Corretores sincronizados com sucesso",
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      }
+    });
   } catch (error: any) {
     console.error("Erro ao sincronizar corretores:", error);
     return NextResponse.json(

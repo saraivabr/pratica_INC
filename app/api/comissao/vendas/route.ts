@@ -6,21 +6,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbQuery } from "@/lib/db";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
+import { withTenant } from "@/lib/tenant-context";
 import {
   comissaoVendaCreateSchema,
   comissaoVendaCompletaCreateSchema,
 } from "@/lib/comissao/schemas";
+import type { PoolClient } from "pg";
 
 /**
  * Gera codigo unico para a venda no formato COM-YYYYMM-XXXX
  */
-async function gerarCodigoVenda(workspaceId: number): Promise<string> {
+async function gerarCodigoVenda(client: PoolClient, workspaceId: number): Promise<string> {
   const now = new Date();
   const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  const { rows } = await dbQuery(
+  const { rows } = await client.query(
     `SELECT codigo FROM comissao_vendas
      WHERE codigo LIKE $1 AND workspace_id = $2
      ORDER BY codigo DESC
@@ -76,72 +77,74 @@ export async function GET(request: NextRequest) {
     );
     const offset = (page - 1) * pageSize;
 
-    // Construir query dinamica
-    const conditions: string[] = [`v.workspace_id = $1`];
-    const params: any[] = [ctx.workspaceId];
-    let paramIndex = 2;
+    return await withTenant(ctx.workspaceId, async (client) => {
+      // Construir query dinamica
+      const conditions: string[] = [`v.workspace_id = $1`];
+      const params: any[] = [ctx.workspaceId];
+      let paramIndex = 2;
 
-    if (status.length > 0) {
-      conditions.push(`v.status = ANY($${paramIndex})`);
-      params.push(status);
-      paramIndex++;
-    }
+      if (status.length > 0) {
+        conditions.push(`v.status = ANY($${paramIndex})`);
+        params.push(status);
+        paramIndex++;
+      }
 
-    if (dataInicio) {
-      conditions.push(`v.data_venda >= $${paramIndex}`);
-      params.push(dataInicio);
-      paramIndex++;
-    }
+      if (dataInicio) {
+        conditions.push(`v.data_venda >= $${paramIndex}`);
+        params.push(dataInicio);
+        paramIndex++;
+      }
 
-    if (dataFim) {
-      conditions.push(`v.data_venda <= $${paramIndex}`);
-      params.push(dataFim);
-      paramIndex++;
-    }
+      if (dataFim) {
+        conditions.push(`v.data_venda <= $${paramIndex}`);
+        params.push(dataFim);
+        paramIndex++;
+      }
 
-    if (empreendimento) {
-      conditions.push(`v.empreendimento ILIKE $${paramIndex}`);
-      params.push(`%${empreendimento}%`);
-      paramIndex++;
-    }
+      if (empreendimento) {
+        conditions.push(`v.empreendimento ILIKE $${paramIndex}`);
+        params.push(`%${empreendimento}%`);
+        paramIndex++;
+      }
 
-    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+      const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
-    // Query principal
-    const query = `
-      SELECT
-        v.*,
-        (SELECT COUNT(*) FROM comissao_corretores c WHERE c.venda_id = v.id) as total_corretores,
-        (SELECT COUNT(*) FROM comissao_parcelas p WHERE p.venda_id = v.id) as total_parcelas
-      FROM comissao_vendas v
-      ${whereClause}
-      ORDER BY v.data_venda DESC, v.created_at DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
+      // Query principal
+      const query = `
+        SELECT
+          v.*,
+          (SELECT COUNT(*) FROM comissao_corretores c WHERE c.venda_id = v.id) as total_corretores,
+          (SELECT COUNT(*) FROM comissao_parcelas p WHERE p.venda_id = v.id) as total_parcelas
+        FROM comissao_vendas v
+        ${whereClause}
+        ORDER BY v.data_venda DESC, v.created_at DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
 
-    params.push(pageSize, offset);
+      params.push(pageSize, offset);
 
-    // Query de contagem
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM comissao_vendas v
-      ${whereClause}
-    `;
+      // Query de contagem
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM comissao_vendas v
+        ${whereClause}
+      `;
 
-    const [{ rows }, { rows: countRows }] = await Promise.all([
-      dbQuery(query, params),
-      dbQuery(countQuery, params.slice(0, -2)),
-    ]);
+      const [{ rows }, { rows: countRows }] = await Promise.all([
+        client.query(query, params),
+        client.query(countQuery, params.slice(0, -2)),
+      ]);
 
-    const total = parseInt(countRows[0]?.total || "0");
+      const total = parseInt(countRows[0]?.total || "0");
 
-    return NextResponse.json({
-      success: true,
-      data: rows,
-      total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
+      return NextResponse.json({
+        success: true,
+        data: rows,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      });
     });
   } catch (error: any) {
     console.error("Erro ao listar vendas comissao:", error);
@@ -197,98 +200,100 @@ export async function POST(request: NextRequest) {
 
       const { venda, corretores, parcelas } = parseResult.data;
 
-      // Gerar codigo
-      const codigo = await gerarCodigoVenda(ctx.workspaceId);
+      return await withTenant(ctx.workspaceId, async (client) => {
+        // Gerar codigo
+        const codigo = await gerarCodigoVenda(client, ctx.workspaceId);
 
-      // Iniciar transacao
-      await dbQuery("BEGIN");
+        // Iniciar transacao
+        await client.query("BEGIN");
 
-      try {
-        // 1. Inserir venda
-        const { rows: vendaRows } = await dbQuery(
-          `INSERT INTO comissao_vendas (
-            workspace_id, codigo, referencia, valor_venda, percentual_comissao,
-            empreendimento, unidade, cliente_nome, cliente_cpf,
-            data_venda, status, observacoes, created_by
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ativa', $11, $12
-          ) RETURNING *`,
-          [
-            ctx.workspaceId,
-            codigo,
-            venda.referencia || null,
-            venda.valor_venda,
-            venda.percentual_comissao,
-            venda.empreendimento || null,
-            venda.unidade || null,
-            venda.cliente_nome || null,
-            venda.cliente_cpf || null,
-            venda.data_venda,
-            venda.observacoes || null,
-            ctx.user.id,
-          ]
-        );
-
-        const vendaCriada = vendaRows[0];
-
-        // 2. Inserir corretores
-        for (const corretor of corretores) {
-          await dbQuery(
-            `INSERT INTO comissao_corretores (
-              venda_id, beneficiario_id, nome, cpf,
-              percentual_participacao, valor_comissao, prioridade, observacoes
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        try {
+          // 1. Inserir venda
+          const { rows: vendaRows } = await client.query(
+            `INSERT INTO comissao_vendas (
+              workspace_id, codigo, referencia, valor_venda, percentual_comissao,
+              empreendimento, unidade, cliente_nome, cliente_cpf,
+              data_venda, status, observacoes, created_by
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ativa', $11, $12
+            ) RETURNING *`,
             [
-              vendaCriada.id,
-              corretor.beneficiario_id || null,
-              corretor.nome,
-              corretor.cpf || null,
-              corretor.percentual_participacao,
-              corretor.valor_comissao,
-              corretor.prioridade || 0,
-              corretor.observacoes || null,
+              ctx.workspaceId,
+              codigo,
+              venda.referencia || null,
+              venda.valor_venda,
+              venda.percentual_comissao,
+              venda.empreendimento || null,
+              venda.unidade || null,
+              venda.cliente_nome || null,
+              venda.cliente_cpf || null,
+              venda.data_venda,
+              venda.observacoes || null,
+              ctx.user.id,
             ]
           );
-        }
 
-        // 3. Inserir parcelas
-        for (const parcela of parcelas) {
-          await dbQuery(
-            `INSERT INTO comissao_parcelas (
-              venda_id, numero, descricao, valor_parcela,
-              percentual_comissao, data_prevista, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, 'prevista')`,
-            [
-              vendaCriada.id,
-              parcela.numero,
-              parcela.descricao || null,
-              parcela.valor_parcela,
-              parcela.percentual_comissao,
-              parcela.data_prevista,
-            ]
+          const vendaCriada = vendaRows[0];
+
+          // 2. Inserir corretores
+          for (const corretor of corretores) {
+            await client.query(
+              `INSERT INTO comissao_corretores (
+                venda_id, beneficiario_id, nome, cpf,
+                percentual_participacao, valor_comissao, prioridade, observacoes
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+              [
+                vendaCriada.id,
+                corretor.beneficiario_id || null,
+                corretor.nome,
+                corretor.cpf || null,
+                corretor.percentual_participacao,
+                corretor.valor_comissao,
+                corretor.prioridade || 0,
+                corretor.observacoes || null,
+              ]
+            );
+          }
+
+          // 3. Inserir parcelas
+          for (const parcela of parcelas) {
+            await client.query(
+              `INSERT INTO comissao_parcelas (
+                venda_id, numero, descricao, valor_parcela,
+                percentual_comissao, data_prevista, status
+              ) VALUES ($1, $2, $3, $4, $5, $6, 'prevista')`,
+              [
+                vendaCriada.id,
+                parcela.numero,
+                parcela.descricao || null,
+                parcela.valor_parcela,
+                parcela.percentual_comissao,
+                parcela.data_prevista,
+              ]
+            );
+          }
+
+          await client.query("COMMIT");
+
+          // Buscar venda completa
+          const { rows: vendaCompleta } = await client.query(
+            `SELECT * FROM comissao_vendas WHERE id = $1`,
+            [vendaCriada.id]
           );
+
+          return NextResponse.json(
+            {
+              success: true,
+              data: vendaCompleta[0],
+              message: `Venda ${codigo} criada com sucesso`,
+            },
+            { status: 201 }
+          );
+        } catch (error) {
+          await client.query("ROLLBACK");
+          throw error;
         }
-
-        await dbQuery("COMMIT");
-
-        // Buscar venda completa
-        const { rows: vendaCompleta } = await dbQuery(
-          `SELECT * FROM comissao_vendas WHERE id = $1`,
-          [vendaCriada.id]
-        );
-
-        return NextResponse.json(
-          {
-            success: true,
-            data: vendaCompleta[0],
-            message: `Venda ${codigo} criada com sucesso`,
-          },
-          { status: 201 }
-        );
-      } catch (error) {
-        await dbQuery("ROLLBACK");
-        throw error;
-      }
+      });
     } else {
       // Venda simples
       const parseResult = comissaoVendaCreateSchema.safeParse(body);
@@ -304,40 +309,43 @@ export async function POST(request: NextRequest) {
       }
 
       const data = parseResult.data;
-      const codigo = await gerarCodigoVenda(ctx.workspaceId);
 
-      const { rows: vendaRows } = await dbQuery(
-        `INSERT INTO comissao_vendas (
-          workspace_id, codigo, referencia, valor_venda, percentual_comissao,
-          empreendimento, unidade, cliente_nome, cliente_cpf,
-          data_venda, status, observacoes, created_by
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ativa', $11, $12
-        ) RETURNING *`,
-        [
-          ctx.workspaceId,
-          codigo,
-          data.referencia || null,
-          data.valor_venda,
-          data.percentual_comissao,
-          data.empreendimento || null,
-          data.unidade || null,
-          data.cliente_nome || null,
-          data.cliente_cpf || null,
-          data.data_venda,
-          data.observacoes || null,
-          ctx.user.id,
-        ]
-      );
+      return await withTenant(ctx.workspaceId, async (client) => {
+        const codigo = await gerarCodigoVenda(client, ctx.workspaceId);
 
-      return NextResponse.json(
-        {
-          success: true,
-          data: vendaRows[0],
-          message: `Venda ${codigo} criada com sucesso`,
-        },
-        { status: 201 }
-      );
+        const { rows: vendaRows } = await client.query(
+          `INSERT INTO comissao_vendas (
+            workspace_id, codigo, referencia, valor_venda, percentual_comissao,
+            empreendimento, unidade, cliente_nome, cliente_cpf,
+            data_venda, status, observacoes, created_by
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ativa', $11, $12
+          ) RETURNING *`,
+          [
+            ctx.workspaceId,
+            codigo,
+            data.referencia || null,
+            data.valor_venda,
+            data.percentual_comissao,
+            data.empreendimento || null,
+            data.unidade || null,
+            data.cliente_nome || null,
+            data.cliente_cpf || null,
+            data.data_venda,
+            data.observacoes || null,
+            ctx.user.id,
+          ]
+        );
+
+        return NextResponse.json(
+          {
+            success: true,
+            data: vendaRows[0],
+            message: `Venda ${codigo} criada com sucesso`,
+          },
+          { status: 201 }
+        );
+      });
     }
   } catch (error: any) {
     console.error("Erro ao criar venda comissao:", error);

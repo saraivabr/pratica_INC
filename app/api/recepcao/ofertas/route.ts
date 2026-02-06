@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { z } from 'zod';
 
 const OfertaSchema = z.object({
@@ -63,73 +63,75 @@ export async function POST(request: NextRequest) {
       lead_nome,
     } = validationResult.data;
 
-    // Verificar se usuario tem presenca ativa no plantao
-    const presencaCheck = await pool.query<{ id: string }>(
-      `SELECT id FROM recepcao_presencas
-       WHERE plantao_id = $1 AND user_id = $2 AND status = 'presente'`,
-      [plantao_id, (user as any).id]
-    );
-
-    if (presencaCheck.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Voce precisa fazer check-in no plantao primeiro' },
-        { status: 400 }
+    return await withTenant(workspaceId, async (client) => {
+      // Verificar se usuario tem presenca ativa no plantao
+      const presencaCheck = await client.query<{ id: string }>(
+        `SELECT id FROM recepcao_presencas
+         WHERE plantao_id = $1 AND user_id = $2 AND status = 'presente'`,
+        [plantao_id, (user as any).id]
       );
-    }
 
-    const presenca_id = presencaCheck.rows[0].id;
-
-    // Registrar oferta usando funcao do banco
-    const result = await pool.query<OfertaResult>(
-      `SELECT * FROM registrar_oferta($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        workspaceId,
-        plantao_id,
-        presenca_id,
-        (user as any).id,
-        empreendimento_id || null,
-        empreendimento_nome,
-        lead_origem,
-        lead_telefone || null,
-        lead_nome || null,
-      ]
-    );
-
-    const ofertaResult = result.rows[0];
-
-    // Montar resposta com mensagem motivacional
-    let message: string;
-    if (ofertaResult.qualificado) {
-      if (ofertaResult.total_ofertas === 30) {
-        message = 'Parabens! Voce esta qualificado para a Roleta de Leads!';
-      } else {
-        message = `Oferta registrada! Total: ${ofertaResult.total_ofertas}`;
+      if (presencaCheck.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Voce precisa fazer check-in no plantao primeiro' },
+          { status: 400 }
+        );
       }
-    } else {
-      message = `Oferta registrada! Agora sao ${ofertaResult.total_ofertas}/30. `;
-      if (ofertaResult.faltam <= 5) {
-        message += `So mais ${ofertaResult.faltam}!`;
-      } else if (ofertaResult.faltam <= 15) {
-        message += 'Continue assim!';
-      } else {
-        message += 'Cada oferta conta!';
-      }
-    }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          oferta_id: ofertaResult.oferta_id,
-          total_ofertas: ofertaResult.total_ofertas,
-          qualificado: ofertaResult.qualificado,
-          faltam: ofertaResult.faltam,
-          just_qualified: ofertaResult.qualificado && ofertaResult.total_ofertas === 30,
+      const presenca_id = presencaCheck.rows[0].id;
+
+      // Registrar oferta usando funcao do banco
+      const result = await client.query<OfertaResult>(
+        `SELECT * FROM registrar_oferta($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          workspaceId,
+          plantao_id,
+          presenca_id,
+          (user as any).id,
+          empreendimento_id || null,
+          empreendimento_nome,
+          lead_origem,
+          lead_telefone || null,
+          lead_nome || null,
+        ]
+      );
+
+      const ofertaResult = result.rows[0];
+
+      // Montar resposta com mensagem motivacional
+      let message: string;
+      if (ofertaResult.qualificado) {
+        if (ofertaResult.total_ofertas === 30) {
+          message = 'Parabens! Voce esta qualificado para a Roleta de Leads!';
+        } else {
+          message = `Oferta registrada! Total: ${ofertaResult.total_ofertas}`;
+        }
+      } else {
+        message = `Oferta registrada! Agora sao ${ofertaResult.total_ofertas}/30. `;
+        if (ofertaResult.faltam <= 5) {
+          message += `So mais ${ofertaResult.faltam}!`;
+        } else if (ofertaResult.faltam <= 15) {
+          message += 'Continue assim!';
+        } else {
+          message += 'Cada oferta conta!';
+        }
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: {
+            oferta_id: ofertaResult.oferta_id,
+            total_ofertas: ofertaResult.total_ofertas,
+            qualificado: ofertaResult.qualificado,
+            faltam: ofertaResult.faltam,
+            just_qualified: ofertaResult.qualificado && ofertaResult.total_ofertas === 30,
+          },
+          message,
         },
-        message,
-      },
-      { status: 201 }
-    );
+        { status: 201 }
+      );
+    });
   } catch (error: any) {
     console.error('Erro ao registrar oferta:', error);
 
@@ -159,58 +161,60 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
     const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
-    // Construir query
-    let query = `
-      SELECT
-        o.id,
-        o.empreendimento_id,
-        o.empreendimento_nome,
-        o.lead_origem,
-        o.lead_telefone,
-        o.lead_nome,
-        o.created_at,
-        p.data AS plantao_data,
-        l.nome AS local_nome
-      FROM roleta_ofertas o
-      JOIN recepcao_plantoes p ON p.id = o.plantao_id
-      JOIN recepcao_locais l ON l.id = p.local_id
-      WHERE o.workspace_id = $1 AND o.user_id = $2
-    `;
+    return await withTenant(workspaceId, async (client) => {
+      // Construir query
+      let query = `
+        SELECT
+          o.id,
+          o.empreendimento_id,
+          o.empreendimento_nome,
+          o.lead_origem,
+          o.lead_telefone,
+          o.lead_nome,
+          o.created_at,
+          p.data AS plantao_data,
+          l.nome AS local_nome
+        FROM roleta_ofertas o
+        JOIN recepcao_plantoes p ON p.id = o.plantao_id
+        JOIN recepcao_locais l ON l.id = p.local_id
+        WHERE o.workspace_id = $1 AND o.user_id = $2
+      `;
 
-    const params: any[] = [workspaceId, (user as any).id];
-    let paramIndex = 3;
+      const params: any[] = [workspaceId, (user as any).id];
+      let paramIndex = 3;
 
-    if (plantao_id) {
-      query += ` AND o.plantao_id = $${paramIndex}`;
-      params.push(plantao_id);
-      paramIndex++;
-    }
+      if (plantao_id) {
+        query += ` AND o.plantao_id = $${paramIndex}`;
+        params.push(plantao_id);
+        paramIndex++;
+      }
 
-    query += ` ORDER BY o.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    params.push(limit, offset);
+      query += ` ORDER BY o.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      params.push(limit, offset);
 
-    const result = await pool.query(query, params);
+      const result = await client.query(query, params);
 
-    // Buscar contagem total
-    let countQuery = `
-      SELECT COUNT(*) AS total FROM roleta_ofertas
-      WHERE workspace_id = $1 AND user_id = $2
-    `;
-    const countParams: any[] = [workspaceId, (user as any).id];
+      // Buscar contagem total
+      let countQuery = `
+        SELECT COUNT(*) AS total FROM roleta_ofertas
+        WHERE workspace_id = $1 AND user_id = $2
+      `;
+      const countParams: any[] = [workspaceId, (user as any).id];
 
-    if (plantao_id) {
-      countQuery += ` AND plantao_id = $3`;
-      countParams.push(plantao_id);
-    }
+      if (plantao_id) {
+        countQuery += ` AND plantao_id = $3`;
+        countParams.push(plantao_id);
+      }
 
-    const countResult = await pool.query<{ total: string }>(countQuery, countParams);
+      const countResult = await client.query<{ total: string }>(countQuery, countParams);
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows,
-      total: parseInt(countResult.rows[0].total),
-      limit,
-      offset,
+      return NextResponse.json({
+        success: true,
+        data: result.rows,
+        total: parseInt(countResult.rows[0].total),
+        limit,
+        offset,
+      });
     });
   } catch (error: any) {
     console.error('Erro ao listar ofertas:', error);

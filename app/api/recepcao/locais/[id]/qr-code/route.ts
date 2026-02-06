@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -39,35 +39,37 @@ export async function GET(
       );
     }
 
-    const result = await pool.query<LocalDB>(
-      `SELECT id, nome, qr_code_token FROM recepcao_locais
-       WHERE id = $1 AND workspace_id = $2 AND is_active = true`,
-      [id, workspaceId]
-    );
-
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Local não encontrado' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      const result = await client.query<LocalDB>(
+        `SELECT id, nome, qr_code_token FROM recepcao_locais
+         WHERE id = $1 AND workspace_id = $2 AND is_active = true`,
+        [id, workspaceId]
       );
-    }
 
-    const local = result.rows[0];
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.app';
-    const checkinUrl = `${baseUrl}/corretor/recepcao?qr=${local.qr_code_token}`;
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Local não encontrado' },
+          { status: 404 }
+        );
+      }
 
-    // URL para gerar QR Code via API externa (Google Charts)
-    const qrCodeUrl = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(checkinUrl)}`;
+      const local = result.rows[0];
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.app';
+      const checkinUrl = `${baseUrl}/corretor/recepcao?qr=${local.qr_code_token}`;
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        local_id: local.id,
-        local_nome: local.nome,
-        qr_code_token: local.qr_code_token,
-        checkin_url: checkinUrl,
-        qr_code_image_url: qrCodeUrl,
-      },
+      // URL para gerar QR Code via API externa (Google Charts)
+      const qrCodeUrl = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(checkinUrl)}`;
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          local_id: local.id,
+          local_nome: local.nome,
+          qr_code_token: local.qr_code_token,
+          checkin_url: checkinUrl,
+          qr_code_image_url: qrCodeUrl,
+        },
+      });
     });
   } catch (error) {
     console.error('Erro ao gerar QR Code:', error);
@@ -100,36 +102,38 @@ export async function POST(
       );
     }
 
-    const result = await pool.query<LocalDB>(
-      `UPDATE recepcao_locais
-       SET qr_code_token = gen_random_uuid(), updated_at = NOW()
-       WHERE id = $1 AND workspace_id = $2 AND is_active = true
-       RETURNING id, nome, qr_code_token`,
-      [id, workspaceId]
-    );
-
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Local não encontrado' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      const result = await client.query<LocalDB>(
+        `UPDATE recepcao_locais
+         SET qr_code_token = gen_random_uuid(), updated_at = NOW()
+         WHERE id = $1 AND workspace_id = $2 AND is_active = true
+         RETURNING id, nome, qr_code_token`,
+        [id, workspaceId]
       );
-    }
 
-    const local = result.rows[0];
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.app';
-    const checkinUrl = `${baseUrl}/corretor/recepcao?qr=${local.qr_code_token}`;
-    const qrCodeUrl = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(checkinUrl)}`;
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Local não encontrado' },
+          { status: 404 }
+        );
+      }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        local_id: local.id,
-        local_nome: local.nome,
-        qr_code_token: local.qr_code_token,
-        checkin_url: checkinUrl,
-        qr_code_image_url: qrCodeUrl,
-      },
-      message: 'QR Code regenerado com sucesso',
+      const local = result.rows[0];
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pratica.app';
+      const checkinUrl = `${baseUrl}/corretor/recepcao?qr=${local.qr_code_token}`;
+      const qrCodeUrl = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(checkinUrl)}`;
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          local_id: local.id,
+          local_nome: local.nome,
+          qr_code_token: local.qr_code_token,
+          checkin_url: checkinUrl,
+          qr_code_image_url: qrCodeUrl,
+        },
+        message: 'QR Code regenerado com sucesso',
+      });
     });
   } catch (error) {
     console.error('Erro ao regenerar QR Code:', error);

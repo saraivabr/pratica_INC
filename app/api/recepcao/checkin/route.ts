@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { z } from 'zod';
 
 const CheckinSchema = z.object({
@@ -55,77 +55,79 @@ export async function POST(request: NextRequest) {
 
     const { plantao_id } = validationResult.data;
 
-    // Verificar se plantão existe, está ativo e pertence ao workspace
-    const plantaoCheck = await pool.query<{ id: string; max_corretores: number | null }>(
-      `SELECT id, max_corretores FROM recepcao_plantoes
-       WHERE id = $1 AND workspace_id = $2 AND status = 'ativo'
-         AND data = CURRENT_DATE`,
-      [plantao_id, workspaceId]
-    );
-
-    if (plantaoCheck.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Plantão não encontrado ou não está ativo hoje' },
-        { status: 404 }
+    return await withTenant(workspaceId, async (client) => {
+      // Verificar se plantão existe, está ativo e pertence ao workspace
+      const plantaoCheck = await client.query<{ id: string; max_corretores: number | null }>(
+        `SELECT id, max_corretores FROM recepcao_plantoes
+         WHERE id = $1 AND workspace_id = $2 AND status = 'ativo'
+           AND data = CURRENT_DATE`,
+        [plantao_id, workspaceId]
       );
-    }
 
-    const plantao = plantaoCheck.rows[0];
+      if (plantaoCheck.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Plantão não encontrado ou não está ativo hoje' },
+          { status: 404 }
+        );
+      }
 
-    // Verificar se já existe presença ativa
-    const presencaExistente = await pool.query(
-      `SELECT id FROM recepcao_presencas
-       WHERE plantao_id = $1 AND user_id = $2 AND status = 'presente'`,
-      [plantao_id, (user as any).id]
-    );
+      const plantao = plantaoCheck.rows[0];
 
-    if (presencaExistente.rows.length > 0) {
-      return NextResponse.json(
-        { success: false, error: 'Você já está presente neste plantão' },
-        { status: 409 }
+      // Verificar se já existe presença ativa
+      const presencaExistente = await client.query(
+        `SELECT id FROM recepcao_presencas
+         WHERE plantao_id = $1 AND user_id = $2 AND status = 'presente'`,
+        [plantao_id, (user as any).id]
       );
-    }
 
-    // Verificar limite de corretores (se definido)
-    if (plantao.max_corretores) {
-      const countResult = await pool.query<{ count: number }>(
-        `SELECT COUNT(*)::int AS count FROM recepcao_presencas
-         WHERE plantao_id = $1 AND status = 'presente'`,
+      if (presencaExistente.rows.length > 0) {
+        return NextResponse.json(
+          { success: false, error: 'Você já está presente neste plantão' },
+          { status: 409 }
+        );
+      }
+
+      // Verificar limite de corretores (se definido)
+      if (plantao.max_corretores) {
+        const countResult = await client.query<{ count: number }>(
+          `SELECT COUNT(*)::int AS count FROM recepcao_presencas
+           WHERE plantao_id = $1 AND status = 'presente'`,
+          [plantao_id]
+        );
+
+        if (countResult.rows[0].count >= plantao.max_corretores) {
+          return NextResponse.json(
+            { success: false, error: 'Plantão atingiu o limite máximo de corretores' },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Obter próxima posição na fila
+      const posicaoResult = await client.query<{ posicao: number }>(
+        `SELECT get_proxima_posicao_fila($1) AS posicao`,
         [plantao_id]
       );
 
-      if (countResult.rows[0].count >= plantao.max_corretores) {
-        return NextResponse.json(
-          { success: false, error: 'Plantão atingiu o limite máximo de corretores' },
-          { status: 400 }
-        );
-      }
-    }
+      const posicao = posicaoResult.rows[0].posicao;
 
-    // Obter próxima posição na fila
-    const posicaoResult = await pool.query<{ posicao: number }>(
-      `SELECT get_proxima_posicao_fila($1) AS posicao`,
-      [plantao_id]
-    );
+      // Criar presença
+      const result = await client.query<PresencaDB>(
+        `INSERT INTO recepcao_presencas (workspace_id, plantao_id, user_id, checkin_method, posicao_fila)
+         VALUES ($1, $2, $3, 'manual', $4)
+         RETURNING *`,
+        [workspaceId, plantao_id, (user as any).id, posicao]
+      );
 
-    const posicao = posicaoResult.rows[0].posicao;
-
-    // Criar presença
-    const result = await pool.query<PresencaDB>(
-      `INSERT INTO recepcao_presencas (workspace_id, plantao_id, user_id, checkin_method, posicao_fila)
-       VALUES ($1, $2, $3, 'manual', $4)
-       RETURNING *`,
-      [workspaceId, plantao_id, (user as any).id, posicao]
-    );
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: result.rows[0],
-        message: `Check-in realizado! Você está na posição ${posicao} da fila.`,
-      },
-      { status: 201 }
-    );
+      return NextResponse.json(
+        {
+          success: true,
+          data: result.rows[0],
+          message: `Check-in realizado! Você está na posição ${posicao} da fila.`,
+        },
+        { status: 201 }
+      );
+    });
   } catch (error: any) {
     console.error('Erro ao fazer check-in:', error);
 

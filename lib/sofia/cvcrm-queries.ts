@@ -6,6 +6,7 @@
  */
 
 import { dbQuery } from "@/lib/db";
+import { withTenant } from "@/lib/tenant-context";
 
 // ============================================================================
 // Types
@@ -151,63 +152,65 @@ export async function getLeadsByCorretor(
 
   const whereClause = conditions.join(" AND ");
 
-  // Get leads
-  const { rows: leads } = await dbQuery(
-    `SELECT
-      id,
-      cvcrm_id,
-      nome,
-      email,
-      telefone,
-      celular,
-      cpf,
-      origem,
-      situacao_nome,
-      situacao_cor,
-      corretor_nome,
-      empreendimentos,
-      score,
-      data_cadastro_cvcrm,
-      created_at
-    FROM cvcrm_leads
-    WHERE ${whereClause}
-    ORDER BY data_cadastro_cvcrm DESC NULLS LAST, created_at DESC
-    LIMIT $${paramIndex}`,
-    [...params, limit]
-  );
+  return withTenant(workspaceId, async (client) => {
+    // Get leads
+    const { rows: leads } = await client.query(
+      `SELECT
+        id,
+        cvcrm_id,
+        nome,
+        email,
+        telefone,
+        celular,
+        cpf,
+        origem,
+        situacao_nome,
+        situacao_cor,
+        corretor_nome,
+        empreendimentos,
+        score,
+        data_cadastro_cvcrm,
+        created_at
+      FROM cvcrm_leads
+      WHERE ${whereClause}
+      ORDER BY data_cadastro_cvcrm DESC NULLS LAST, created_at DESC
+      LIMIT $${paramIndex}`,
+      [...params, limit]
+    );
 
-  // Get total count
-  const { rows: countRows } = await dbQuery(
-    `SELECT COUNT(*) as total FROM cvcrm_leads WHERE ${whereClause}`,
-    params
-  );
-  const total = parseInt(countRows[0]?.total || "0", 10);
+    // Get total count
+    const { rows: countRows } = await client.query(
+      `SELECT COUNT(*) as total FROM cvcrm_leads WHERE ${whereClause}`,
+      params
+    );
+    const total = parseInt(countRows[0]?.total || "0", 10);
 
-  // Get breakdown by situacao
-  const { rows: breakdownRows } = await dbQuery(
-    `SELECT
-      COALESCE(situacao_nome, 'Sem Status') as situacao,
-      COUNT(*) as count
-    FROM cvcrm_leads
-    WHERE workspace_id = $1
-      AND corretor_id = $2
-      AND (
-        LOWER(situacao_nome) NOT LIKE '%perdido%'
-        AND LOWER(situacao_nome) NOT LIKE '%cancelado%'
-        AND LOWER(situacao_nome) NOT LIKE '%desistiu%'
-        AND LOWER(situacao_nome) NOT LIKE '%inativo%'
-      )
-    GROUP BY situacao_nome
-    ORDER BY count DESC`,
-    [workspaceId, parseInt(corretorId, 10)]
-  );
+    // Get breakdown by situacao
+    const { rows: breakdownRows } = await client.query(
+      `SELECT
+        COALESCE(situacao_nome, 'Sem Status') as situacao,
+        COUNT(*) as count
+      FROM cvcrm_leads
+      WHERE workspace_id = $1
+        AND corretor_id = $2
+        AND (
+          LOWER(situacao_nome) NOT LIKE '%perdido%'
+          AND LOWER(situacao_nome) NOT LIKE '%cancelado%'
+          AND LOWER(situacao_nome) NOT LIKE '%desistiu%'
+          AND LOWER(situacao_nome) NOT LIKE '%inativo%'
+        )
+      GROUP BY situacao_nome
+      ORDER BY count DESC`,
+      [workspaceId, parseInt(corretorId, 10)]
+    );
 
-  const resumo: Record<string, number> = {};
-  for (const row of breakdownRows) {
-    resumo[row.situacao] = parseInt(row.count, 10);
-  }
+    const resumo: Record<string, number> = {};
+    for (const row of breakdownRows) {
+      resumo[row.situacao] = parseInt(row.count, 10);
+    }
 
-  return { leads: leads as Lead[], total, resumo };
+    return { leads: leads as Lead[], total, resumo };
+  });
 }
 
 // ============================================================================
@@ -264,48 +267,50 @@ export async function getReservaStatus(
 
   const whereClause = conditions.join(" AND ");
 
-  const { rows } = await dbQuery(
-    `SELECT
-      id,
-      cvcrm_id,
-      numero_reserva,
-      status,
-      cliente_principal_nome,
-      empreendimento_nome,
-      unidade_nome,
-      valor_reserva,
-      valor_venda,
-      corretor_nome,
-      data_reserva,
-      data_venda
-    FROM cvcrm_reservas
-    WHERE ${whereClause}
-    ORDER BY data_reserva DESC NULLS LAST, created_at DESC
-    LIMIT 10`,
-    params
-  );
+  return withTenant(workspaceId, async (client) => {
+    const { rows } = await client.query(
+      `SELECT
+        id,
+        cvcrm_id,
+        numero_reserva,
+        status,
+        cliente_principal_nome,
+        empreendimento_nome,
+        unidade_nome,
+        valor_reserva,
+        valor_venda,
+        corretor_nome,
+        data_reserva,
+        data_venda
+      FROM cvcrm_reservas
+      WHERE ${whereClause}
+      ORDER BY data_reserva DESC NULLS LAST, created_at DESC
+      LIMIT 10`,
+      params
+    );
 
-  if (rows.length === 0) {
+    if (rows.length === 0) {
+      return {
+        encontrado: false,
+        reservas: [],
+        mensagem: cpf
+          ? `Nenhuma reserva encontrada para CPF "${cpf}" ou nome "${clienteNome}".`
+          : `Nenhuma reserva encontrada para "${clienteNome}".`,
+      };
+    }
+
+    const reservas = rows as ReservaStatus[];
+    const statusList = reservas.map(
+      (r) =>
+        `${r.empreendimento_nome || "Empreendimento"} - ${r.unidade_nome || "Unidade"}: ${r.status || "Sem status"}`
+    );
+
     return {
-      encontrado: false,
-      reservas: [],
-      mensagem: cpf
-        ? `Nenhuma reserva encontrada para CPF "${cpf}" ou nome "${clienteNome}".`
-        : `Nenhuma reserva encontrada para "${clienteNome}".`,
+      encontrado: true,
+      reservas,
+      mensagem: `Encontradas ${reservas.length} reserva(s) para "${clienteNome}":\n${statusList.join("\n")}`,
     };
-  }
-
-  const reservas = rows as ReservaStatus[];
-  const statusList = reservas.map(
-    (r) =>
-      `${r.empreendimento_nome || "Empreendimento"} - ${r.unidade_nome || "Unidade"}: ${r.status || "Sem status"}`
-  );
-
-  return {
-    encontrado: true,
-    reservas,
-    mensagem: `Encontradas ${reservas.length} reserva(s) para "${clienteNome}":\n${statusList.join("\n")}`,
-  };
+  });
 }
 
 // ============================================================================
@@ -324,8 +329,9 @@ export async function getComissoesCorretor(corretorId: string, workspaceId: numb
 }> {
   const corretorIdNum = parseInt(corretorId, 10);
 
+  return withTenant(workspaceId, async (client) => {
   // Get all commissions for this corretor
-  const { rows } = await dbQuery(
+  const { rows } = await client.query(
     `SELECT
       id,
       cvcrm_id,
@@ -348,7 +354,7 @@ export async function getComissoesCorretor(corretorId: string, workspaceId: numb
   );
 
   // Also check cvcrm_reserva_comissoes
-  const { rows: reservaComissoes } = await dbQuery(
+  const { rows: reservaComissoes } = await client.query(
     `SELECT
       rc.id,
       rc.cvcrm_id,
@@ -407,6 +413,7 @@ export async function getComissoesCorretor(corretorId: string, workspaceId: numb
       quantidade_pago,
     },
   };
+  });
 }
 
 // ============================================================================
@@ -427,8 +434,9 @@ export async function getProximasAtividades(
   const dataLimite = new Date();
   dataLimite.setDate(dataLimite.getDate() + dias);
 
+  return withTenant(workspaceId, async (client) => {
   // Get from cvcrm_agendamentos
-  const { rows: agendamentos } = await dbQuery(
+  const { rows: agendamentos } = await client.query(
     `SELECT
       id,
       cvcrm_id,
@@ -454,7 +462,7 @@ export async function getProximasAtividades(
   );
 
   // Get from cvcrm_lead_tarefas
-  const { rows: tarefas } = await dbQuery(
+  const { rows: tarefas } = await client.query(
     `SELECT
       t.id,
       t.cvcrm_id,
@@ -477,7 +485,7 @@ export async function getProximasAtividades(
   );
 
   // Get from cvcrm_lead_visitas
-  const { rows: visitas } = await dbQuery(
+  const { rows: visitas } = await client.query(
     `SELECT
       v.id,
       v.cvcrm_id,
@@ -529,6 +537,7 @@ export async function getProximasAtividades(
     total: todasAtividades.length,
     agrupado_por_dia,
   };
+  });
 }
 
 // ============================================================================
@@ -589,8 +598,9 @@ export async function getRankingEquipe(
 
   const whereClause = conditions.join(" AND ");
 
+  return withTenant(workspaceId, async (client) => {
   // Get ranking by sales
-  const { rows } = await dbQuery(
+  const { rows } = await client.query(
     `SELECT
       r.corretor_id,
       COALESCE(r.corretor_nome, c.nome, 'Corretor Desconhecido') as corretor_nome,
@@ -606,7 +616,7 @@ export async function getRankingEquipe(
   );
 
   // Get leads count per corretor for conversion rate
-  const { rows: leadsRows } = await dbQuery(
+  const { rows: leadsRows } = await client.query(
     `SELECT
       corretor_id,
       COUNT(*) as total_leads,
@@ -657,6 +667,7 @@ export async function getRankingEquipe(
     periodo_inicio: start.toISOString().split("T")[0],
     periodo_fim: end.toISOString().split("T")[0],
   };
+  });
 }
 
 // ============================================================================
@@ -677,8 +688,9 @@ export async function getMetasCorretor(corretorId: string, workspaceId: number):
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
+  return withTenant(workspaceId, async (client) => {
   // Get actual sales for this month
-  const { rows: vendasRows } = await dbQuery(
+  const { rows: vendasRows } = await client.query(
     `SELECT
       COUNT(*) as quantidade_vendas,
       COALESCE(SUM(valor_venda), 0) as valor_vendas
@@ -695,7 +707,7 @@ export async function getMetasCorretor(corretorId: string, workspaceId: number):
   const valorVendas = parseFloat(vendasRows[0]?.valor_vendas || "0");
 
   // Get leads count this month
-  const { rows: leadsRows } = await dbQuery(
+  const { rows: leadsRows } = await client.query(
     `SELECT
       COUNT(*) as total_leads,
       COUNT(*) FILTER (WHERE
@@ -715,7 +727,7 @@ export async function getMetasCorretor(corretorId: string, workspaceId: number):
   const leadsConvertidos = parseInt(leadsRows[0]?.leads_convertidos || "0", 10);
 
   // Get visits this month
-  const { rows: visitasRows } = await dbQuery(
+  const { rows: visitasRows } = await client.query(
     `SELECT COUNT(*) as total_visitas
     FROM cvcrm_lead_visitas
     WHERE workspace_id = $1
@@ -790,6 +802,7 @@ export async function getMetasCorretor(corretorId: string, workspaceId: number):
       percentual_geral: percentualGeral,
     },
   };
+  });
 }
 
 // ============================================================================
