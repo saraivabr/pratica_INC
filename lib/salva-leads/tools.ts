@@ -8,10 +8,10 @@
 import { dbQuery } from '@/lib/db';
 import { getUnidadesCVCRM, getEmpreendimentosCVCRM } from '@/lib/cvcrm-client';
 import {
-  sendTextMessage,
   sendPresence,
   formatPhoneNumber
 } from '@/lib/evolution-api';
+import { getCorretorEvolutionInstance, sendToCorretor } from '@/lib/evolution-helpers';
 import type { SalvaLeadsToolDefinition, SalvaLeadsConversation } from './types';
 
 // ============================================================================
@@ -389,43 +389,29 @@ async function executePostVisita(
       console.warn('[Salva-Leads] Tabela salva_leads_visitas nao existe:', err.message);
     });
 
-    // 2. Notificar corretor se configurado
+    // 2. Notificar corretor se configurado (via Z-API - sistema→corretor)
     if (context.corretor_id) {
-      // Buscar telefone do corretor
       const corretorResult = await dbQuery(
-        `SELECT phone FROM users WHERE id = $1`,
+        `SELECT telefone FROM users WHERE id = $1`,
         [context.corretor_id]
       ).catch(() => ({ rows: [] }));
 
-      const corretorPhone = corretorResult.rows[0]?.phone || context.corretor_phone;
+      const corretorPhone = corretorResult.rows[0]?.telefone || context.corretor_phone;
 
       if (corretorPhone) {
-        // Buscar instance_name do tenant
-        const tenantResult = await dbQuery(
-          `SELECT whatsapp_config FROM tenants WHERE id = $1`,
-          [workspaceId]
-        ).catch(() => ({ rows: [] }));
+        const notificacao = [
+          `Novo interesse de visita!`,
+          `Cliente: ${context.lead_name || context.lead_phone}`,
+          `Imovel: ${cod_imovel}`,
+          data_sugerida ? `Data sugerida: ${data_sugerida}` : '',
+          periodo ? `Periodo: ${periodo}` : '',
+          observacao ? `Obs: ${observacao}` : ''
+        ].filter(Boolean).join('\n');
 
-        const instanceName = tenantResult.rows[0]?.whatsapp_config?.instance_name;
-
-        if (instanceName) {
-          const notificacao = [
-            `Novo interesse de visita!`,
-            `Cliente: ${context.lead_name || context.lead_phone}`,
-            `Imovel: ${cod_imovel}`,
-            data_sugerida ? `Data sugerida: ${data_sugerida}` : '',
-            periodo ? `Periodo: ${periodo}` : '',
-            observacao ? `Obs: ${observacao}` : ''
-          ].filter(Boolean).join('\n');
-
-          try {
-            await sendTextMessage(instanceName, {
-              number: formatPhoneNumber(corretorPhone),
-              text: notificacao
-            });
-          } catch (e) {
-            console.warn('[Salva-Leads] Erro ao notificar corretor:', e);
-          }
+        try {
+          await sendToCorretor(corretorPhone, notificacao);
+        } catch (e) {
+          console.warn('[Salva-Leads] Erro ao notificar corretor:', e);
         }
       }
     }
@@ -461,24 +447,21 @@ async function executeNotifyClient(
   }
 
   try {
-    // Buscar instance_name do tenant
-    const tenantResult = await dbQuery(
-      `SELECT whatsapp_config FROM tenants WHERE id = $1`,
-      [workspaceId]
-    ).catch(() => ({ rows: [] }));
+    // Buscar instância Evolution do corretor desta conversa
+    const instance = context.corretor_id
+      ? await getCorretorEvolutionInstance(context.corretor_id)
+      : null;
 
-    const instanceName = tenantResult.rows[0]?.whatsapp_config?.instance_name;
-
-    if (instanceName) {
+    if (instance?.connected) {
       await sendPresence(
-        instanceName,
+        instance.instanceName,
         formatPhoneNumber(context.lead_phone),
         'composing'
       );
       return { sent: true };
     }
 
-    return { sent: false, reason: 'instance_name nao encontrado' };
+    return { sent: false, reason: 'corretor sem Evolution conectado' };
   } catch (error) {
     console.warn('[Salva-Leads] Erro ao enviar presence:', error);
     return { sent: false };
@@ -512,40 +495,27 @@ async function executeTransferToCorretor(
       console.warn('[Salva-Leads] Erro ao atualizar conversa:', err.message);
     });
 
-    // 2. Notificar corretor
+    // 2. Notificar corretor (via Z-API - sistema→corretor)
     if (context.corretor_id) {
       const corretorResult = await dbQuery(
-        `SELECT phone FROM users WHERE id = $1`,
+        `SELECT telefone FROM users WHERE id = $1`,
         [context.corretor_id]
       ).catch(() => ({ rows: [] }));
 
-      const corretorPhone = corretorResult.rows[0]?.phone || context.corretor_phone;
+      const corretorPhone = corretorResult.rows[0]?.telefone || context.corretor_phone;
 
       if (corretorPhone) {
-        // Buscar instance_name do tenant
-        const tenantResult = await dbQuery(
-          `SELECT whatsapp_config FROM tenants WHERE id = $1`,
-          [workspaceId]
-        ).catch(() => ({ rows: [] }));
+        const notificacao = [
+          `Conversa transferida!`,
+          `Cliente: ${context.lead_name || context.lead_phone}`,
+          `Telefone: ${context.lead_phone}`,
+          args.motivo ? `Motivo: ${args.motivo}` : ''
+        ].filter(Boolean).join('\n');
 
-        const instanceName = tenantResult.rows[0]?.whatsapp_config?.instance_name;
-
-        if (instanceName) {
-          const notificacao = [
-            `Conversa transferida!`,
-            `Cliente: ${context.lead_name || context.lead_phone}`,
-            `Telefone: ${context.lead_phone}`,
-            args.motivo ? `Motivo: ${args.motivo}` : ''
-          ].filter(Boolean).join('\n');
-
-          try {
-            await sendTextMessage(instanceName, {
-              number: formatPhoneNumber(corretorPhone),
-              text: notificacao
-            });
-          } catch (e) {
-            console.warn('[Salva-Leads] Erro ao notificar corretor:', e);
-          }
+        try {
+          await sendToCorretor(corretorPhone, notificacao);
+        } catch (e) {
+          console.warn('[Salva-Leads] Erro ao notificar corretor:', e);
         }
       }
     }

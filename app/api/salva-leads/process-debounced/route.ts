@@ -29,7 +29,7 @@ import {
 } from '@/lib/salva-leads/conversation';
 import { processWithAgent } from '@/lib/salva-leads/agent';
 import { sendTextMessage, formatPhoneNumber } from '@/lib/evolution-api';
-import { getWorkspace } from '@/lib/tenant-context';
+import { getCorretorEvolutionInstance } from '@/lib/evolution-helpers';
 import {
   getActiveTenantsWithEvolution,
 } from '@/lib/salva-leads/processor';
@@ -97,17 +97,9 @@ async function processDebounced(request: NextRequest) {
 
         console.log(`[Process-Debounced] Tenant ${tenant.id}: ${conversations.length} conversas prontas`);
 
-        // Obter instance name do tenant
-        const instanceName = await getEvolutionInstanceName(tenant.id);
-
-        if (!instanceName) {
-          console.warn(`[Process-Debounced] Tenant ${tenant.id} sem instance Evolution conectada`);
-          continue;
-        }
-
         for (const conv of conversations) {
           try {
-            const result = await processConversation(conv.id, tenant.id, instanceName);
+            const result = await processConversation(conv.id, tenant.id);
             results.push({
               workspaceId: tenant.id,
               conversationId: conv.id,
@@ -175,7 +167,6 @@ const MAX_RETRY_COUNT = 3;
 async function processConversation(
   conversationId: number,
   workspaceId: number,
-  instanceName: string
 ): Promise<{ messagesCount: number; status: 'processed' | 'error' | 'skipped'; error?: string }> {
   // Buscar conversa atualizada
   const conv = await getConversation(conversationId);
@@ -211,6 +202,18 @@ async function processConversation(
     if (conv.bot_paused) {
       return { messagesCount: pendingMessages.length, status: 'skipped', error: 'bot_pausado' };
     }
+
+    // Buscar instância Evolution do corretor desta conversa
+    const corretorInstance = conv.corretor_id
+      ? await getCorretorEvolutionInstance(conv.corretor_id)
+      : null;
+
+    if (!corretorInstance?.connected) {
+      console.warn(`[Process-Debounced] Corretor ${conv.corretor_id} sem Evolution conectado para conversa ${conversationId}`);
+      return { messagesCount: pendingMessages.length, status: 'skipped', error: 'corretor_sem_evolution' };
+    }
+
+    const instanceName = corretorInstance.instanceName;
 
     // Verificar se já atingiu limite de retries
     const retryCount = (conv as any).retry_count || 0;
@@ -290,17 +293,3 @@ async function processConversation(
   }
 }
 
-/**
- * Obtem o nome da instancia Evolution para um tenant
- */
-async function getEvolutionInstanceName(workspaceId: number): Promise<string | null> {
-  const tenant = await getWorkspace(workspaceId);
-  if (!tenant) return null;
-
-  const instances = tenant.evolution_instances || [];
-  const activeInstance = instances.find(
-    (i) => i.status === 'connected' || i.status === 'open'
-  );
-
-  return activeInstance?.instance_name || instances[0]?.instance_name || null;
-}
