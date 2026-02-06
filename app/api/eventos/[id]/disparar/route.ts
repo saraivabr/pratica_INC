@@ -11,7 +11,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
-import pool from '@/lib/db';
 import { withTenant } from '@/lib/tenant-context';
 import { isInstanceConnected, sendTextMessage, formatPhoneNumber } from '@/lib/evolution-api';
 import { z } from 'zod';
@@ -175,16 +174,14 @@ function delay(ms: number): Promise<void> {
 
 /**
  * Processa envio sincrono de convites
- * NOTE: pool.query is used here for per-message updates because processarEnviosSincronos
- * is called from within the withTenant callback (which holds the RLS client),
- * but individual message updates don't need the RLS client context since they
- * update by specific ID. We keep pool for these fire-and-forget updates.
+ * Uses the tenant-scoped client for RLS-protected writes (e.g. whatsapp_messages).
  */
 async function processarEnviosSincronos(
   convidados: ConvidadoDB[],
   evento: EventoDB,
   instanceName: string,
-  workspaceId: number
+  workspaceId: number,
+  client: import('pg').PoolClient
 ): Promise<{ enviados: number; falhas: number; erros: any[] }> {
   const resultado = { enviados: 0, falhas: 0, erros: [] as any[] };
 
@@ -202,13 +199,13 @@ async function processarEnviosSincronos(
       });
 
       // Atualizar convidado como enviado
-      await pool.query(
+      await client.query(
         `UPDATE evento_convidados SET convite_enviado_at = NOW() WHERE id = $1`,
         [convidado.id]
       );
 
       // Salvar mensagem no historico
-      await pool.query(
+      await client.query(
         `INSERT INTO whatsapp_messages (
           workspace_id, instance_name, phone_number, message_id,
           message_type, message_text, is_from_me, status, timestamp, raw_data
@@ -491,7 +488,8 @@ export async function POST(
           convidados,
           evento,
           instance_name,
-          workspaceId
+          workspaceId,
+          client
         );
 
         console.log(`[Dispatch] Concluido: ${resultado.enviados} enviados, ${resultado.falhas} falhas`);

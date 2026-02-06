@@ -5,7 +5,6 @@
  * Cada ferramenta tem acesso ao contexto da conversa (SalvaLeadsConversation) e ao workspaceId.
  */
 
-import { dbQuery } from '@/lib/db';
 import { withTenant } from '@/lib/tenant-context';
 import { getUnidadesCVCRM, getEmpreendimentosCVCRM } from '@/lib/cvcrm-client';
 import {
@@ -54,7 +53,7 @@ async function executeGetImoveis(
 
   try {
     // 1. Carregar dados (snapshot local ou API)
-    const { empreendimentos, unidades } = await loadImoveisData();
+    const { empreendimentos, unidades } = await loadImoveisData(workspaceId);
 
     // 2. Primeira tentativa: filtros estritos
     let result = filterImoveis(empreendimentos, unidades, args, { strict: true });
@@ -113,14 +112,16 @@ async function executeGetImoveis(
 /**
  * Carrega dados de imóveis (snapshot local ou API)
  */
-async function loadImoveisData(): Promise<{ empreendimentos: any[]; unidades: any[] }> {
+async function loadImoveisData(workspaceId: number): Promise<{ empreendimentos: any[]; unidades: any[] }> {
   // 1. Primeiro tenta buscar do snapshot local (mais rapido)
-  const snapshotResult = await dbQuery(
-    `SELECT empreendimentos, unidades
-     FROM cvcrm_snapshots
-     ORDER BY created_at DESC
-     LIMIT 1`
-  );
+  const snapshotResult = await withTenant(workspaceId, async (client) => {
+    return client.query(
+      `SELECT empreendimentos, unidades
+       FROM cvcrm_snapshots
+       ORDER BY created_at DESC
+       LIMIT 1`
+    );
+  });
   const snapshot = snapshotResult.rows[0];
 
   let empreendimentos: any[] = [];
