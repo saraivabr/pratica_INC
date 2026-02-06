@@ -358,7 +358,21 @@ async function handleNewMessage(workspaceId: number, data: any) {
       }
     }
 
-    const finalMediaUrl = localMediaUrl || rawMediaUrl;
+    // If download failed but we have a raw URL, queue a retry instead of using
+    // the temporary Evolution API URL (which expires in ~1h)
+    if (!localMediaUrl && rawMediaUrl && messageId) {
+      enqueueMessage(workspaceId, 'index_message', {
+        workspace_id: workspaceId,
+        instance_name: data.instance,
+        phone_number: phoneNumber,
+        message_id: messageId,
+        _media_retry: true,
+        _raw_media_url: rawMediaUrl,
+        _mimetype: mimetype,
+      }).catch(() => {});
+    }
+
+    const finalMediaUrl = localMediaUrl || null;
 
     if (messageId) {
       await withTenant(workspaceId, async (client) => {

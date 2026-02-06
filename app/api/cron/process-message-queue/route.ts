@@ -21,6 +21,7 @@ import {
   analyzeConversation,
   shouldReanalyze,
 } from "@/lib/whatsapp-storage/ai-engine";
+import { downloadAndStoreMedia } from "@/lib/media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,40 @@ export async function GET(request: NextRequest) {
           switch (item.action) {
             case "index_message": {
               const p = item.payload;
+
+              // Handle media download retry
+              if (p._media_retry && p._raw_media_url && p.message_id) {
+                try {
+                  const localUrl = await downloadAndStoreMedia(
+                    p.instance_name,
+                    p.message_id,
+                    p._raw_media_url,
+                    p._mimetype
+                  );
+                  if (localUrl) {
+                    // Update PG with the downloaded media URL
+                    const { withTenant } = await import("@/lib/tenant-context");
+                    await withTenant(workspaceId, async (client) => {
+                      await client.query(
+                        `UPDATE whatsapp_messages SET media_url = $1 WHERE instance_name = $2 AND message_id = $3`,
+                        [localUrl, p.instance_name, p.message_id]
+                      );
+                    });
+                    // Update MongoDB
+                    const { getMongoDb } = await import("@/lib/mongodb");
+                    const db = getMongoDb();
+                    await db.collection("messages").updateOne(
+                      { workspace_id: workspaceId, message_id: p.message_id },
+                      { $set: { media_url: localUrl } }
+                    );
+                    console.log(`[MQ] Media retry success: ${p.message_id}`);
+                  }
+                } catch (err: any) {
+                  console.error(`[MQ] Media retry failed: ${err.message}`);
+                }
+                break;
+              }
+
               const doc: MessageDoc = {
                 workspace_id: p.workspace_id,
                 instance_name: p.instance_name,
@@ -61,6 +96,9 @@ export async function GET(request: NextRequest) {
                 timestamp: new Date(p.timestamp),
                 contact_name: p.contact_name || null,
                 status: p.status || "sent",
+                media_url: p.media_url || null,
+                caption: p.caption || null,
+                mimetype: p.mimetype || null,
                 raw_data: p.raw_data,
               };
 

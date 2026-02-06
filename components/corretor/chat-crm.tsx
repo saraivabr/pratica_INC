@@ -27,6 +27,7 @@ import {
   useSendTyping,
 } from '@/hooks/use-chat';
 import { MessageBubble } from './chat/message-bubble';
+import { DateSeparator } from './chat/date-separator';
 import { ConversationItem } from './chat/conversation-item';
 import { ConnectionIndicator } from './chat/connection-indicator';
 import { ChatHeader } from './chat/chat-header';
@@ -303,9 +304,18 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
             {/* Messages Area */}
             <ScrollArea className="flex-1 p-4 bg-gray-100 dark:bg-gray-900/50">
               <div className="space-y-3 max-w-3xl mx-auto">
-                {messages.map((msg) => (
-                  <MessageBubble key={msg.id} message={msg} />
-                ))}
+                {messages.map((msg, idx) => {
+                  const msgDate = new Date(msg.timestamp).toDateString();
+                  const prevDate = idx > 0 ? new Date(messages[idx - 1].timestamp).toDateString() : null;
+                  const showSeparator = idx === 0 || msgDate !== prevDate;
+
+                  return (
+                    <div key={msg.id}>
+                      {showSeparator && <DateSeparator date={msg.timestamp} />}
+                      <MessageBubble message={msg} />
+                    </div>
+                  );
+                })}
                 <div ref={scrollRef} />
               </div>
             </ScrollArea>

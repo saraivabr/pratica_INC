@@ -24,6 +24,9 @@ export interface MessageDoc {
   timestamp: Date;
   contact_name: string | null;
   status: string;
+  media_url?: string | null;
+  caption?: string | null;
+  mimetype?: string | null;
   raw_data?: any;
 }
 
@@ -109,6 +112,9 @@ export async function indexMessage(
         is_from_me: doc.is_from_me,
         is_group: doc.is_group,
         has_media: doc.has_media,
+        media_url: doc.media_url || null,
+        caption: doc.caption || null,
+        mimetype: doc.mimetype || null,
         timestamp: doc.timestamp.toISOString(),
         status: doc.status,
       },

@@ -1,3 +1,7 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Check,
   CheckCheck,
@@ -71,7 +75,47 @@ function getMessageTypeCategory(type: string | undefined): string {
   return 'text';
 }
 
-function MediaContent({ message }: { message: Message }) {
+function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <button
+        className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition z-10"
+        onClick={onClose}
+      >
+        <X className="w-6 h-6" />
+      </button>
+      <a
+        href={src}
+        download
+        className="absolute top-4 left-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition z-10"
+        onClick={(e) => e.stopPropagation()}
+        title="Download"
+      >
+        <Download className="w-6 h-6" />
+      </a>
+      <img
+        src={src}
+        alt={alt}
+        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>,
+    document.body
+  );
+}
+
+function MediaContent({ message, onImageClick }: { message: Message; onImageClick?: (url: string) => void }) {
   const category = getMessageTypeCategory(message.message_type);
   const mediaUrl = message.media_url;
 
@@ -95,7 +139,7 @@ function MediaContent({ message }: { message: Message }) {
             src={mediaUrl}
             alt={message.caption || 'Imagem'}
             className="rounded-xl max-w-full max-h-64 object-cover cursor-pointer"
-            onClick={() => window.open(mediaUrl, '_blank')}
+            onClick={() => onImageClick?.(mediaUrl)}
             loading="lazy"
           />
         </div>
@@ -195,13 +239,16 @@ export function MessageBubble({ message }: { message: Message }) {
   const category = getMessageTypeCategory(message.message_type);
   const displayText = message.caption || message.message_text;
   const hasTextContent = !!displayText && displayText.trim().length > 0;
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  const closeLightbox = useCallback(() => setLightboxUrl(null), []);
 
   // Stickers render without bubble background
   if (category === 'sticker' && message.media_url) {
     return (
       <div className={cn('flex', message.is_from_me ? 'justify-end' : 'justify-start')}>
         <div className="max-w-[85%] sm:max-w-md">
-          <MediaContent message={message} />
+          <MediaContent message={message} onImageClick={setLightboxUrl} />
           <div className={cn(
             'flex items-center gap-1 px-1 text-[10px] text-gray-400',
             message.is_from_me ? 'justify-end' : ''
@@ -210,6 +257,7 @@ export function MessageBubble({ message }: { message: Message }) {
             <MessageStatus status={message.status} isFromMe={message.is_from_me} />
           </div>
         </div>
+        {lightboxUrl && <ImageLightbox src={lightboxUrl} alt={message.caption || 'Imagem'} onClose={closeLightbox} />}
       </div>
     );
   }
@@ -225,7 +273,7 @@ export function MessageBubble({ message }: { message: Message }) {
         )}
       >
         {/* Media content */}
-        <MediaContent message={message} />
+        <MediaContent message={message} onImageClick={setLightboxUrl} />
 
         {/* Text content */}
         {hasTextContent && (
@@ -248,6 +296,7 @@ export function MessageBubble({ message }: { message: Message }) {
           <MessageStatus status={message.status} isFromMe={message.is_from_me} />
         </div>
       </div>
+      {lightboxUrl && <ImageLightbox src={lightboxUrl} alt={message.caption || 'Imagem'} onClose={closeLightbox} />}
     </div>
   );
 }

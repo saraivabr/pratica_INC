@@ -84,12 +84,41 @@ export async function GET(request: NextRequest) {
     // ── Single conversation: return messages ────────────────────────────
     if (phoneNumber) {
       return await withTenant(workspaceId, async (client) => {
-        const { rows: messages } = await client.query(
-          `SELECT * FROM whatsapp_messages
-           WHERE workspace_id = $1 AND instance_name = $2 AND phone_number = $3
-           ORDER BY timestamp ASC`,
-          [workspaceId, instanceName, phoneNumber]
-        );
+        const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 200);
+        const before = searchParams.get('before'); // cursor-based pagination
+
+        let messages: any[];
+        if (before) {
+          const { rows } = await client.query(
+            `SELECT * FROM whatsapp_messages
+             WHERE workspace_id = $1 AND instance_name = $2 AND phone_number = $3
+               AND timestamp < $4
+             ORDER BY timestamp DESC LIMIT $5`,
+            [workspaceId, instanceName, phoneNumber, before, limit]
+          );
+          messages = rows.reverse(); // Return in ASC order
+        } else {
+          // Default: last N messages
+          const { rows } = await client.query(
+            `SELECT * FROM whatsapp_messages
+             WHERE workspace_id = $1 AND instance_name = $2 AND phone_number = $3
+             ORDER BY timestamp DESC LIMIT $4`,
+            [workspaceId, instanceName, phoneNumber, limit]
+          );
+          messages = rows.reverse(); // Return in ASC order
+        }
+
+        // Check if there are older messages
+        let hasMore = false;
+        if (messages.length > 0) {
+          const { rows: [{ count }] } = await client.query(
+            `SELECT COUNT(*) as count FROM whatsapp_messages
+             WHERE workspace_id = $1 AND instance_name = $2 AND phone_number = $3
+               AND timestamp < $4`,
+            [workspaceId, instanceName, phoneNumber, messages[0].timestamp]
+          );
+          hasMore = parseInt(count) > 0;
+        }
 
         const unreadCount = messages.filter(
           (m: any) => !m.is_from_me && m.status !== 'read'
@@ -113,6 +142,7 @@ export async function GET(request: NextRequest) {
           success: true,
           data: messages,
           total: messages.length,
+          has_more: hasMore,
           unread_count: unreadCount,
           ai_analysis: aiAnalysis,
         });
@@ -320,6 +350,21 @@ export async function PATCH(request: NextRequest) {
         markAsReadEvolution(instanceName, phoneNumber, messageIds || []).catch(err => {
           console.error('[Evolution API] Error syncing read status:', err.message);
         });
+
+        // Reset MongoDB unread count
+        try {
+          const db = getMongoDb();
+          await db.collection('conversations').updateOne(
+            { workspace_id: workspaceId, phone_number: phoneNumber, instance_name: instanceName },
+            { $set: { unread_count: 0 } }
+          );
+        } catch {}
+
+        // Reset Redis unread count
+        try {
+          const { resetUnread } = await import('@/lib/whatsapp-storage/realtime');
+          await resetUnread(workspaceId, phoneNumber);
+        } catch {}
       }
 
       return NextResponse.json({
