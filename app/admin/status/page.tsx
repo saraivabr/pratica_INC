@@ -31,7 +31,22 @@ interface EndpointStatus {
   responseTime?: number
 }
 
+interface InfrastructureStatus {
+  name: string
+  status: 'ok' | 'error' | 'not_configured'
+  responseTime?: number
+  message?: string
+  details?: string
+}
+
 interface StatusData {
+  infrastructure: InfrastructureStatus[]
+  infrastructureSummary: {
+    total: number
+    ok: number
+    error: number
+    notConfigured: number
+  }
   summary: {
     total: number
     ok: number
@@ -116,6 +131,7 @@ export default function StatusPage() {
       case 'error':
         return <XCircle className="h-5 w-5 text-red-500" />
       case 'no_token':
+      case 'not_configured':
         return <AlertCircle className="h-5 w-5 text-yellow-500" />
       default:
         return null
@@ -130,6 +146,8 @@ export default function StatusPage() {
         return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Erro</Badge>
       case 'no_token':
         return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Sem Token</Badge>
+      case 'not_configured':
+        return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Não Configurado</Badge>
       default:
         return null
     }
@@ -216,11 +234,60 @@ export default function StatusPage() {
           </div>
         )}
 
+        {/* Infrastructure Health Checks */}
+        {data && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Server className="h-5 w-5 text-primary" />
+                Infraestrutura
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {data.infrastructure.map((infra) => (
+                  <div
+                    key={infra.name}
+                    className={cn(
+                      "flex items-center justify-between p-4 rounded-xl border",
+                      infra.status === 'ok' && "bg-green-500/5 border-green-500/20",
+                      infra.status === 'error' && "bg-red-500/5 border-red-500/20",
+                      infra.status === 'not_configured' && "bg-yellow-500/5 border-yellow-500/20"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      {getStatusIcon(infra.status)}
+                      <div>
+                        <p className="font-medium">{infra.name}</p>
+                        {infra.details && (
+                          <p className="text-sm text-muted-foreground">{infra.details}</p>
+                        )}
+                        {infra.message && infra.status !== 'ok' && (
+                          <p className="text-sm text-red-500">{infra.message}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {infra.responseTime && (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          {infra.responseTime}ms
+                        </div>
+                      )}
+                      {getStatusBadge(infra.status)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Config Info */}
         {data && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Configuração</CardTitle>
+              <CardTitle className="text-lg">Configuração CV CRM</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-3 gap-4 text-sm">
