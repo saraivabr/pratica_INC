@@ -17,5 +17,14 @@ module.exports = {
     autorestart: true,
     watch: false,
     max_memory_restart: '1G'
+  }, {
+    name: 'mq-processor',
+    script: 'scripts/mq-cron.sh',
+    cwd: '/var/www/pratica',
+    exec_mode: 'fork',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '100M'
   }]
 };
