@@ -17,16 +17,82 @@ import "dotenv/config";
 import { Pool } from "pg";
 import { MongoClient } from "mongodb";
 import { Client as ESClient } from "@elastic/elasticsearch";
-import {
-  fetchAllChats,
-  fetchAllChatMessages,
-  fetchAllContacts,
-  extractPhoneFromJid,
-} from "../lib/whatsapp-sync/fetch";
-import {
-  getContact,
-  getProfilePicture,
-} from "../lib/evolution-api";
+
+// ── Inlined helpers (avoid server-only imports) ──────────────────────
+
+const EVOLUTION_BASE_URL =
+  process.env.EVOLUTION_BASE_URL ||
+  "https://pratica-evolution-api.robuvi.easypanel.host";
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || "";
+
+async function evolutionFetch<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const url = `${EVOLUTION_BASE_URL}${endpoint}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      apikey: EVOLUTION_API_KEY,
+      ...((options.headers as Record<string, string>) || {}),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Evolution API ${response.status}: ${await response.text()}`);
+  }
+  return response.json();
+}
+
+function extractPhoneFromJid(remoteJid: string): string {
+  if (!remoteJid) return "";
+  const atIndex = remoteJid.indexOf("@");
+  const jidPart = atIndex > 0 ? remoteJid.substring(0, atIndex) : remoteJid;
+  const dashIndex = jidPart.indexOf("-");
+  const phoneNumber = dashIndex > 0 ? jidPart.substring(0, dashIndex) : jidPart;
+  return phoneNumber.replace(/\D/g, "");
+}
+
+async function fetchAllChats(workspaceId: number, instanceName: string): Promise<any[]> {
+  const chats = await evolutionFetch<any[]>(`/chat/findChats/${instanceName}`, { method: "GET" });
+  return Array.isArray(chats) ? chats : [];
+}
+
+async function fetchAllChatMessages(
+  instanceName: string,
+  remoteJid: string,
+  batchSize = 500,
+  maxMessages = 10000
+): Promise<any[]> {
+  const allMessages: any[] = [];
+  let offset = 0;
+  while (allMessages.length < maxMessages) {
+    try {
+      const batch = await evolutionFetch<any>(`/chat/findMessages/${instanceName}`, {
+        method: "POST",
+        body: JSON.stringify({ where: { key: { remoteJid } }, limit: batchSize, offset }),
+      });
+      const messages = Array.isArray(batch) ? batch : batch?.messages || [];
+      if (messages.length === 0) break;
+      allMessages.push(...messages);
+      if (messages.length < batchSize) break;
+      offset += batchSize;
+      await sleep(200);
+    } catch {
+      break;
+    }
+  }
+  return allMessages;
+}
+
+async function fetchAllContacts(workspaceId: number, instanceName: string): Promise<any[]> {
+  const contacts = await evolutionFetch<any[]>(`/chat/findContacts/${instanceName}`, { method: "GET" });
+  return Array.isArray(contacts) ? contacts : [];
+}
+
+async function getProfilePicture(instanceName: string, number: string): Promise<any> {
+  return evolutionFetch(`/chat/getProfilePicUrl/${instanceName}`, {
+    method: "POST",
+    body: JSON.stringify({ number }),
+  });
+}
 
 const DATABASE_URL =
   process.env.DATABASE_URL ||
@@ -56,9 +122,21 @@ async function main() {
   // ── Step 1: Migrate existing PostgreSQL messages ────────────────────
   console.log("[Step 1] Migrating existing PostgreSQL messages...");
 
-  const { rows: pgMessages } = await pool.query(`
-    SELECT * FROM whatsapp_messages ORDER BY timestamp ASC
-  `);
+  // Get all workspace IDs first (bypass RLS with a non-RLS table)
+  const { rows: allWorkspaces } = await pool.query(`SELECT id FROM workspaces`);
+
+  // Fetch messages per workspace (setting RLS context for each)
+  const pgMessages: any[] = [];
+  for (const ws of allWorkspaces) {
+    const client = await pool.connect();
+    try {
+      await client.query(`SELECT set_config('app.current_workspace_id', $1, false)`, [String(ws.id)]);
+      const { rows } = await client.query(`SELECT * FROM whatsapp_messages ORDER BY timestamp ASC`);
+      pgMessages.push(...rows);
+    } finally {
+      client.release();
+    }
+  }
 
   console.log(`  Found ${pgMessages.length} messages in PostgreSQL`);
 
@@ -417,11 +495,19 @@ async function main() {
           phone_number: phoneNumber,
         });
 
-        // Get matched lead from PostgreSQL
-        const { rows: leads } = await pool.query(
-          `SELECT id_lead, nome FROM cvcrm_leads WHERE workspace_id = $1 AND telefone LIKE $2 LIMIT 1`,
-          [ws.id, `%${phoneNumber.slice(-9)}`]
-        );
+        // Get matched lead from PostgreSQL (with RLS context)
+        const leadClient = await pool.connect();
+        let leads: any[] = [];
+        try {
+          await leadClient.query(`SELECT set_config('app.current_workspace_id', $1, false)`, [String(ws.id)]);
+          const result = await leadClient.query(
+            `SELECT id_lead, nome FROM cvcrm_leads WHERE workspace_id = $1 AND telefone LIKE $2 LIMIT 1`,
+            [ws.id, `%${phoneNumber.slice(-9)}`]
+          );
+          leads = result.rows;
+        } finally {
+          leadClient.release();
+        }
         const matchedLead = leads[0] || null;
 
         const bestName =
