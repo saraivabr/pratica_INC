@@ -36,9 +36,8 @@ export async function POST(request: NextRequest) {
           properties,
           url,
           user_agent,
-          created_at,
-          workspace_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6)`,
         [
           name,
           category,
@@ -46,7 +45,6 @@ export async function POST(request: NextRequest) {
           url,
           userAgent,
           timestamp || new Date().toISOString(),
-          ctx.workspaceId
         ]
       )
 

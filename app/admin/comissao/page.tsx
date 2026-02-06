@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef, Suspense } from "react"
 import {
   Plus,
   Trash2,
@@ -48,6 +48,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { AppShell } from "@/components/app-shell"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -754,7 +755,10 @@ function CollapsibleWebropay({
 // MAIN PAGE COMPONENT
 // ============================================================================
 
-export default function ComissaoCalculadoraPage() {
+function ComissaoCalculadoraContent() {
+  const searchParams = useSearchParams()
+  const editIdParam = searchParams.get("edit")
+
   // ── Section 1: Dados do Imovel e Cliente ──
   const [empreendimento, setEmpreendimento] = useState("")
   const [empreendimentoId, setEmpreendimentoId] = useState<string | null>(null)
@@ -850,6 +854,91 @@ export default function ComissaoCalculadoraPage() {
       }))
     } catch { /* ignore */ }
   }, [loaded, empreendimento, empreendimentoCvCrmId, unidade, clienteNome, clienteCpf, valorImovel, percentualComissao, series, autonomos, clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero, clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep, vendaId, webropayStatus, currentStep])
+
+  // ── Load venda for edit mode ──
+  const editLoadedRef = useRef(false)
+  useEffect(() => {
+    if (!editIdParam || editLoadedRef.current || !loaded) return
+    editLoadedRef.current = true
+
+    const id = parseInt(editIdParam)
+    if (isNaN(id)) return
+
+    const detectTipo = (desc: string): TipoParcela => {
+      const d = (desc || "").toLowerCase()
+      if (d.startsWith("ato")) return "ato"
+      if (d.startsWith("entrada")) return "entrada"
+      if (d.startsWith("mensal")) return "mensal"
+      if (d.startsWith("bimestral")) return "bimestral"
+      if (d.startsWith("trimestral")) return "trimestral"
+      if (d.startsWith("semestral")) return "semestral"
+      if (d.startsWith("anual")) return "anual"
+      if (d.startsWith("financiamento")) return "financiamento"
+      if (d.startsWith("intercalada")) return "intercalada"
+      if (d.startsWith("chaves")) return "chaves"
+      return "personalizado"
+    }
+
+    fetch(`/api/comissao/vendas/${id}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success || !data.data) return
+        const v = data.data
+
+        // Populate venda fields
+        setEmpreendimento(v.empreendimento || "")
+        setUnidade(v.unidade || "")
+        setClienteNome(v.cliente_nome || "")
+        setClienteCpf(v.cliente_cpf ? formatCpfMask(v.cliente_cpf) : "")
+        setValorImovel(Number(v.valor_venda) || 0)
+        setPercentualComissao(Number(v.percentual_comissao) * 100 || 5)
+        setVendaId(v.id)
+        setWebropayStatus(v.webropay_status || null)
+
+        // Address fields
+        setClienteEmail(v.cliente_email || "")
+        setClienteTelefone(v.cliente_telefone || "")
+        setClienteLogradouro(v.cliente_logradouro || "")
+        setClienteNumero(v.cliente_numero || "")
+        setClienteComplemento(v.cliente_complemento || "")
+        setClienteBairro(v.cliente_bairro || "")
+        setClienteCidade(v.cliente_cidade || "")
+        setClienteUf(v.cliente_uf || "")
+        setClienteCep(v.cliente_cep ? formatCepMask(v.cliente_cep) : "")
+
+        // Corretores → autonomos
+        if (v.corretores?.length) {
+          setAutonomos(v.corretores.map((c: any) => ({
+            id: generateId(),
+            nome: c.nome || "",
+            cargo: c.observacoes || "Corretor",
+            percentual: (Number(c.percentual_participacao) || 0) * 100,
+            valorBruto: Number(c.valor_comissao) || 0,
+            prioridade: c.prioridade || 0,
+            documento: c.cpf ? formatDocMask(c.cpf) : "",
+          })))
+        }
+
+        // Parcelas → series (each parcela as individual serie)
+        if (v.parcelas?.length) {
+          setSeries(v.parcelas.map((p: any) => ({
+            id: generateId(),
+            tipo: detectTipo(p.descricao),
+            quantidade: 1,
+            valorUnitario: Number(p.valor_parcela) || 0,
+            valorTotal: Number(p.valor_parcela) || 0,
+            percentualDoImovel: Number(p.percentual_comissao) || 0,
+          })))
+        }
+
+        setCurrentStep(1)
+        toast.success(`Venda ${v.codigo} carregada para edição`)
+      })
+      .catch(err => {
+        console.error("Erro ao carregar venda para edição:", err)
+        toast.error("Erro ao carregar venda")
+      })
+  }, [editIdParam, loaded])
 
   // ── Auto-fetch unidades when empreendimento changes ──
   useEffect(() => {
@@ -1173,78 +1262,114 @@ export default function ComissaoCalculadoraPage() {
 
     setSaving(true)
     try {
-      const vendaData = {
-        venda: {
+      const addressData = {
+        cliente_email: clienteEmail,
+        cliente_telefone: clienteTelefone,
+        cliente_logradouro: clienteLogradouro,
+        cliente_numero: clienteNumero,
+        cliente_complemento: clienteComplemento,
+        cliente_bairro: clienteBairro,
+        cliente_cidade: clienteCidade,
+        cliente_uf: clienteUf,
+        cliente_cep: clienteCep?.replace(/\D/g, ""),
+      }
+
+      const corretoresData = autonomos.map((a, i) => ({
+        nome: a.nome,
+        cpf: a.documento?.replace(/\D/g, "") || undefined,
+        percentual_participacao: a.percentual / 100,
+        valor_comissao: a.valorBruto,
+        prioridade: i + 1,
+        observacoes: a.cargo || undefined,
+      }))
+
+      let parcNum = 0
+      const parcelasData = series.flatMap(s => {
+        const items: any[] = []
+        for (let i = 0; i < s.quantidade; i++) {
+          parcNum++
+          items.push({
+            numero: parcNum,
+            descricao: s.quantidade === 1 ? TIPO_PARCELA_LABELS[s.tipo] : `${TIPO_PARCELA_LABELS[s.tipo]} ${i + 1}`,
+            valor_parcela: s.valorUnitario,
+            percentual_comissao: s.percentualDoImovel / s.quantidade,
+            data_prevista: new Date(Date.now() + parcNum * 30 * 86400000).toISOString().split("T")[0],
+          })
+        }
+        return items
+      })
+
+      if (vendaId) {
+        // ── UPDATE existing venda ──
+        await comissaoApi.vendas.update(vendaId, {
           valor_venda: valorImovel,
           percentual_comissao: percentualComissao / 100,
           empreendimento,
           unidade,
           cliente_nome: clienteNome || undefined,
           cliente_cpf: clienteCpf?.replace(/\D/g, "") || undefined,
-          data_venda: new Date().toISOString().split("T")[0],
-          observacoes: undefined,
-          referencia: undefined,
-        },
-        corretores: autonomos.map((a, i) => ({
-          nome: a.nome,
-          cpf: a.documento?.replace(/\D/g, "") || undefined,
-          percentual_participacao: a.percentual / 100,
-          valor_comissao: a.valorBruto,
-          prioridade: i + 1,
-        })),
-        parcelas: series.flatMap(s => {
-          const items: any[] = []
-          for (let i = 0; i < s.quantidade; i++) {
-            items.push({
-              numero: items.length + 1,
-              descricao: s.quantidade === 1 ? TIPO_PARCELA_LABELS[s.tipo] : `${TIPO_PARCELA_LABELS[s.tipo]} ${i + 1}`,
-              valor_parcela: s.valorUnitario,
-              percentual_comissao: s.percentualDoImovel / s.quantidade,
-              data_prevista: new Date(Date.now() + (items.length + 1) * 30 * 86400000).toISOString().split("T")[0],
-            })
-          }
-          return items
-        }),
-      }
+          ...addressData,
+        })
 
-      const result = await comissaoApi.vendas.createCompleta(vendaData)
-      const newId = (result as any).id || (result as any).data?.id
+        // Sync corretores and parcelas
+        await Promise.all([
+          comissaoApi.corretores.sync(vendaId, corretoresData),
+          comissaoApi.parcelas.sync(vendaId, parcelasData),
+        ])
 
-      if (newId) {
-        setVendaId(newId)
-
-        // Save address fields to venda
+        // Recalculate matrix
         try {
-          await fetch(`/api/comissao/vendas/${newId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              cliente_email: clienteEmail,
-              cliente_telefone: clienteTelefone,
-              cliente_logradouro: clienteLogradouro,
-              cliente_numero: clienteNumero,
-              cliente_complemento: clienteComplemento,
-              cliente_bairro: clienteBairro,
-              cliente_cidade: clienteCidade,
-              cliente_uf: clienteUf,
-              cliente_cep: clienteCep?.replace(/\D/g, ""),
-            }),
-          })
-        } catch { /* address save is optional */ }
-
-        // Trigger calculation
-        try {
-          await comissaoApi.matriz.calcular(newId)
+          await comissaoApi.matriz.calcular(vendaId)
         } catch { /* calc is optional */ }
-      }
 
-      toast.success("Comissão salva com sucesso!")
+        toast.success("Comissão atualizada com sucesso!")
+      } else {
+        // ── CREATE new venda ──
+        const vendaPayload = {
+          venda: {
+            valor_venda: valorImovel,
+            percentual_comissao: percentualComissao / 100,
+            empreendimento,
+            unidade,
+            cliente_nome: clienteNome || undefined,
+            cliente_cpf: clienteCpf?.replace(/\D/g, "") || undefined,
+            data_venda: new Date().toISOString().split("T")[0],
+            observacoes: undefined,
+            referencia: undefined,
+          },
+          corretores: corretoresData,
+          parcelas: parcelasData,
+        }
+
+        const result = await comissaoApi.vendas.createCompleta(vendaPayload)
+        const newId = (result as any).id || (result as any).data?.id
+
+        if (newId) {
+          setVendaId(newId)
+
+          // Save address fields
+          try {
+            await fetch(`/api/comissao/vendas/${newId}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(addressData),
+            })
+          } catch { /* address save is optional */ }
+
+          // Trigger calculation
+          try {
+            await comissaoApi.matriz.calcular(newId)
+          } catch { /* calc is optional */ }
+        }
+
+        toast.success("Comissão salva com sucesso!")
+      }
     } catch (err: any) {
       toast.error(err.message || "Erro ao salvar comissão")
     } finally {
       setSaving(false)
     }
-  }, [empreendimento, valorImovel, percentualComissao, unidade, clienteNome, clienteCpf, autonomos, series, clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero, clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep])
+  }, [empreendimento, valorImovel, percentualComissao, unidade, clienteNome, clienteCpf, autonomos, series, clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero, clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep, vendaId])
 
   // ── Webropay handlers ──
   const handleEnviarWebropay = useCallback(async () => {
@@ -1393,7 +1518,7 @@ export default function ComissaoCalculadoraPage() {
             </Button>
             <Button size="sm" onClick={handleSave} disabled={saving || !empreendimento || valorImovel <= 0}>
               {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : vendaId ? <Check className="h-4 w-4 mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
-              <span className="hidden sm:inline">{vendaId ? "Salva" : "Salvar"}</span>
+              <span className="hidden sm:inline">{saving ? "Salvando..." : vendaId ? "Atualizar" : "Salvar"}</span>
             </Button>
           </div>
         </div>
@@ -2209,5 +2334,23 @@ function StatusPill({ ok, label }: { ok: boolean; label: string }) {
       {ok ? <Check className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
       {label}
     </div>
+  )
+}
+
+// ============================================================================
+// PAGE WRAPPER (Suspense boundary for useSearchParams)
+// ============================================================================
+
+export default function ComissaoCalculadoraPage() {
+  return (
+    <Suspense fallback={
+      <AppShell title="Calculo de Comissionamento">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      </AppShell>
+    }>
+      <ComissaoCalculadoraContent />
+    </Suspense>
   )
 }
