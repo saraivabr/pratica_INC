@@ -5,7 +5,6 @@
  * para identificar oportunidades de recuperacao.
  */
 
-import pool from '@/lib/db';
 import { withTenant } from '@/lib/tenant-context';
 import {
   WhatsAppSyncedChat,
@@ -124,7 +123,7 @@ export async function analyzeChats(workspaceId: number): Promise<SyncAnalysisRes
             days_without_response: daysSinceLastMessage,
             recovery_potential: recoveryPotential,
             suggested_message: suggestedMessage,
-          });
+          }, workspaceId);
 
           // Mapear potencial para prioridade
           const priorityMap: Record<RecoveryPotential, 1 | 2 | 3> = {
@@ -165,7 +164,7 @@ export async function analyzeChats(workspaceId: number): Promise<SyncAnalysisRes
             days_without_response: daysSinceLastMessage,
             recovery_potential: 'none',
             suggested_message: null,
-          });
+          }, workspaceId);
         }
       } else {
         noMatch++;
@@ -176,7 +175,7 @@ export async function analyzeChats(workspaceId: number): Promise<SyncAnalysisRes
           days_without_response: null,
           recovery_potential: 'none',
           suggested_message: null,
-        });
+        }, workspaceId);
       }
     } catch (error) {
       console.error(
@@ -434,6 +433,7 @@ export async function generateSuggestedMessage(
  * Atualiza os campos de analise em whatsapp_synced_chats
  * @param chatId - ID do chat a ser atualizado
  * @param analysis - Dados da analise
+ * @param workspaceId - ID do workspace (para RLS)
  */
 export async function updateChatAnalysis(
   chatId: number,
@@ -443,28 +443,56 @@ export async function updateChatAnalysis(
     days_without_response: number | null;
     recovery_potential: RecoveryPotential | null;
     suggested_message: string | null;
-  }
+  },
+  workspaceId?: number
 ): Promise<void> {
-  await pool.query(
-    `UPDATE whatsapp_synced_chats
-     SET
-       matched_lead_id = $2,
-       matched_lead_name = $3,
-       days_without_response = $4,
-       recovery_potential = $5,
-       suggested_message = $6,
-       analyzed_at = NOW(),
-       updated_at = NOW()
-     WHERE id = $1`,
-    [
-      chatId,
-      analysis.matched_lead_id,
-      analysis.matched_lead_name,
-      analysis.days_without_response,
-      analysis.recovery_potential,
-      analysis.suggested_message,
-    ]
-  );
+  if (workspaceId) {
+    await withTenant(workspaceId, async (client) => {
+      await client.query(
+        `UPDATE whatsapp_synced_chats
+         SET
+           matched_lead_id = $2,
+           matched_lead_name = $3,
+           days_without_response = $4,
+           recovery_potential = $5,
+           suggested_message = $6,
+           analyzed_at = NOW(),
+           updated_at = NOW()
+         WHERE id = $1`,
+        [
+          chatId,
+          analysis.matched_lead_id,
+          analysis.matched_lead_name,
+          analysis.days_without_response,
+          analysis.recovery_potential,
+          analysis.suggested_message,
+        ]
+      );
+    });
+  } else {
+    // Fallback for callers without workspaceId (legacy)
+    const pool = (await import('@/lib/db')).default;
+    await pool.query(
+      `UPDATE whatsapp_synced_chats
+       SET
+         matched_lead_id = $2,
+         matched_lead_name = $3,
+         days_without_response = $4,
+         recovery_potential = $5,
+         suggested_message = $6,
+         analyzed_at = NOW(),
+         updated_at = NOW()
+       WHERE id = $1`,
+      [
+        chatId,
+        analysis.matched_lead_id,
+        analysis.matched_lead_name,
+        analysis.days_without_response,
+        analysis.recovery_potential,
+        analysis.suggested_message,
+      ]
+    );
+  }
 }
 
 // =============================================================================

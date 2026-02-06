@@ -4,7 +4,7 @@
  * Ferramentas para o agente de voz consultar dados de leads.
  */
 
-import { dbQuery } from '../db';
+import { withTenant } from '../../tenant-context';
 import type { VoiceAgentToolDefinition } from '../types';
 
 // ============================================================================
@@ -19,88 +19,90 @@ async function executeGetLeadsCount(
   console.log('[Voice-Agent] get_leads_count:', args, 'workspaceId:', workspaceId);
 
   try {
-    const { status, periodo, origem } = args;
+    return await withTenant(workspaceId, async (client) => {
+      const { status, periodo, origem } = args;
 
-    // Build WHERE clauses
-    const conditions: string[] = ['workspace_id = $1'];
-    const params: any[] = [workspaceId];
-    let paramIndex = 2;
+      // Build WHERE clauses
+      const conditions: string[] = ['workspace_id = $1'];
+      const params: any[] = [workspaceId];
+      let paramIndex = 2;
 
-    // Filter by status
-    if (status) {
-      conditions.push(`status = $${paramIndex}`);
-      params.push(status);
-      paramIndex++;
-    }
-
-    // Filter by origem
-    if (origem) {
-      conditions.push(`origem ILIKE $${paramIndex}`);
-      params.push(`%${origem}%`);
-      paramIndex++;
-    }
-
-    // Filter by periodo
-    if (periodo) {
-      let dateFilter = '';
-      switch (periodo) {
-        case 'hoje':
-          dateFilter = `created_at >= CURRENT_DATE`;
-          break;
-        case 'semana':
-          dateFilter = `created_at >= CURRENT_DATE - INTERVAL '7 days'`;
-          break;
-        case 'mes':
-          dateFilter = `created_at >= CURRENT_DATE - INTERVAL '30 days'`;
-          break;
-        case 'ano':
-          dateFilter = `created_at >= CURRENT_DATE - INTERVAL '365 days'`;
-          break;
+      // Filter by status
+      if (status) {
+        conditions.push(`status = $${paramIndex}`);
+        params.push(status);
+        paramIndex++;
       }
-      if (dateFilter) {
-        conditions.push(dateFilter);
+
+      // Filter by origem
+      if (origem) {
+        conditions.push(`origem ILIKE $${paramIndex}`);
+        params.push(`%${origem}%`);
+        paramIndex++;
       }
-    }
 
-    const whereClause = conditions.join(' AND ');
+      // Filter by periodo
+      if (periodo) {
+        let dateFilter = '';
+        switch (periodo) {
+          case 'hoje':
+            dateFilter = `created_at >= CURRENT_DATE`;
+            break;
+          case 'semana':
+            dateFilter = `created_at >= CURRENT_DATE - INTERVAL '7 days'`;
+            break;
+          case 'mes':
+            dateFilter = `created_at >= CURRENT_DATE - INTERVAL '30 days'`;
+            break;
+          case 'ano':
+            dateFilter = `created_at >= CURRENT_DATE - INTERVAL '365 days'`;
+            break;
+        }
+        if (dateFilter) {
+          conditions.push(dateFilter);
+        }
+      }
 
-    // Count total
-    const countResult = await dbQuery(
-      `SELECT COUNT(*) as total FROM cvcrm_leads WHERE ${whereClause}`,
-      params
-    );
+      const whereClause = conditions.join(' AND ');
 
-    const total = parseInt(countResult.rows[0]?.total || '0', 10);
-
-    // Get breakdown by status if no specific status filter
-    let breakdown: Record<string, number> = {};
-    if (!status) {
-      const breakdownResult = await dbQuery(
-        `SELECT status, COUNT(*) as count
-         FROM cvcrm_leads
-         WHERE ${whereClause}
-         GROUP BY status
-         ORDER BY count DESC`,
+      // Count total
+      const countResult = await client.query(
+        `SELECT COUNT(*) as total FROM cvcrm_leads WHERE ${whereClause}`,
         params
       );
-      breakdown = breakdownResult.rows.reduce((acc: Record<string, number>, row: any) => {
-        acc[row.status || 'sem_status'] = parseInt(row.count, 10);
-        return acc;
-      }, {});
-    }
 
-    // Build response message
-    let message = `Total de ${total} leads`;
-    if (status) message += ` com status "${status}"`;
-    if (periodo) message += ` no periodo: ${periodo}`;
-    if (origem) message += ` da origem "${origem}"`;
+      const total = parseInt(countResult.rows[0]?.total || '0', 10);
 
-    return {
-      total,
-      breakdown,
-      filters: { status, periodo, origem },
-      message
-    };
+      // Get breakdown by status if no specific status filter
+      let breakdown: Record<string, number> = {};
+      if (!status) {
+        const breakdownResult = await client.query(
+          `SELECT status, COUNT(*) as count
+           FROM cvcrm_leads
+           WHERE ${whereClause}
+           GROUP BY status
+           ORDER BY count DESC`,
+          params
+        );
+        breakdown = breakdownResult.rows.reduce((acc: Record<string, number>, row: any) => {
+          acc[row.status || 'sem_status'] = parseInt(row.count, 10);
+          return acc;
+        }, {});
+      }
+
+      // Build response message
+      let message = `Total de ${total} leads`;
+      if (status) message += ` com status "${status}"`;
+      if (periodo) message += ` no periodo: ${periodo}`;
+      if (origem) message += ` da origem "${origem}"`;
+
+      return {
+        total,
+        breakdown,
+        filters: { status, periodo, origem },
+        message
+      };
+    });
   } catch (error) {
     console.error('[Voice-Agent] Erro em get_leads_count:', error);
     return {
@@ -153,23 +155,25 @@ async function executeGetLeadDetails(
 
     const whereClause = conditions.join(' AND ');
 
-    const result = await dbQuery(
-      `SELECT
-        id,
-        nome,
-        telefone,
-        email,
-        status,
-        corretor,
-        origem,
-        created_at,
-        updated_at
-       FROM cvcrm_leads
-       WHERE ${whereClause}
-       ORDER BY created_at DESC
-       LIMIT 5`,
-      params
-    );
+    const result = await withTenant(workspaceId, async (client) => {
+      return client.query(
+        `SELECT
+          id,
+          nome,
+          telefone,
+          email,
+          status,
+          corretor,
+          origem,
+          created_at,
+          updated_at
+         FROM cvcrm_leads
+         WHERE ${whereClause}
+         ORDER BY created_at DESC
+         LIMIT 5`,
+        params
+      );
+    });
 
     if (result.rows.length === 0) {
       return {

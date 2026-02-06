@@ -2,7 +2,7 @@
  * Funções de configuração de Agentes IA
  */
 
-import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import type { AgentConfig, AgentConfigInput, ConversationLog } from './types';
 
 /**
@@ -13,51 +13,53 @@ export async function getAgentConfig(
   instanceName: string
 ): Promise<AgentConfig | null> {
   try {
-    const { rows } = await dbQuery(
-      `SELECT
-        id,
-        workspace_id,
-        instance_name,
-        is_active,
-        agent_name,
-        agent_role,
-        personality,
-        trait_openness,
-        trait_conscientiousness,
-        trait_extraversion,
-        trait_agreeableness,
-        trait_neuroticism,
-        greeting_message,
-        fallback_message,
-        escalation_message,
-        out_of_hours_message,
-        auto_reply,
-        typing_delay_ms,
-        max_message_length,
-        business_hours_only,
-        business_hours_start,
-        business_hours_end,
-        business_days,
-        escalation_keywords,
-        escalation_frustration_threshold,
-        use_psychological_analysis,
-        use_proactive_messages,
-        metadata,
-        created_at,
-        updated_at,
-        created_by
-      FROM agent_configs
-      WHERE workspace_id = $1 AND instance_name = $2
-      LIMIT 1`,
-      [workspaceId, instanceName]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      const { rows } = await client.query(
+        `SELECT
+          id,
+          workspace_id,
+          instance_name,
+          is_active,
+          agent_name,
+          agent_role,
+          personality,
+          trait_openness,
+          trait_conscientiousness,
+          trait_extraversion,
+          trait_agreeableness,
+          trait_neuroticism,
+          greeting_message,
+          fallback_message,
+          escalation_message,
+          out_of_hours_message,
+          auto_reply,
+          typing_delay_ms,
+          max_message_length,
+          business_hours_only,
+          business_hours_start,
+          business_hours_end,
+          business_days,
+          escalation_keywords,
+          escalation_frustration_threshold,
+          use_psychological_analysis,
+          use_proactive_messages,
+          metadata,
+          created_at,
+          updated_at,
+          created_by
+        FROM agent_configs
+        WHERE workspace_id = $1 AND instance_name = $2
+        LIMIT 1`,
+        [workspaceId, instanceName]
+      );
 
-    if (rows.length === 0) {
-      return null;
-    }
+      if (rows.length === 0) {
+        return null;
+      }
 
-    const row = rows[0];
-    return mapRowToAgentConfig(row);
+      const row = rows[0];
+      return mapRowToAgentConfig(row);
+    });
   } catch (error) {
     console.error('[AgentConfig] Error fetching config:', error);
     return null;
@@ -69,12 +71,14 @@ export async function getAgentConfig(
  */
 export async function getAgentConfigs(workspaceId: number): Promise<AgentConfig[]> {
   try {
-    const { rows } = await dbQuery(
-      `SELECT * FROM agent_configs WHERE workspace_id = $1 ORDER BY created_at DESC`,
-      [workspaceId]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      const { rows } = await client.query(
+        `SELECT * FROM agent_configs WHERE workspace_id = $1 ORDER BY created_at DESC`,
+        [workspaceId]
+      );
 
-    return rows.map(mapRowToAgentConfig);
+      return rows.map(mapRowToAgentConfig);
+    });
   } catch (error) {
     console.error('[AgentConfig] Error fetching configs:', error);
     return [];
@@ -90,100 +94,102 @@ export async function upsertAgentConfig(
   userId?: string
 ): Promise<AgentConfig | null> {
   try {
-    const { rows } = await dbQuery(
-      `INSERT INTO agent_configs (
-        workspace_id,
-        instance_name,
-        is_active,
-        agent_name,
-        agent_role,
-        personality,
-        trait_openness,
-        trait_conscientiousness,
-        trait_extraversion,
-        trait_agreeableness,
-        trait_neuroticism,
-        greeting_message,
-        fallback_message,
-        escalation_message,
-        out_of_hours_message,
-        auto_reply,
-        typing_delay_ms,
-        max_message_length,
-        business_hours_only,
-        business_hours_start,
-        business_hours_end,
-        business_days,
-        escalation_keywords,
-        escalation_frustration_threshold,
-        use_psychological_analysis,
-        use_proactive_messages,
-        created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
-      ON CONFLICT (workspace_id, instance_name)
-      DO UPDATE SET
-        is_active = COALESCE(EXCLUDED.is_active, agent_configs.is_active),
-        agent_name = COALESCE(EXCLUDED.agent_name, agent_configs.agent_name),
-        agent_role = COALESCE(EXCLUDED.agent_role, agent_configs.agent_role),
-        personality = COALESCE(EXCLUDED.personality, agent_configs.personality),
-        trait_openness = COALESCE(EXCLUDED.trait_openness, agent_configs.trait_openness),
-        trait_conscientiousness = COALESCE(EXCLUDED.trait_conscientiousness, agent_configs.trait_conscientiousness),
-        trait_extraversion = COALESCE(EXCLUDED.trait_extraversion, agent_configs.trait_extraversion),
-        trait_agreeableness = COALESCE(EXCLUDED.trait_agreeableness, agent_configs.trait_agreeableness),
-        trait_neuroticism = COALESCE(EXCLUDED.trait_neuroticism, agent_configs.trait_neuroticism),
-        greeting_message = COALESCE(EXCLUDED.greeting_message, agent_configs.greeting_message),
-        fallback_message = COALESCE(EXCLUDED.fallback_message, agent_configs.fallback_message),
-        escalation_message = COALESCE(EXCLUDED.escalation_message, agent_configs.escalation_message),
-        out_of_hours_message = COALESCE(EXCLUDED.out_of_hours_message, agent_configs.out_of_hours_message),
-        auto_reply = COALESCE(EXCLUDED.auto_reply, agent_configs.auto_reply),
-        typing_delay_ms = COALESCE(EXCLUDED.typing_delay_ms, agent_configs.typing_delay_ms),
-        max_message_length = COALESCE(EXCLUDED.max_message_length, agent_configs.max_message_length),
-        business_hours_only = COALESCE(EXCLUDED.business_hours_only, agent_configs.business_hours_only),
-        business_hours_start = COALESCE(EXCLUDED.business_hours_start, agent_configs.business_hours_start),
-        business_hours_end = COALESCE(EXCLUDED.business_hours_end, agent_configs.business_hours_end),
-        business_days = COALESCE(EXCLUDED.business_days, agent_configs.business_days),
-        escalation_keywords = COALESCE(EXCLUDED.escalation_keywords, agent_configs.escalation_keywords),
-        escalation_frustration_threshold = COALESCE(EXCLUDED.escalation_frustration_threshold, agent_configs.escalation_frustration_threshold),
-        use_psychological_analysis = COALESCE(EXCLUDED.use_psychological_analysis, agent_configs.use_psychological_analysis),
-        use_proactive_messages = COALESCE(EXCLUDED.use_proactive_messages, agent_configs.use_proactive_messages),
-        updated_at = NOW()
-      RETURNING *`,
-      [
-        workspaceId,
-        input.instanceName,
-        input.isActive ?? false,
-        input.agentName ?? 'Sofia',
-        input.agentRole ?? 'Assistente de vendas e suporte',
-        input.personality ?? 'amigavel',
-        input.traits?.openness ?? 80,
-        input.traits?.conscientiousness ?? 90,
-        input.traits?.extraversion ?? 70,
-        input.traits?.agreeableness ?? 90,
-        input.traits?.neuroticism ?? 20,
-        input.greetingMessage,
-        input.fallbackMessage,
-        input.escalationMessage,
-        input.outOfHoursMessage,
-        input.autoReply ?? true,
-        input.typingDelayMs ?? 1500,
-        input.maxMessageLength ?? 500,
-        input.businessHours?.enabled ?? false,
-        input.businessHours?.start ?? '08:00',
-        input.businessHours?.end ?? '18:00',
-        input.businessHours?.days ?? [1, 2, 3, 4, 5],
-        input.escalationKeywords ?? ['gerente', 'humano', 'atendente'],
-        input.escalationFrustrationThreshold ?? 7,
-        input.usePsychologicalAnalysis ?? false,
-        input.useProactiveMessages ?? false,
-        userId,
-      ]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO agent_configs (
+          workspace_id,
+          instance_name,
+          is_active,
+          agent_name,
+          agent_role,
+          personality,
+          trait_openness,
+          trait_conscientiousness,
+          trait_extraversion,
+          trait_agreeableness,
+          trait_neuroticism,
+          greeting_message,
+          fallback_message,
+          escalation_message,
+          out_of_hours_message,
+          auto_reply,
+          typing_delay_ms,
+          max_message_length,
+          business_hours_only,
+          business_hours_start,
+          business_hours_end,
+          business_days,
+          escalation_keywords,
+          escalation_frustration_threshold,
+          use_psychological_analysis,
+          use_proactive_messages,
+          created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+        ON CONFLICT (workspace_id, instance_name)
+        DO UPDATE SET
+          is_active = COALESCE(EXCLUDED.is_active, agent_configs.is_active),
+          agent_name = COALESCE(EXCLUDED.agent_name, agent_configs.agent_name),
+          agent_role = COALESCE(EXCLUDED.agent_role, agent_configs.agent_role),
+          personality = COALESCE(EXCLUDED.personality, agent_configs.personality),
+          trait_openness = COALESCE(EXCLUDED.trait_openness, agent_configs.trait_openness),
+          trait_conscientiousness = COALESCE(EXCLUDED.trait_conscientiousness, agent_configs.trait_conscientiousness),
+          trait_extraversion = COALESCE(EXCLUDED.trait_extraversion, agent_configs.trait_extraversion),
+          trait_agreeableness = COALESCE(EXCLUDED.trait_agreeableness, agent_configs.trait_agreeableness),
+          trait_neuroticism = COALESCE(EXCLUDED.trait_neuroticism, agent_configs.trait_neuroticism),
+          greeting_message = COALESCE(EXCLUDED.greeting_message, agent_configs.greeting_message),
+          fallback_message = COALESCE(EXCLUDED.fallback_message, agent_configs.fallback_message),
+          escalation_message = COALESCE(EXCLUDED.escalation_message, agent_configs.escalation_message),
+          out_of_hours_message = COALESCE(EXCLUDED.out_of_hours_message, agent_configs.out_of_hours_message),
+          auto_reply = COALESCE(EXCLUDED.auto_reply, agent_configs.auto_reply),
+          typing_delay_ms = COALESCE(EXCLUDED.typing_delay_ms, agent_configs.typing_delay_ms),
+          max_message_length = COALESCE(EXCLUDED.max_message_length, agent_configs.max_message_length),
+          business_hours_only = COALESCE(EXCLUDED.business_hours_only, agent_configs.business_hours_only),
+          business_hours_start = COALESCE(EXCLUDED.business_hours_start, agent_configs.business_hours_start),
+          business_hours_end = COALESCE(EXCLUDED.business_hours_end, agent_configs.business_hours_end),
+          business_days = COALESCE(EXCLUDED.business_days, agent_configs.business_days),
+          escalation_keywords = COALESCE(EXCLUDED.escalation_keywords, agent_configs.escalation_keywords),
+          escalation_frustration_threshold = COALESCE(EXCLUDED.escalation_frustration_threshold, agent_configs.escalation_frustration_threshold),
+          use_psychological_analysis = COALESCE(EXCLUDED.use_psychological_analysis, agent_configs.use_psychological_analysis),
+          use_proactive_messages = COALESCE(EXCLUDED.use_proactive_messages, agent_configs.use_proactive_messages),
+          updated_at = NOW()
+        RETURNING *`,
+        [
+          workspaceId,
+          input.instanceName,
+          input.isActive ?? false,
+          input.agentName ?? 'Sofia',
+          input.agentRole ?? 'Assistente de vendas e suporte',
+          input.personality ?? 'amigavel',
+          input.traits?.openness ?? 80,
+          input.traits?.conscientiousness ?? 90,
+          input.traits?.extraversion ?? 70,
+          input.traits?.agreeableness ?? 90,
+          input.traits?.neuroticism ?? 20,
+          input.greetingMessage,
+          input.fallbackMessage,
+          input.escalationMessage,
+          input.outOfHoursMessage,
+          input.autoReply ?? true,
+          input.typingDelayMs ?? 1500,
+          input.maxMessageLength ?? 500,
+          input.businessHours?.enabled ?? false,
+          input.businessHours?.start ?? '08:00',
+          input.businessHours?.end ?? '18:00',
+          input.businessHours?.days ?? [1, 2, 3, 4, 5],
+          input.escalationKeywords ?? ['gerente', 'humano', 'atendente'],
+          input.escalationFrustrationThreshold ?? 7,
+          input.usePsychologicalAnalysis ?? false,
+          input.useProactiveMessages ?? false,
+          userId,
+        ]
+      );
 
-    if (rows.length === 0) {
-      return null;
-    }
+      if (rows.length === 0) {
+        return null;
+      }
 
-    return mapRowToAgentConfig(rows[0]);
+      return mapRowToAgentConfig(rows[0]);
+    });
   } catch (error) {
     console.error('[AgentConfig] Error upserting config:', error);
     throw error;
@@ -199,14 +205,16 @@ export async function toggleAgentActive(
   isActive: boolean
 ): Promise<boolean> {
   try {
-    const { rowCount } = await dbQuery(
-      `UPDATE agent_configs
-       SET is_active = $3, updated_at = NOW()
-       WHERE workspace_id = $1 AND instance_name = $2`,
-      [workspaceId, instanceName, isActive]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      const { rowCount } = await client.query(
+        `UPDATE agent_configs
+         SET is_active = $3, updated_at = NOW()
+         WHERE workspace_id = $1 AND instance_name = $2`,
+        [workspaceId, instanceName, isActive]
+      );
 
-    return (rowCount ?? 0) > 0;
+      return (rowCount ?? 0) > 0;
+    });
   } catch (error) {
     console.error('[AgentConfig] Error toggling active:', error);
     return false;
@@ -270,33 +278,35 @@ export async function logConversation(
   }
 ): Promise<void> {
   try {
-    await dbQuery(
-      `INSERT INTO agent_conversation_logs (
-        workspace_id, agent_config_id, instance_name, phone_number, lead_id,
-        session_id, message_received, message_type, intent_detected,
-        intent_confidence, sentiment, frustration_level, response_generated,
-        response_sent, response_time_ms, was_escalated, escalation_reason
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
-      [
-        workspaceId,
-        data.agentConfigId,
-        data.instanceName,
-        data.phoneNumber,
-        data.leadId,
-        data.sessionId,
-        data.messageReceived,
-        data.messageType ?? 'text',
-        data.intentDetected,
-        data.intentConfidence,
-        data.sentiment,
-        data.frustrationLevel,
-        data.responseGenerated,
-        data.responseSent ?? false,
-        data.responseTimeMs,
-        data.wasEscalated ?? false,
-        data.escalationReason,
-      ]
-    );
+    await withTenant(workspaceId, async (client) => {
+      await client.query(
+        `INSERT INTO agent_conversation_logs (
+          workspace_id, agent_config_id, instance_name, phone_number, lead_id,
+          session_id, message_received, message_type, intent_detected,
+          intent_confidence, sentiment, frustration_level, response_generated,
+          response_sent, response_time_ms, was_escalated, escalation_reason
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+        [
+          workspaceId,
+          data.agentConfigId,
+          data.instanceName,
+          data.phoneNumber,
+          data.leadId,
+          data.sessionId,
+          data.messageReceived,
+          data.messageType ?? 'text',
+          data.intentDetected,
+          data.intentConfidence,
+          data.sentiment,
+          data.frustrationLevel,
+          data.responseGenerated,
+          data.responseSent ?? false,
+          data.responseTimeMs,
+          data.wasEscalated ?? false,
+          data.escalationReason,
+        ]
+      );
+    });
   } catch (error) {
     console.error('[AgentConfig] Error logging conversation:', error);
   }
@@ -310,13 +320,15 @@ export async function deleteAgentConfig(
   instanceName: string
 ): Promise<boolean> {
   try {
-    const { rowCount } = await dbQuery(
-      `DELETE FROM agent_configs
-       WHERE workspace_id = $1 AND instance_name = $2`,
-      [workspaceId, instanceName]
-    );
+    return await withTenant(workspaceId, async (client) => {
+      const { rowCount } = await client.query(
+        `DELETE FROM agent_configs
+         WHERE workspace_id = $1 AND instance_name = $2`,
+        [workspaceId, instanceName]
+      );
 
-    return (rowCount ?? 0) > 0;
+      return (rowCount ?? 0) > 0;
+    });
   } catch (error) {
     console.error('[AgentConfig] Error deleting config:', error);
     return false;
@@ -338,53 +350,55 @@ export async function getConversationLogs(
   } = {}
 ): Promise<{ logs: ConversationLog[]; total: number; page: number; limit: number }> {
   try {
-    const { page = 1, limit = 20, phoneNumber, startDate, endDate } = options;
-    const offset = (page - 1) * limit;
+    return await withTenant(workspaceId, async (client) => {
+      const { page = 1, limit = 20, phoneNumber, startDate, endDate } = options;
+      const offset = (page - 1) * limit;
 
-    // Build WHERE conditions
-    const conditions = ['workspace_id = $1', 'instance_name = $2'];
-    const params: (number | string)[] = [workspaceId, instanceName];
-    let paramIndex = 3;
+      // Build WHERE conditions
+      const conditions = ['workspace_id = $1', 'instance_name = $2'];
+      const params: (number | string)[] = [workspaceId, instanceName];
+      let paramIndex = 3;
 
-    if (phoneNumber) {
-      conditions.push(`phone_number = $${paramIndex}`);
-      params.push(phoneNumber);
-      paramIndex++;
-    }
+      if (phoneNumber) {
+        conditions.push(`phone_number = $${paramIndex}`);
+        params.push(phoneNumber);
+        paramIndex++;
+      }
 
-    if (startDate) {
-      conditions.push(`created_at >= $${paramIndex}`);
-      params.push(startDate);
-      paramIndex++;
-    }
+      if (startDate) {
+        conditions.push(`created_at >= $${paramIndex}`);
+        params.push(startDate);
+        paramIndex++;
+      }
 
-    if (endDate) {
-      conditions.push(`created_at <= $${paramIndex}`);
-      params.push(endDate);
-      paramIndex++;
-    }
+      if (endDate) {
+        conditions.push(`created_at <= $${paramIndex}`);
+        params.push(endDate);
+        paramIndex++;
+      }
 
-    const whereClause = conditions.join(' AND ');
+      const whereClause = conditions.join(' AND ');
 
-    // Get total count
-    const countResult = await dbQuery(
-      `SELECT COUNT(*) as total FROM agent_conversation_logs WHERE ${whereClause}`,
-      params
-    );
-    const total = parseInt(countResult.rows[0]?.total || '0', 10);
+      // Get total count
+      const countResult = await client.query(
+        `SELECT COUNT(*) as total FROM agent_conversation_logs WHERE ${whereClause}`,
+        params
+      );
+      const total = parseInt(countResult.rows[0]?.total || '0', 10);
 
-    // Get paginated logs
-    const { rows } = await dbQuery(
-      `SELECT * FROM agent_conversation_logs
-       WHERE ${whereClause}
-       ORDER BY created_at DESC
-       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-      [...params, limit, offset]
-    );
+      // Get paginated logs
+      const { rows } = await client.query(
+        `SELECT * FROM agent_conversation_logs
+         WHERE ${whereClause}
+         ORDER BY created_at DESC
+         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+        [...params, limit, offset]
+      );
 
-    const logs = rows.map(mapRowToConversationLog);
+      const logs = rows.map(mapRowToConversationLog);
 
-    return { logs, total, page, limit };
+      return { logs, total, page, limit };
+    });
   } catch (error) {
     console.error('[AgentConfig] Error fetching conversation logs:', error);
     return { logs: [], total: 0, page: 1, limit: 20 };

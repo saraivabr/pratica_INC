@@ -1,4 +1,4 @@
-import { dbQuery } from '../db'
+import { withTenant } from '../../tenant-context'
 import { VoiceAgentToolDefinition } from '../types'
 
 /**
@@ -48,7 +48,9 @@ const get_reservas_count: VoiceAgentToolDefinition = {
 
     query += ` GROUP BY status ORDER BY count DESC`
 
-    const result = await dbQuery(query, params)
+    const result = await withTenant(workspaceId, async (client) => {
+      return client.query(query, params)
+    })
 
     return {
       reservas: result.rows,
@@ -80,7 +82,9 @@ const get_vendas_mes: VoiceAgentToolDefinition = {
         AND created_at < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'
     `
 
-    const result = await dbQuery(query, [workspaceId])
+    const result = await withTenant(workspaceId, async (client) => {
+      return client.query(query, [workspaceId])
+    })
     const row = result.rows[0]
 
     return {
@@ -144,7 +148,9 @@ const get_valor_vendas: VoiceAgentToolDefinition = {
         AND ${dateFilter}
     `
 
-    const result = await dbQuery(query, [workspaceId])
+    const result = await withTenant(workspaceId, async (client) => {
+      return client.query(query, [workspaceId])
+    })
     const row = result.rows[0]
 
     return {
@@ -191,7 +197,9 @@ const get_disponibilidade: VoiceAgentToolDefinition = {
 
     query += ` GROUP BY empreendimento_id ORDER BY unidades_disponiveis DESC`
 
-    const result = await dbQuery(query, params)
+    const result = await withTenant(workspaceId, async (client) => {
+      return client.query(query, params)
+    })
 
     return {
       disponibilidade: result.rows,

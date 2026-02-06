@@ -6,7 +6,6 @@
  */
 
 import 'dotenv/config';
-import pool from '../db';
 import { withTenant } from '@/lib/tenant-context';
 import { EvolutionChat, EvolutionContact } from './types';
 
@@ -412,49 +411,51 @@ export async function syncContactsToDatabase(
   try {
     const contacts = await fetchAllContacts(workspaceId, instanceName);
 
-    for (const contact of contacts) {
-      try {
-        const phoneNumber = extractPhoneFromJid(contact.remoteJid);
-        const isGroup = isGroupJid(contact.remoteJid);
+    await withTenant(workspaceId, async (client) => {
+      for (const contact of contacts) {
+        try {
+          const phoneNumber = extractPhoneFromJid(contact.remoteJid);
+          const isGroup = isGroupJid(contact.remoteJid);
 
-        // Ignora grupos na sincronizacao de contatos
-        if (isGroup) {
-          continue;
+          // Ignora grupos na sincronizacao de contatos
+          if (isGroup) {
+            continue;
+          }
+
+          // UPSERT no banco de dados
+          await client.query(`
+            INSERT INTO whatsapp_synced_contacts (
+              workspace_id,
+              remote_jid,
+              phone_number,
+              push_name,
+              profile_picture_url,
+              is_business,
+              synced_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            ON CONFLICT (workspace_id, remote_jid) DO UPDATE SET
+              phone_number = EXCLUDED.phone_number,
+              push_name = EXCLUDED.push_name,
+              profile_picture_url = EXCLUDED.profile_picture_url,
+              is_business = EXCLUDED.is_business,
+              synced_at = NOW()
+          `, [
+            workspaceId,
+            contact.remoteJid,
+            phoneNumber,
+            contact.pushName || null,
+            contact.profilePictureUrl || null,
+            contact.isBusiness || false
+          ]);
+
+          synced++;
+        } catch (error: any) {
+          const errorMsg = `Error syncing contact ${contact.remoteJid}: ${error.message}`;
+          console.error(`[WhatsApp Sync] ${errorMsg}`);
+          errors.push(errorMsg);
         }
-
-        // UPSERT no banco de dados
-        await pool.query(`
-          INSERT INTO whatsapp_synced_contacts (
-            workspace_id,
-            remote_jid,
-            phone_number,
-            push_name,
-            profile_picture_url,
-            is_business,
-            synced_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
-          ON CONFLICT (workspace_id, remote_jid) DO UPDATE SET
-            phone_number = EXCLUDED.phone_number,
-            push_name = EXCLUDED.push_name,
-            profile_picture_url = EXCLUDED.profile_picture_url,
-            is_business = EXCLUDED.is_business,
-            synced_at = NOW()
-        `, [
-          workspaceId,
-          contact.remoteJid,
-          phoneNumber,
-          contact.pushName || null,
-          contact.profilePictureUrl || null,
-          contact.isBusiness || false
-        ]);
-
-        synced++;
-      } catch (error: any) {
-        const errorMsg = `Error syncing contact ${contact.remoteJid}: ${error.message}`;
-        console.error(`[WhatsApp Sync] ${errorMsg}`);
-        errors.push(errorMsg);
       }
-    }
+    });
 
     console.log(`[WhatsApp Sync] Contact sync completed: ${synced} synced, ${errors.length} errors`);
     return { synced, errors };
@@ -504,65 +505,67 @@ export async function syncMessagesToDatabase(
           continue;
         }
 
-        // Salvar cada mensagem
-        for (const msg of messages) {
-          try {
-            const messageId = msg.key?.id;
-            if (!messageId) continue;
+        // Salvar cada mensagem dentro do contexto do tenant
+        await withTenant(workspaceId, async (client) => {
+          for (const msg of messages) {
+            try {
+              const messageId = msg.key?.id;
+              if (!messageId) continue;
 
-            const isFromMe = msg.key?.fromMe || false;
-            const messageText = extractMessageText(msg.message);
-            const messageType = msg.message ? Object.keys(msg.message)[0] : 'unknown';
-            const timestamp = msg.messageTimestamp
-              ? new Date(msg.messageTimestamp * 1000).toISOString()
-              : new Date().toISOString();
+              const isFromMe = msg.key?.fromMe || false;
+              const messageText = extractMessageText(msg.message);
+              const messageType = msg.message ? Object.keys(msg.message)[0] : 'unknown';
+              const timestamp = msg.messageTimestamp
+                ? new Date(msg.messageTimestamp * 1000).toISOString()
+                : new Date().toISOString();
 
-            // Verificar se mensagem já existe antes de inserir
-            const existingMsg = await pool.query(
-              `SELECT id FROM whatsapp_messages WHERE workspace_id = $1 AND message_id = $2 LIMIT 1`,
-              [workspaceId, messageId]
-            );
+              // Verificar se mensagem já existe antes de inserir
+              const existingMsg = await client.query(
+                `SELECT id FROM whatsapp_messages WHERE workspace_id = $1 AND message_id = $2 LIMIT 1`,
+                [workspaceId, messageId]
+              );
 
-            if (existingMsg.rows.length > 0) {
-              // Mensagem já existe, pular
-              continue;
-            }
+              if (existingMsg.rows.length > 0) {
+                // Mensagem já existe, pular
+                continue;
+              }
 
-            // Inserir nova mensagem
-            await pool.query(`
-              INSERT INTO whatsapp_messages (
-                workspace_id,
-                instance_name,
-                phone_number,
-                message_id,
-                message_type,
-                message_text,
-                is_from_me,
+              // Inserir nova mensagem
+              await client.query(`
+                INSERT INTO whatsapp_messages (
+                  workspace_id,
+                  instance_name,
+                  phone_number,
+                  message_id,
+                  message_type,
+                  message_text,
+                  is_from_me,
+                  timestamp,
+                  contact_name,
+                  status,
+                  raw_data
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+              `, [
+                workspaceId,
+                instanceName,
+                phoneNumber,
+                messageId,
+                messageType,
+                messageText,
+                isFromMe,
                 timestamp,
-                contact_name,
-                status,
-                raw_data
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            `, [
-              workspaceId,
-              instanceName,
-              phoneNumber,
-              messageId,
-              messageType,
-              messageText,
-              isFromMe,
-              timestamp,
-              contactName,
-              'synced',
-              JSON.stringify(msg)
-            ]);
+                contactName,
+                'synced',
+                JSON.stringify(msg)
+              ]);
 
-            synced++;
-          } catch (msgError: any) {
-            // Log mas continua com próxima mensagem
-            console.error(`[WhatsApp Sync] Error saving message: ${msgError.message}`);
+              synced++;
+            } catch (msgError: any) {
+              // Log mas continua com próxima mensagem
+              console.error(`[WhatsApp Sync] Error saving message: ${msgError.message}`);
+            }
           }
-        }
+        });
 
         chatsProcessed++;
 

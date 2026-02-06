@@ -4,7 +4,6 @@
  * Tools for querying service/support data from the CRM
  */
 
-import { dbQuery } from '../db'
 import { withTenant } from '../../tenant-context'
 import { VoiceAgentToolDefinition } from '../types'
 
@@ -293,133 +292,130 @@ const get_agenda_hoje: VoiceAgentToolDefinition = {
   execute: async (args: Record<string, any>, workspaceId: number) => {
     const { corretor_id } = args
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    return withTenant(workspaceId, async (client) => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
 
-    const result: any = {
-      tarefas: [],
-      visitas: [],
-      agendamentos: []
-    }
+      const result: any = {
+        tarefas: [],
+        visitas: [],
+        agendamentos: []
+      }
 
-    // Build corretor filter
-    let corretorFilter = ''
-    const baseParams = [today.toISOString(), tomorrow.toISOString()]
+      // Build corretor filter
+      const baseParams = [today.toISOString(), tomorrow.toISOString()]
 
-    if (corretor_id) {
-      corretorFilter = ' AND responsavel_id = $3'
-    }
+      // Get tarefas (tasks) scheduled for today
+      const tarefasQuery = `
+        SELECT
+          cvcrm_id,
+          titulo,
+          descricao,
+          tipo,
+          status,
+          prioridade,
+          data_agendamento,
+          cvcrm_lead_id
+        FROM cvcrm_lead_tarefas
+        WHERE workspace_id = $1
+          AND data_agendamento >= $2
+          AND data_agendamento < $3
+          AND status != 'concluida'
+          ${corretor_id ? ' AND responsavel_id = $4' : ''}
+        ORDER BY data_agendamento ASC
+        LIMIT 50
+      `
+      const tarefasParams = corretor_id ? [workspaceId, ...baseParams, corretor_id] : [workspaceId, ...baseParams]
+      const tarefasResult = await client.query(tarefasQuery, tarefasParams)
+      result.tarefas = tarefasResult.rows
 
-    // Get tarefas (tasks) scheduled for today
-    const tarefasQuery = `
-      SELECT
-        cvcrm_id,
-        titulo,
-        descricao,
-        tipo,
-        status,
-        prioridade,
-        data_agendamento,
-        cvcrm_lead_id
-      FROM cvcrm_lead_tarefas
-      WHERE workspace_id = $1
-        AND data_agendamento >= $2
-        AND data_agendamento < $3
-        AND status != 'concluida'
-        ${corretor_id ? ' AND responsavel_id = $4' : ''}
-      ORDER BY data_agendamento ASC
-      LIMIT 50
-    `
-    const tarefasParams = corretor_id ? [workspaceId, ...baseParams, corretor_id] : [workspaceId, ...baseParams]
-    const tarefasResult = await dbQuery(tarefasQuery, tarefasParams)
-    result.tarefas = tarefasResult.rows
+      // Get visitas (visits) scheduled for today
+      const visitasQuery = `
+        SELECT
+          cvcrm_id,
+          cvcrm_lead_id,
+          empreendimento_nome,
+          data_agendamento,
+          status,
+          observacoes,
+          corretor_nome
+        FROM cvcrm_lead_visitas
+        WHERE workspace_id = $1
+          AND data_agendamento >= $2
+          AND data_agendamento < $3
+          AND status NOT IN ('realizada', 'cancelada')
+          ${corretor_id ? ' AND corretor_id = $4' : ''}
+        ORDER BY data_agendamento ASC
+        LIMIT 50
+      `
+      const visitasParams = corretor_id ? [workspaceId, ...baseParams, corretor_id] : [workspaceId, ...baseParams]
+      const visitasResult = await client.query(visitasQuery, visitasParams)
+      result.visitas = visitasResult.rows
 
-    // Get visitas (visits) scheduled for today
-    const visitasQuery = `
-      SELECT
-        cvcrm_id,
-        cvcrm_lead_id,
-        empreendimento_nome,
-        data_agendamento,
-        status,
-        observacoes,
-        corretor_nome
-      FROM cvcrm_lead_visitas
-      WHERE workspace_id = $1
-        AND data_agendamento >= $2
-        AND data_agendamento < $3
-        AND status NOT IN ('realizada', 'cancelada')
-        ${corretor_id ? ' AND corretor_id = $4' : ''}
-      ORDER BY data_agendamento ASC
-      LIMIT 50
-    `
-    const visitasParams = corretor_id ? [workspaceId, ...baseParams, corretor_id] : [workspaceId, ...baseParams]
-    const visitasResult = await dbQuery(visitasQuery, visitasParams)
-    result.visitas = visitasResult.rows
+      // Get agendamentos (appointments) for today
+      const agendamentosQuery = `
+        SELECT
+          cvcrm_id,
+          titulo,
+          descricao,
+          tipo,
+          data_inicio,
+          data_fim,
+          local,
+          status,
+          participantes
+        FROM cvcrm_agendamentos
+        WHERE workspace_id = $1
+          AND data_inicio >= $2
+          AND data_inicio < $3
+          AND status != 'cancelado'
+        ORDER BY data_inicio ASC
+        LIMIT 50
+      `
+      const agendamentosResult = await client.query(agendamentosQuery, [workspaceId, ...baseParams])
+      result.agendamentos = agendamentosResult.rows
 
-    // Get agendamentos (appointments) for today
-    const agendamentosQuery = `
-      SELECT
-        cvcrm_id,
-        titulo,
-        descricao,
-        tipo,
-        data_inicio,
-        data_fim,
-        local,
-        status,
-        participantes
-      FROM cvcrm_agendamentos
-      WHERE workspace_id = $1
-        AND data_inicio >= $2
-        AND data_inicio < $3
-        AND status != 'cancelado'
-      ORDER BY data_inicio ASC
-      LIMIT 50
-    `
-    const agendamentosResult = await dbQuery(agendamentosQuery, [workspaceId, ...baseParams])
-    result.agendamentos = agendamentosResult.rows
-
-    return {
-      data: today.toISOString().split('T')[0],
-      resumo: {
-        total_tarefas: result.tarefas.length,
-        total_visitas: result.visitas.length,
-        total_agendamentos: result.agendamentos.length,
-        total_compromissos: result.tarefas.length + result.visitas.length + result.agendamentos.length
-      },
-      tarefas: result.tarefas.map((t: any) => ({
-        id: t.cvcrm_id,
-        titulo: t.titulo,
-        descricao: t.descricao,
-        tipo: t.tipo,
-        status: t.status,
-        prioridade: t.prioridade,
-        horario: t.data_agendamento,
-        lead_id: t.cvcrm_lead_id
-      })),
-      visitas: result.visitas.map((v: any) => ({
-        id: v.cvcrm_id,
-        lead_id: v.cvcrm_lead_id,
-        empreendimento: v.empreendimento_nome,
-        horario: v.data_agendamento,
-        status: v.status,
-        observacoes: v.observacoes,
-        corretor: v.corretor_nome
-      })),
-      agendamentos: result.agendamentos.map((a: any) => ({
-        id: a.cvcrm_id,
-        titulo: a.titulo,
-        descricao: a.descricao,
-        tipo: a.tipo,
-        inicio: a.data_inicio,
-        fim: a.data_fim,
-        local: a.local,
-        status: a.status
-      }))
-    }
+      return {
+        data: today.toISOString().split('T')[0],
+        resumo: {
+          total_tarefas: result.tarefas.length,
+          total_visitas: result.visitas.length,
+          total_agendamentos: result.agendamentos.length,
+          total_compromissos: result.tarefas.length + result.visitas.length + result.agendamentos.length
+        },
+        tarefas: result.tarefas.map((t: any) => ({
+          id: t.cvcrm_id,
+          titulo: t.titulo,
+          descricao: t.descricao,
+          tipo: t.tipo,
+          status: t.status,
+          prioridade: t.prioridade,
+          horario: t.data_agendamento,
+          lead_id: t.cvcrm_lead_id
+        })),
+        visitas: result.visitas.map((v: any) => ({
+          id: v.cvcrm_id,
+          lead_id: v.cvcrm_lead_id,
+          empreendimento: v.empreendimento_nome,
+          horario: v.data_agendamento,
+          status: v.status,
+          observacoes: v.observacoes,
+          corretor: v.corretor_nome
+        })),
+        agendamentos: result.agendamentos.map((a: any) => ({
+          id: a.cvcrm_id,
+          titulo: a.titulo,
+          descricao: a.descricao,
+          tipo: a.tipo,
+          inicio: a.data_inicio,
+          fim: a.data_fim,
+          local: a.local,
+          status: a.status
+        }))
+      }
+    })
   }
 }
 
@@ -441,58 +437,60 @@ const get_tarefas_atrasadas: VoiceAgentToolDefinition = {
   execute: async (args: Record<string, any>, workspaceId: number) => {
     const { corretor_id } = args
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    return withTenant(workspaceId, async (client) => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
 
-    let query = `
-      SELECT
-        cvcrm_id,
-        titulo,
-        descricao,
-        tipo,
-        status,
-        prioridade,
-        data_agendamento,
-        cvcrm_lead_id,
-        responsavel_nome
-      FROM cvcrm_lead_tarefas
-      WHERE workspace_id = $1
-        AND data_agendamento < $2
-        AND status != 'concluida'
-    `
-    const params: any[] = [workspaceId, today.toISOString()]
+      let query = `
+        SELECT
+          cvcrm_id,
+          titulo,
+          descricao,
+          tipo,
+          status,
+          prioridade,
+          data_agendamento,
+          cvcrm_lead_id,
+          responsavel_nome
+        FROM cvcrm_lead_tarefas
+        WHERE workspace_id = $1
+          AND data_agendamento < $2
+          AND status != 'concluida'
+      `
+      const params: any[] = [workspaceId, today.toISOString()]
 
-    if (corretor_id) {
-      query += ` AND responsavel_id = $3`
-      params.push(corretor_id)
-    }
+      if (corretor_id) {
+        query += ` AND responsavel_id = $3`
+        params.push(corretor_id)
+      }
 
-    query += ` ORDER BY data_agendamento ASC LIMIT 100`
+      query += ` ORDER BY data_agendamento ASC LIMIT 100`
 
-    const result = await dbQuery(query, params)
+      const result = await client.query(query, params)
 
-    // Calculate days overdue for each task
-    const tarefas = result.rows.map((t: any) => {
-      const dueDate = new Date(t.data_agendamento)
-      const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+      // Calculate days overdue for each task
+      const tarefas = result.rows.map((t: any) => {
+        const dueDate = new Date(t.data_agendamento)
+        const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+        return {
+          id: t.cvcrm_id,
+          titulo: t.titulo,
+          descricao: t.descricao,
+          tipo: t.tipo,
+          status: t.status,
+          prioridade: t.prioridade,
+          data_vencimento: t.data_agendamento,
+          dias_atraso: daysOverdue,
+          lead_id: t.cvcrm_lead_id,
+          responsavel: t.responsavel_nome
+        }
+      })
+
       return {
-        id: t.cvcrm_id,
-        titulo: t.titulo,
-        descricao: t.descricao,
-        tipo: t.tipo,
-        status: t.status,
-        prioridade: t.prioridade,
-        data_vencimento: t.data_agendamento,
-        dias_atraso: daysOverdue,
-        lead_id: t.cvcrm_lead_id,
-        responsavel: t.responsavel_nome
+        count: tarefas.length,
+        tarefas_atrasadas: tarefas
       }
     })
-
-    return {
-      count: tarefas.length,
-      tarefas_atrasadas: tarefas
-    }
   }
 }
 
@@ -514,69 +512,71 @@ const get_comissoes_pendentes: VoiceAgentToolDefinition = {
   execute: async (args: Record<string, any>, workspaceId: number) => {
     const { corretor_id } = args
 
-    let query = `
-      SELECT
-        cvcrm_id,
-        tipo,
-        corretor_id,
-        corretor_nome,
-        reserva_id,
-        empreendimento_nome,
-        percentual,
-        valor,
-        status,
-        data_previsao
-      FROM cvcrm_comissoes
-      WHERE workspace_id = $1 AND status = 'pendente'
-    `
-    const params: any[] = [workspaceId]
+    return withTenant(workspaceId, async (client) => {
+      let query = `
+        SELECT
+          cvcrm_id,
+          tipo,
+          corretor_id,
+          corretor_nome,
+          reserva_id,
+          empreendimento_nome,
+          percentual,
+          valor,
+          status,
+          data_previsao
+        FROM cvcrm_comissoes
+        WHERE workspace_id = $1 AND status = 'pendente'
+      `
+      const params: any[] = [workspaceId]
 
-    if (corretor_id) {
-      query += ` AND corretor_id = $2`
-      params.push(corretor_id)
-    }
-
-    query += ` ORDER BY data_previsao ASC LIMIT 100`
-
-    const result = await dbQuery(query, params)
-
-    // Calculate totals
-    const totalPendente = result.rows.reduce((sum: number, c: any) => sum + (parseFloat(c.valor) || 0), 0)
-
-    // Group by corretor
-    const porCorretor: Record<string, { nome: string; total: number; quantidade: number }> = {}
-    result.rows.forEach((c: any) => {
-      const corretorKey = c.corretor_id || 'sem_corretor'
-      if (!porCorretor[corretorKey]) {
-        porCorretor[corretorKey] = {
-          nome: c.corretor_nome || 'Sem corretor',
-          total: 0,
-          quantidade: 0
-        }
+      if (corretor_id) {
+        query += ` AND corretor_id = $2`
+        params.push(corretor_id)
       }
-      porCorretor[corretorKey].total += parseFloat(c.valor) || 0
-      porCorretor[corretorKey].quantidade++
-    })
 
-    return {
-      total_pendente: totalPendente,
-      total_pendente_formatado: `R$ ${totalPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      quantidade_comissoes: result.rows.length,
-      por_corretor: Object.values(porCorretor).map(c => ({
-        ...c,
-        total_formatado: `R$ ${c.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-      })),
-      comissoes: result.rows.map((c: any) => ({
-        id: c.cvcrm_id,
-        tipo: c.tipo,
-        corretor: c.corretor_nome,
-        empreendimento: c.empreendimento_nome,
-        percentual: c.percentual,
-        valor: c.valor,
-        valor_formatado: `R$ ${parseFloat(c.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        data_previsao: c.data_previsao
-      }))
-    }
+      query += ` ORDER BY data_previsao ASC LIMIT 100`
+
+      const result = await client.query(query, params)
+
+      // Calculate totals
+      const totalPendente = result.rows.reduce((sum: number, c: any) => sum + (parseFloat(c.valor) || 0), 0)
+
+      // Group by corretor
+      const porCorretor: Record<string, { nome: string; total: number; quantidade: number }> = {}
+      result.rows.forEach((c: any) => {
+        const corretorKey = c.corretor_id || 'sem_corretor'
+        if (!porCorretor[corretorKey]) {
+          porCorretor[corretorKey] = {
+            nome: c.corretor_nome || 'Sem corretor',
+            total: 0,
+            quantidade: 0
+          }
+        }
+        porCorretor[corretorKey].total += parseFloat(c.valor) || 0
+        porCorretor[corretorKey].quantidade++
+      })
+
+      return {
+        total_pendente: totalPendente,
+        total_pendente_formatado: `R$ ${totalPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        quantidade_comissoes: result.rows.length,
+        por_corretor: Object.values(porCorretor).map(c => ({
+          ...c,
+          total_formatado: `R$ ${c.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        })),
+        comissoes: result.rows.map((c: any) => ({
+          id: c.cvcrm_id,
+          tipo: c.tipo,
+          corretor: c.corretor_nome,
+          empreendimento: c.empreendimento_nome,
+          percentual: c.percentual,
+          valor: c.valor,
+          valor_formatado: `R$ ${parseFloat(c.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          data_previsao: c.data_previsao
+        }))
+      }
+    })
   }
 }
 
@@ -598,128 +598,130 @@ const get_empreendimento_stats: VoiceAgentToolDefinition = {
   execute: async (args: Record<string, any>, workspaceId: number) => {
     const { empreendimento_id } = args
 
-    // Get empreendimentos list
-    let empreendimentosQuery = `
-      SELECT
-        cvcrm_id,
-        nome,
-        tipo,
-        status,
-        cidade,
-        uf,
-        total_unidades
-      FROM cvcrm_empreendimentos
-      WHERE workspace_id = $1
-    `
-    const empreendimentosParams: any[] = [workspaceId]
+    return withTenant(workspaceId, async (client) => {
+      // Get empreendimentos list
+      let empreendimentosQuery = `
+        SELECT
+          cvcrm_id,
+          nome,
+          tipo,
+          status,
+          cidade,
+          uf,
+          total_unidades
+        FROM cvcrm_empreendimentos
+        WHERE workspace_id = $1
+      `
+      const empreendimentosParams: any[] = [workspaceId]
 
-    if (empreendimento_id) {
-      empreendimentosQuery += ` AND cvcrm_id = $2`
-      empreendimentosParams.push(empreendimento_id)
-    }
+      if (empreendimento_id) {
+        empreendimentosQuery += ` AND cvcrm_id = $2`
+        empreendimentosParams.push(empreendimento_id)
+      }
 
-    empreendimentosQuery += ` ORDER BY nome ASC LIMIT 50`
+      empreendimentosQuery += ` ORDER BY nome ASC LIMIT 50`
 
-    const empreendimentosResult = await dbQuery(empreendimentosQuery, empreendimentosParams)
+      const empreendimentosResult = await client.query(empreendimentosQuery, empreendimentosParams)
 
-    // Get stats for each empreendimento
-    const stats = await Promise.all(
-      empreendimentosResult.rows.map(async (emp: any) => {
-        // Count leads (from JSON empreendimento field)
-        const leadsResult = await dbQuery(`
-          SELECT COUNT(*) as total
-          FROM cvcrm_leads
-          WHERE workspace_id = $1 AND empreendimento::text LIKE $2
-        `, [workspaceId, `%"id":${emp.cvcrm_id}%`])
+      // Get stats for each empreendimento
+      const stats = await Promise.all(
+        empreendimentosResult.rows.map(async (emp: any) => {
+          // Count leads (from JSON empreendimento field)
+          const leadsResult = await client.query(`
+            SELECT COUNT(*) as total
+            FROM cvcrm_leads
+            WHERE workspace_id = $1 AND empreendimento::text LIKE $2
+          `, [workspaceId, `%"id":${emp.cvcrm_id}%`])
 
-        // Count reservas
-        const reservasResult = await dbQuery(`
-          SELECT
-            COUNT(*) as total,
-            COUNT(*) FILTER (WHERE status = 'ativa') as ativas,
-            SUM(CASE WHEN status = 'ativa' THEN valor_reserva ELSE 0 END) as valor_ativas
-          FROM cvcrm_reservas
-          WHERE workspace_id = $1 AND empreendimento_id = $2
-        `, [workspaceId, emp.cvcrm_id])
+          // Count reservas
+          const reservasResult = await client.query(`
+            SELECT
+              COUNT(*) as total,
+              COUNT(*) FILTER (WHERE status = 'ativa') as ativas,
+              SUM(CASE WHEN status = 'ativa' THEN valor_reserva ELSE 0 END) as valor_ativas
+            FROM cvcrm_reservas
+            WHERE workspace_id = $1 AND empreendimento_id = $2
+          `, [workspaceId, emp.cvcrm_id])
 
-        // Count vendas
-        const vendasResult = await dbQuery(`
-          SELECT
-            COUNT(*) as total,
-            SUM(valor_venda) as valor_total
-          FROM cvcrm_vendas
-          WHERE workspace_id = $1 AND empreendimento_id = $2
-        `, [workspaceId, emp.cvcrm_id])
+          // Count vendas
+          const vendasResult = await client.query(`
+            SELECT
+              COUNT(*) as total,
+              SUM(valor_venda) as valor_total
+            FROM cvcrm_vendas
+            WHERE workspace_id = $1 AND empreendimento_id = $2
+          `, [workspaceId, emp.cvcrm_id])
 
-        // Get unidades stats
-        const unidadesResult = await dbQuery(`
-          SELECT
-            COUNT(*) as total,
-            COUNT(*) FILTER (WHERE situacao = 'disponivel') as disponiveis,
-            COUNT(*) FILTER (WHERE situacao = 'reservada') as reservadas,
-            COUNT(*) FILTER (WHERE situacao = 'vendida') as vendidas
-          FROM cvcrm_unidades
-          WHERE workspace_id = $1 AND empreendimento_id = $2
-        `, [workspaceId, emp.cvcrm_id])
+          // Get unidades stats
+          const unidadesResult = await client.query(`
+            SELECT
+              COUNT(*) as total,
+              COUNT(*) FILTER (WHERE situacao = 'disponivel') as disponiveis,
+              COUNT(*) FILTER (WHERE situacao = 'reservada') as reservadas,
+              COUNT(*) FILTER (WHERE situacao = 'vendida') as vendidas
+            FROM cvcrm_unidades
+            WHERE workspace_id = $1 AND empreendimento_id = $2
+          `, [workspaceId, emp.cvcrm_id])
 
-        return {
-          empreendimento: {
-            id: emp.cvcrm_id,
-            nome: emp.nome,
-            tipo: emp.tipo,
-            status: emp.status,
-            cidade: emp.cidade,
-            uf: emp.uf
-          },
-          leads: {
-            total: parseInt(leadsResult.rows[0]?.total || 0)
-          },
+          return {
+            empreendimento: {
+              id: emp.cvcrm_id,
+              nome: emp.nome,
+              tipo: emp.tipo,
+              status: emp.status,
+              cidade: emp.cidade,
+              uf: emp.uf
+            },
+            leads: {
+              total: parseInt(leadsResult.rows[0]?.total || 0)
+            },
+            reservas: {
+              total: parseInt(reservasResult.rows[0]?.total || 0),
+              ativas: parseInt(reservasResult.rows[0]?.ativas || 0),
+              valor_ativas: parseFloat(reservasResult.rows[0]?.valor_ativas || 0)
+            },
+            vendas: {
+              total: parseInt(vendasResult.rows[0]?.total || 0),
+              valor_total: parseFloat(vendasResult.rows[0]?.valor_total || 0)
+            },
+            unidades: {
+              total: parseInt(unidadesResult.rows[0]?.total || 0) || emp.total_unidades,
+              disponiveis: parseInt(unidadesResult.rows[0]?.disponiveis || 0),
+              reservadas: parseInt(unidadesResult.rows[0]?.reservadas || 0),
+              vendidas: parseInt(unidadesResult.rows[0]?.vendidas || 0)
+            }
+          }
+        })
+      )
+
+      // Calculate totals across all empreendimentos
+      const totais = {
+        empreendimentos: stats.length,
+        leads: stats.reduce((sum, s) => sum + s.leads.total, 0),
+        reservas_ativas: stats.reduce((sum, s) => sum + s.reservas.ativas, 0),
+        vendas: stats.reduce((sum, s) => sum + s.vendas.total, 0),
+        valor_vendas: stats.reduce((sum, s) => sum + s.vendas.valor_total, 0),
+        unidades_disponiveis: stats.reduce((sum, s) => sum + s.unidades.disponiveis, 0)
+      }
+
+      return {
+        totais: {
+          ...totais,
+          valor_vendas_formatado: `R$ ${totais.valor_vendas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        },
+        empreendimentos: stats.map(s => ({
+          ...s,
           reservas: {
-            total: parseInt(reservasResult.rows[0]?.total || 0),
-            ativas: parseInt(reservasResult.rows[0]?.ativas || 0),
-            valor_ativas: parseFloat(reservasResult.rows[0]?.valor_ativas || 0)
+            ...s.reservas,
+            valor_ativas_formatado: `R$ ${s.reservas.valor_ativas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
           },
           vendas: {
-            total: parseInt(vendasResult.rows[0]?.total || 0),
-            valor_total: parseFloat(vendasResult.rows[0]?.valor_total || 0)
-          },
-          unidades: {
-            total: parseInt(unidadesResult.rows[0]?.total || 0) || emp.total_unidades,
-            disponiveis: parseInt(unidadesResult.rows[0]?.disponiveis || 0),
-            reservadas: parseInt(unidadesResult.rows[0]?.reservadas || 0),
-            vendidas: parseInt(unidadesResult.rows[0]?.vendidas || 0)
+            ...s.vendas,
+            valor_total_formatado: `R$ ${s.vendas.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
           }
-        }
-      })
-    )
-
-    // Calculate totals across all empreendimentos
-    const totais = {
-      empreendimentos: stats.length,
-      leads: stats.reduce((sum, s) => sum + s.leads.total, 0),
-      reservas_ativas: stats.reduce((sum, s) => sum + s.reservas.ativas, 0),
-      vendas: stats.reduce((sum, s) => sum + s.vendas.total, 0),
-      valor_vendas: stats.reduce((sum, s) => sum + s.vendas.valor_total, 0),
-      unidades_disponiveis: stats.reduce((sum, s) => sum + s.unidades.disponiveis, 0)
-    }
-
-    return {
-      totais: {
-        ...totais,
-        valor_vendas_formatado: `R$ ${totais.valor_vendas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-      },
-      empreendimentos: stats.map(s => ({
-        ...s,
-        reservas: {
-          ...s.reservas,
-          valor_ativas_formatado: `R$ ${s.reservas.valor_ativas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-        },
-        vendas: {
-          ...s.vendas,
-          valor_total_formatado: `R$ ${s.vendas.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-        }
-      }))
-    }
+        }))
+      }
+    })
   }
 }
 

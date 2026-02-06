@@ -4,7 +4,7 @@
  * Tools for querying CRM metrics, rankings, and analytics via voice commands
  */
 
-import { dbQuery } from '../db'
+import { withTenant } from '../../tenant-context'
 import { VoiceAgentToolDefinition } from '../types'
 
 // ============================================================================
@@ -75,19 +75,18 @@ const getConversionMetrics: VoiceAgentToolDefinition = {
     const { start, end } = getPeriodFilter(periodo)
 
     // Query leads grouped by status (situacao)
-    const result = await dbQuery<{
-      situacao_nome: string
-      total: string
-    }>(
-      `SELECT
-        COALESCE(situacao_nome, 'Sem Status') as situacao_nome,
-        COUNT(*) as total
-      FROM cvcrm_leads
-      WHERE synced_at >= $1 AND synced_at <= $2
-      GROUP BY situacao_nome
-      ORDER BY total DESC`,
-      [start.toISOString(), end.toISOString()]
-    )
+    const result = await withTenant(workspaceId, async (client) => {
+      return client.query(
+        `SELECT
+          COALESCE(situacao_nome, 'Sem Status') as situacao_nome,
+          COUNT(*) as total
+        FROM cvcrm_leads
+        WHERE workspace_id = $1 AND synced_at >= $2 AND synced_at <= $3
+        GROUP BY situacao_nome
+        ORDER BY total DESC`,
+        [workspaceId, start.toISOString(), end.toISOString()]
+      )
+    })
 
     // Calculate metrics
     let totalLeads = 0
@@ -163,26 +162,24 @@ const getCorretorRanking: VoiceAgentToolDefinition = {
     const periodo = args.periodo as 'mes' | 'trimestre' | 'ano' | undefined
     const { start, end } = getPeriodFilter(periodo)
 
-    const result = await dbQuery<{
-      corretor_id: number
-      corretor_nome: string
-      total_vendas: string
-      valor_total: string
-    }>(
-      `SELECT
-        r.corretor_id,
-        COALESCE(r.corretor_nome, 'Corretor Desconhecido') as corretor_nome,
-        COUNT(*) as total_vendas,
-        COALESCE(SUM(r.valor_venda), 0) as valor_total
-      FROM cvcrm_reservas r
-      WHERE r.data_venda >= $1
-        AND r.data_venda <= $2
-        AND r.status IN ('vendido', 'concluido', 'ativo', 'aprovado')
-      GROUP BY r.corretor_id, r.corretor_nome
-      ORDER BY total_vendas DESC, valor_total DESC
-      LIMIT $3`,
-      [start.toISOString(), end.toISOString(), limite]
-    )
+    const result = await withTenant(workspaceId, async (client) => {
+      return client.query(
+        `SELECT
+          r.corretor_id,
+          COALESCE(r.corretor_nome, 'Corretor Desconhecido') as corretor_nome,
+          COUNT(*) as total_vendas,
+          COALESCE(SUM(r.valor_venda), 0) as valor_total
+        FROM cvcrm_reservas r
+        WHERE r.workspace_id = $1
+          AND r.data_venda >= $2
+          AND r.data_venda <= $3
+          AND r.status IN ('vendido', 'concluido', 'ativo', 'aprovado')
+        GROUP BY r.corretor_id, r.corretor_nome
+        ORDER BY total_vendas DESC, valor_total DESC
+        LIMIT $4`,
+        [workspaceId, start.toISOString(), end.toISOString(), limite]
+      )
+    })
 
     const ranking = result.rows.map((row, index) => ({
       posicao: index + 1,
@@ -224,42 +221,47 @@ const getDashboardSummary: VoiceAgentToolDefinition = {
 
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    // Run all queries in parallel
+    // Run all queries in parallel inside withTenant
     const [
       totalLeadsResult,
       leadsHojeResult,
       reservasAtivasResult,
       vendasMesResult
-    ] = await Promise.all([
-      // Total leads
-      dbQuery<{ count: string }>(
-        `SELECT COUNT(*) as count FROM cvcrm_leads`
-      ),
+    ] = await withTenant(workspaceId, async (client) => {
+      return Promise.all([
+        // Total leads
+        client.query(
+          `SELECT COUNT(*) as count FROM cvcrm_leads WHERE workspace_id = $1`,
+          [workspaceId]
+        ),
 
-      // Leads de hoje
-      dbQuery<{ count: string }>(
-        `SELECT COUNT(*) as count FROM cvcrm_leads
-         WHERE data_cadastro_cvcrm >= $1`,
-        [todayStart.toISOString()]
-      ),
+        // Leads de hoje
+        client.query(
+          `SELECT COUNT(*) as count FROM cvcrm_leads
+           WHERE workspace_id = $1 AND data_cadastro_cvcrm >= $2`,
+          [workspaceId, todayStart.toISOString()]
+        ),
 
-      // Reservas ativas
-      dbQuery<{ count: string }>(
-        `SELECT COUNT(*) as count FROM cvcrm_reservas
-         WHERE status IN ('ativo', 'pendente', 'em_analise', 'aguardando')`
-      ),
+        // Reservas ativas
+        client.query(
+          `SELECT COUNT(*) as count FROM cvcrm_reservas
+           WHERE workspace_id = $1 AND status IN ('ativo', 'pendente', 'em_analise', 'aguardando')`,
+          [workspaceId]
+        ),
 
-      // Vendas do mês
-      dbQuery<{ count: string; valor: string }>(
-        `SELECT
-          COUNT(*) as count,
-          COALESCE(SUM(valor_venda), 0) as valor
-        FROM cvcrm_reservas
-        WHERE data_venda >= $1
-          AND status IN ('vendido', 'concluido', 'aprovado')`,
-        [monthStart.toISOString()]
-      )
-    ])
+        // Vendas do mês
+        client.query(
+          `SELECT
+            COUNT(*) as count,
+            COALESCE(SUM(valor_venda), 0) as valor
+          FROM cvcrm_reservas
+          WHERE workspace_id = $1
+            AND data_venda >= $2
+            AND status IN ('vendido', 'concluido', 'aprovado')`,
+          [workspaceId, monthStart.toISOString()]
+        )
+      ])
+    })
 
     const totalLeads = parseInt(totalLeadsResult.rows[0]?.count || '0', 10)
     const leadsHoje = parseInt(leadsHojeResult.rows[0]?.count || '0', 10)
@@ -304,54 +306,52 @@ const getWhatsAppStats: VoiceAgentToolDefinition = {
     const periodo = args.periodo as 'hoje' | 'semana' | 'mes' | undefined
     const { start, end } = getWhatsAppPeriodFilter(periodo)
 
-    // Run queries in parallel
+    // Run queries in parallel inside withTenant
     const [
       conversationsResult,
       statusBreakdownResult,
       messagesStatsResult
-    ] = await Promise.all([
-      // Total conversations in period
-      dbQuery<{ total: string; active: string }>(
-        `SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE status = 'active') as active
-        FROM salva_leads_conversations
-        WHERE workspace_id = $1
-          AND created_at >= $2
-          AND created_at <= $3`,
-        [workspaceId, start.toISOString(), end.toISOString()]
-      ),
+    ] = await withTenant(workspaceId, async (client) => {
+      return Promise.all([
+        // Total conversations in period
+        client.query(
+          `SELECT
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE status = 'active') as active
+          FROM salva_leads_conversations
+          WHERE workspace_id = $1
+            AND created_at >= $2
+            AND created_at <= $3`,
+          [workspaceId, start.toISOString(), end.toISOString()]
+        ),
 
-      // Breakdown by status
-      dbQuery<{ status: string; count: string }>(
-        `SELECT
-          status,
-          COUNT(*) as count
-        FROM salva_leads_conversations
-        WHERE workspace_id = $1
-          AND created_at >= $2
-          AND created_at <= $3
-        GROUP BY status`,
-        [workspaceId, start.toISOString(), end.toISOString()]
-      ),
+        // Breakdown by status
+        client.query(
+          `SELECT
+            status,
+            COUNT(*) as count
+          FROM salva_leads_conversations
+          WHERE workspace_id = $1
+            AND created_at >= $2
+            AND created_at <= $3
+          GROUP BY status`,
+          [workspaceId, start.toISOString(), end.toISOString()]
+        ),
 
-      // Message stats (count messages in JSONB array)
-      dbQuery<{
-        total_conversations: string
-        avg_messages: string
-        conversations_with_messages: string
-      }>(
-        `SELECT
-          COUNT(*) as total_conversations,
-          AVG(jsonb_array_length(messages)) as avg_messages,
-          COUNT(*) FILTER (WHERE jsonb_array_length(messages) > 0) as conversations_with_messages
-        FROM salva_leads_conversations
-        WHERE workspace_id = $1
-          AND created_at >= $2
-          AND created_at <= $3`,
-        [workspaceId, start.toISOString(), end.toISOString()]
-      )
-    ])
+        // Message stats (count messages in JSONB array)
+        client.query(
+          `SELECT
+            COUNT(*) as total_conversations,
+            AVG(jsonb_array_length(messages)) as avg_messages,
+            COUNT(*) FILTER (WHERE jsonb_array_length(messages) > 0) as conversations_with_messages
+          FROM salva_leads_conversations
+          WHERE workspace_id = $1
+            AND created_at >= $2
+            AND created_at <= $3`,
+          [workspaceId, start.toISOString(), end.toISOString()]
+        )
+      ])
+    })
 
     const totalConversations = parseInt(conversationsResult.rows[0]?.total || '0', 10)
     const activeConversations = parseInt(conversationsResult.rows[0]?.active || '0', 10)
