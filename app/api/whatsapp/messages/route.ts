@@ -1,30 +1,17 @@
 /**
  * API: Listar Mensagens WhatsApp
  *
- * GET /api/whatsapp/messages?instance=xxx&phone=xxx
- * PATCH /api/whatsapp/messages - Marcar mensagens como lidas
+ * GET /api/whatsapp/messages?instance=xxx          → lista conversas (agregado)
+ * GET /api/whatsapp/messages?instance=xxx&phone=xxx → mensagens de uma conversa
+ * PATCH /api/whatsapp/messages                     → marcar como lidas
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { tenantQuery, findUserWorkspace } from '@/lib/tenant-context';
+import { findUserWorkspace, withTenant } from '@/lib/tenant-context';
 import { getAuthenticatedUser } from '@/lib/api-auth';
 import { markAsRead as markAsReadEvolution } from '@/lib/evolution-api';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 import { getMongoDb } from '@/lib/mongodb';
-import { resetUnread } from '@/lib/whatsapp-storage/realtime';
-
-/**
- * Contar mensagens não lidas de uma conversa
- * Mensagens recebidas (is_from_me = false) sem status 'read'
- */
-function countUnreadMessages(messages: any[], phoneNumber: string): number {
-  return messages.filter(
-    (msg: any) =>
-      msg.phone_number === phoneNumber &&
-      !msg.is_from_me &&
-      msg.status !== 'read'
-  ).length;
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,160 +38,149 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const query = tenantQuery(workspaceId);
-
-    // Se phone number foi especificado, buscar mensagens dessa conversa
-    // Note: we filter by workspace_id (via RLS) only, not instance_name,
-    // because users may reconnect with a new instance but want all history
+    // ── Single conversation: return messages ────────────────────────────
     if (phoneNumber) {
-      const messages = await query.select('whatsapp_messages', {
-        phone_number: phoneNumber,
-      });
+      return await withTenant(workspaceId, async (client) => {
+        const { rows: messages } = await client.query(
+          `SELECT * FROM whatsapp_messages
+           WHERE workspace_id = $1 AND phone_number = $2
+           ORDER BY timestamp ASC`,
+          [workspaceId, phoneNumber]
+        );
 
-      // Ordenar por timestamp
-      messages.sort((a: any, b: any) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        const unreadCount = messages.filter(
+          (m: any) => !m.is_from_me && m.status !== 'read'
+        ).length;
+
+        // AI analysis from MongoDB
+        let aiAnalysis = null;
+        try {
+          const db = getMongoDb();
+          const conv = await db.collection('conversations').findOne({
+            workspace_id: workspaceId,
+            phone_number: phoneNumber,
+          });
+          aiAnalysis = conv?.ai_analysis || null;
+        } catch {
+          // MongoDB unavailable
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: messages,
+          total: messages.length,
+          unread_count: unreadCount,
+          ai_analysis: aiAnalysis,
+        });
+      });
+    }
+
+    // ── Conversation list: use efficient SQL aggregation ─────────────────
+    return await withTenant(workspaceId, async (client) => {
+      // Single SQL query with DISTINCT ON to get last message per phone
+      const { rows: conversations } = await client.query(
+        `SELECT DISTINCT ON (m.phone_number)
+           m.phone_number,
+           m.message_text,
+           m.message_type,
+           m.timestamp,
+           m.is_from_me,
+           m.contact_name,
+           c.contact_name AS pg_contact_name,
+           c.profile_picture_url AS pg_profile_pic,
+           c.lead_id
+         FROM whatsapp_messages m
+         LEFT JOIN whatsapp_contacts c
+           ON c.phone_number = m.phone_number AND c.workspace_id = m.workspace_id
+         WHERE m.workspace_id = $1
+         ORDER BY m.phone_number, m.timestamp DESC`,
+        [workspaceId]
       );
 
-      // Contar não lidas desta conversa
-      const unreadCount = countUnreadMessages(messages, phoneNumber);
+      // Unread counts in a single query
+      const { rows: unreadRows } = await client.query(
+        `SELECT phone_number, COUNT(*) as unread
+         FROM whatsapp_messages
+         WHERE workspace_id = $1 AND is_from_me = false AND status != 'read'
+         GROUP BY phone_number`,
+        [workspaceId]
+      );
+      const unreadMap = new Map(unreadRows.map((r: any) => [r.phone_number, parseInt(r.unread)]));
 
-      // Fetch AI analysis for this conversation from MongoDB
-      let aiAnalysis = null;
+      // Enrich from MongoDB (batch — 2 queries total)
+      let mongoContactMap = new Map<string, any>();
+      let mongoConvMap = new Map<string, any>();
       try {
         const db = getMongoDb();
-        const conv = await db.collection('conversations').findOne({
-          workspace_id: workspaceId,
-          phone_number: phoneNumber,
-        });
-        aiAnalysis = conv?.ai_analysis || null;
+        const phones = conversations.map((c: any) => c.phone_number);
+
+        const [mongoContacts, mongoConvs] = await Promise.all([
+          db.collection('contacts')
+            .find({ workspace_id: workspaceId, phone_number: { $in: phones } })
+            .toArray(),
+          db.collection('conversations')
+            .find({ workspace_id: workspaceId, phone_number: { $in: phones } })
+            .toArray(),
+        ]);
+
+        mongoContactMap = new Map(mongoContacts.map((c) => [c.phone_number, c]));
+        mongoConvMap = new Map(mongoConvs.map((c) => [c.phone_number, c]));
       } catch {
         // MongoDB unavailable
       }
 
+      // Build response
+      const data = conversations
+        .map((msg: any) => {
+          const mc = mongoContactMap.get(msg.phone_number);
+          const mongoConv = mongoConvMap.get(msg.phone_number);
+
+          const contactName =
+            mc?.push_name ||
+            mc?.contact_name ||
+            msg.pg_contact_name ||
+            msg.contact_name ||
+            mongoConv?.contact_name ||
+            msg.phone_number;
+
+          const profilePicUrl =
+            mc?.profile_picture_url ||
+            msg.pg_profile_pic ||
+            mongoConv?.profile_picture_url ||
+            null;
+
+          return {
+            phone_number: msg.phone_number,
+            contact_name: contactName,
+            profile_picture_url: profilePicUrl,
+            last_message: msg.message_text,
+            last_message_type: msg.message_type,
+            last_message_time: msg.timestamp,
+            is_from_me: msg.is_from_me,
+            unread_count: unreadMap.get(msg.phone_number) || 0,
+            lead_id: msg.lead_id || mongoConv?.matched_lead_id,
+            is_lead: !!(msg.lead_id || mongoConv?.matched_lead_id),
+            labels: mongoConv?.labels || [],
+            archived: mongoConv?.archived || false,
+            pinned: mongoConv?.pinned || false,
+            ai_summary: mongoConv?.ai_analysis?.summary || null,
+            ai_sentiment: mongoConv?.ai_analysis?.sentiment || null,
+            ai_temperature: mongoConv?.ai_analysis?.temperature || null,
+          };
+        })
+        // Sort by last message time descending
+        .sort((a: any, b: any) =>
+          new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime()
+        );
+
+      const totalUnread = Array.from(unreadMap.values()).reduce((a, b) => a + b, 0);
+
       return NextResponse.json({
         success: true,
-        data: messages,
-        total: messages.length,
-        unread_count: unreadCount,
-        ai_analysis: aiAnalysis,
+        data,
+        total: data.length,
+        total_unread: totalUnread,
       });
-    }
-
-    // Caso contrário, listar todas as conversas (últimas mensagens por telefone)
-    // Filter by workspace_id only (via RLS), not instance_name,
-    // so users see all their history across instance reconnections
-    const allMessages = await query.select('whatsapp_messages');
-
-    // Agrupar por telefone e pegar a última mensagem de cada
-    const conversationsMap = new Map<string, any>();
-    const unreadCountMap = new Map<string, number>();
-
-    // Primeiro passo: agrupar mensagens e contar não lidas
-    allMessages.forEach((msg: any) => {
-      const phone = msg.phone_number;
-
-      // Atualizar última mensagem
-      const existing = conversationsMap.get(phone);
-      if (!existing || new Date(msg.timestamp) > new Date(existing.timestamp)) {
-        conversationsMap.set(phone, msg);
-      }
-
-      // Contar não lidas (mensagens recebidas sem status 'read')
-      if (!msg.is_from_me && msg.status !== 'read') {
-        unreadCountMap.set(phone, (unreadCountMap.get(phone) || 0) + 1);
-      }
-    });
-
-    const conversations = Array.from(conversationsMap.values())
-      .sort((a: any, b: any) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
-
-    // Enrich with MongoDB contacts (batch fetch — single query)
-    let mongoContactMap = new Map<string, any>();
-    try {
-      const db = getMongoDb();
-      const allPhoneNumbers = conversations.map((m: any) => m.phone_number);
-      const mongoContacts = await db
-        .collection('contacts')
-        .find({ workspace_id: workspaceId, phone_number: { $in: allPhoneNumbers } })
-        .toArray();
-      mongoContactMap = new Map(mongoContacts.map((c) => [c.phone_number, c]));
-    } catch {
-      // MongoDB unavailable — fallback to PostgreSQL contacts only
-    }
-
-    // Also try to get MongoDB conversation data (for AI analysis, labels, etc.)
-    let mongoConvMap = new Map<string, any>();
-    try {
-      const db = getMongoDb();
-      const allPhoneNumbers = conversations.map((m: any) => m.phone_number);
-      const mongoConvs = await db
-        .collection('conversations')
-        .find({ workspace_id: workspaceId, phone_number: { $in: allPhoneNumbers } })
-        .toArray();
-      mongoConvMap = new Map(mongoConvs.map((c) => [c.phone_number, c]));
-    } catch {
-      // MongoDB unavailable
-    }
-
-    // Buscar informações dos contatos (PostgreSQL + MongoDB enrichment)
-    const conversationsWithContact = await Promise.all(
-      conversations.map(async (msg: any) => {
-        const contacts = await query.select('whatsapp_contacts', {
-          phone_number: msg.phone_number,
-        });
-
-        const pgContact = contacts[0];
-        const mc = mongoContactMap.get(msg.phone_number);
-        const mongoConv = mongoConvMap.get(msg.phone_number);
-
-        // Priority: push_name (WhatsApp) > contact_name (agenda) > lead name > phone
-        const contactName =
-          mc?.push_name ||
-          mc?.contact_name ||
-          pgContact?.contact_name ||
-          msg.contact_name ||
-          mongoConv?.contact_name ||
-          msg.phone_number;
-
-        const profilePicUrl =
-          mc?.profile_picture_url ||
-          pgContact?.profile_picture_url ||
-          mongoConv?.profile_picture_url ||
-          null;
-
-        return {
-          phone_number: msg.phone_number,
-          contact_name: contactName,
-          profile_picture_url: profilePicUrl,
-          last_message: msg.message_text,
-          last_message_type: msg.message_type,
-          last_message_time: msg.timestamp,
-          is_from_me: msg.is_from_me,
-          unread_count: unreadCountMap.get(msg.phone_number) || 0,
-          lead_id: pgContact?.lead_id || msg.lead_id || mongoConv?.matched_lead_id,
-          is_lead: !!(pgContact?.lead_id || msg.lead_id || mongoConv?.matched_lead_id),
-          // AI enrichment from MongoDB
-          labels: mongoConv?.labels || [],
-          archived: mongoConv?.archived || false,
-          pinned: mongoConv?.pinned || false,
-          ai_summary: mongoConv?.ai_analysis?.summary || null,
-          ai_sentiment: mongoConv?.ai_analysis?.sentiment || null,
-          ai_temperature: mongoConv?.ai_analysis?.temperature || null,
-        };
-      })
-    );
-
-    // Calcular total de não lidas
-    const totalUnread = Array.from(unreadCountMap.values()).reduce((a, b) => a + b, 0);
-
-    return NextResponse.json({
-      success: true,
-      data: conversationsWithContact,
-      total: conversationsWithContact.length,
-      total_unread: totalUnread,
     });
   } catch (error: any) {
     console.error('Error fetching messages:', error);
@@ -225,7 +201,6 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
     }
 
-    // Rate limiting
     const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
     const rateLimit = await rateLimiter.check(`whatsapp:${clientIp}`, RateLimitConfigs.WHATSAPP_SEND);
     if (!rateLimit.allowed) {
@@ -252,50 +227,48 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const query = tenantQuery(workspaceId);
+    return await withTenant(workspaceId, async (client) => {
+      let updatedCount = 0;
 
-    // Buscar mensagens não lidas desta conversa (workspace-scoped, not instance-scoped)
-    const messages = await query.select('whatsapp_messages', {
-      phone_number: phoneNumber,
-    });
-
-    // Filtrar mensagens para marcar como lidas
-    const toUpdate = messages.filter((msg: any) => {
-      // Se messageIds foi especificado, usar apenas esses
-      if (messageIds && Array.isArray(messageIds)) {
-        return messageIds.includes(msg.message_id) && !msg.is_from_me;
-      }
-      // Caso contrário, marcar todas as mensagens recebidas como lidas
-      return !msg.is_from_me && msg.status !== 'read';
-    });
-
-    // Atualizar cada mensagem
-    let updatedCount = 0;
-    for (const msg of toUpdate) {
-      try {
-        await query.update(
-          'whatsapp_messages',
-          { id: msg.id },
-          { status: 'read' }
+      if (messageIds && Array.isArray(messageIds) && messageIds.length > 0) {
+        // Mark specific messages as read
+        const result = await client.query(
+          `UPDATE whatsapp_messages
+           SET status = 'read'
+           WHERE workspace_id = $1
+             AND phone_number = $2
+             AND message_id = ANY($3)
+             AND is_from_me = false
+             AND status != 'read'`,
+          [workspaceId, phoneNumber, messageIds]
         );
-        updatedCount++;
-      } catch (updateError) {
-        console.error(`Error updating message ${msg.id}:`, updateError);
+        updatedCount = result.rowCount || 0;
+      } else {
+        // Mark all unread messages from this phone as read
+        const result = await client.query(
+          `UPDATE whatsapp_messages
+           SET status = 'read'
+           WHERE workspace_id = $1
+             AND phone_number = $2
+             AND is_from_me = false
+             AND status != 'read'`,
+          [workspaceId, phoneNumber]
+        );
+        updatedCount = result.rowCount || 0;
       }
-    }
 
-    // Sincronizar com Evolution API (opcional, não deve travar a resposta)
-    if (toUpdate.length > 0) {
-      const messageIdsToSync = toUpdate.map(m => m.message_id);
-      markAsReadEvolution(instanceName, phoneNumber, messageIdsToSync).catch(err => {
-        console.error('[Evolution API] Error syncing read status:', err.message);
+      // Sync with Evolution API (non-blocking)
+      if (updatedCount > 0) {
+        markAsReadEvolution(instanceName, phoneNumber, messageIds || []).catch(err => {
+          console.error('[Evolution API] Error syncing read status:', err.message);
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        updated: updatedCount,
+        message: `${updatedCount} mensagem(ns) marcada(s) como lida(s)`,
       });
-    }
-
-    return NextResponse.json({
-      success: true,
-      updated: updatedCount,
-      message: `${updatedCount} mensagem(ns) marcada(s) como lida(s)`,
     });
   } catch (error: any) {
     console.error('Error marking messages as read:', error);

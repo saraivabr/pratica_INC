@@ -362,7 +362,13 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
       const response = await fetch(`/api/whatsapp/messages?instance=${instanceName}`);
       const data = await response.json();
       if (data.success) {
-        setConversations(data.data);
+        setConversations((prev) => {
+          // Only update if data actually changed (prevent flicker)
+          const newJson = JSON.stringify(data.data.map((c: any) => c.phone_number + c.last_message_time + c.unread_count));
+          const oldJson = JSON.stringify(prev.map((c: any) => c.phone_number + c.last_message_time + c.unread_count));
+          if (newJson === oldJson) return prev;
+          return data.data;
+        });
         setTotalUnread(data.total_unread || 0);
       }
     } catch (error) {
@@ -380,31 +386,38 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
       );
       const data = await response.json();
       if (data.success) {
-        setMessages(data.data);
-        setTimeout(() => scrollToBottom(), 100);
+        setMessages((prev) => {
+          // Only update if message count or last message changed
+          if (prev.length === data.data.length && prev.length > 0 &&
+              prev[prev.length - 1]?.message_id === data.data[data.data.length - 1]?.message_id) {
+            return prev;
+          }
+          setTimeout(() => scrollToBottom(), 100);
+          return data.data;
+        });
 
-        // Mark as read
+        // Mark as read (non-blocking, don't reload conversations)
         if (data.unread_count > 0) {
-          notifications.markAsRead(phone).then(() => loadConversations());
+          notifications.markAsRead(phone).catch(() => {});
         }
       }
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
     }
-  }, [instanceName, loadConversations, notifications]);
+  }, [instanceName, notifications]);
 
-  // Initial load and polling
+  // Initial load and polling (15s for conversations)
   useEffect(() => {
     loadConversations();
-    const interval = setInterval(loadConversations, 5000);
+    const interval = setInterval(loadConversations, 15000);
     return () => clearInterval(interval);
   }, [loadConversations]);
 
-  // Load messages when conversation changes
+  // Load messages when conversation changes (10s polling)
   useEffect(() => {
     if (selectedPhone) {
       loadMessages(selectedPhone);
-      const interval = setInterval(() => loadMessages(selectedPhone), 3000);
+      const interval = setInterval(() => loadMessages(selectedPhone), 10000);
       return () => clearInterval(interval);
     }
   }, [selectedPhone, loadMessages]);
