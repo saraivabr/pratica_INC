@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
@@ -43,97 +43,99 @@ export async function GET(request: NextRequest) {
     const sortKey = searchParams.get('sort') || 'score';
     const sort = ALLOWED_SORTS[sortKey] || ALLOWED_SORTS['score'];
 
-    // Construir query dinâmica
-    const conditions: string[] = ['workspace_id = $1'];
-    const params: any[] = [workspaceId];
-    let paramIndex = 2;
+    return await withTenant(workspaceId, async (client) => {
+      // Construir query dinâmica
+      const conditions: string[] = ['workspace_id = $1'];
+      const params: any[] = [workspaceId];
+      let paramIndex = 2;
 
-    if (corretorId) {
-      conditions.push(`corretor_id = $${paramIndex}`);
-      params.push(corretorId);
-      paramIndex++;
-    }
+      if (corretorId) {
+        conditions.push(`corretor_id = $${paramIndex}`);
+        params.push(corretorId);
+        paramIndex++;
+      }
 
-    if (status) {
-      conditions.push(`status = $${paramIndex}`);
-      params.push(status);
-      paramIndex++;
-    }
+      if (status) {
+        conditions.push(`status = $${paramIndex}`);
+        params.push(status);
+        paramIndex++;
+      }
 
-    if (qualificado !== null && qualificado !== undefined && qualificado !== '') {
-      conditions.push(`qualificado = $${paramIndex}`);
-      params.push(qualificado === 'true');
-      paramIndex++;
-    }
+      if (qualificado !== null && qualificado !== undefined && qualificado !== '') {
+        conditions.push(`qualificado = $${paramIndex}`);
+        params.push(qualificado === 'true');
+        paramIndex++;
+      }
 
-    const whereClause = conditions.join(' AND ');
+      const whereClause = conditions.join(' AND ');
 
-    // Buscar leads (use COALESCE for nome/name and whatsapp/phone compatibility)
-    const leadsResult = await pool.query(
-      `SELECT
-        id,
-        COALESCE(nome, name) as nome,
-        email,
-        COALESCE(whatsapp, phone) as whatsapp,
-        imovel_id,
-        imovel_nome,
-        imovel_preco,
-        filtros,
-        score,
-        COALESCE(qualificado, false) as qualificado,
-        COALESCE(status, 'novo') as status,
-        corretor_id,
-        source,
-        created_at,
-        updated_at,
-        (SELECT COUNT(*) FROM leads_interactions WHERE lead_id = leads.id) as interaction_count,
-        (SELECT MAX(created_at) FROM leads_interactions WHERE lead_id = leads.id) as last_interaction
-      FROM leads
-      WHERE ${whereClause}
-      ORDER BY ${sort}
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-      [...params, limit, offset]
-    );
+      // Buscar leads (use COALESCE for nome/name and whatsapp/phone compatibility)
+      const leadsResult = await client.query(
+        `SELECT
+          id,
+          COALESCE(nome, name) as nome,
+          email,
+          COALESCE(whatsapp, phone) as whatsapp,
+          imovel_id,
+          imovel_nome,
+          imovel_preco,
+          filtros,
+          score,
+          COALESCE(qualificado, false) as qualificado,
+          COALESCE(status, 'novo') as status,
+          corretor_id,
+          source,
+          created_at,
+          updated_at,
+          (SELECT COUNT(*) FROM leads_interactions WHERE lead_id = leads.id) as interaction_count,
+          (SELECT MAX(created_at) FROM leads_interactions WHERE lead_id = leads.id) as last_interaction
+        FROM leads
+        WHERE ${whereClause}
+        ORDER BY ${sort}
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+        [...params, limit, offset]
+      );
 
-    // Contar total
-    const countResult = await pool.query(
-      `SELECT COUNT(*) as total FROM leads WHERE ${whereClause}`,
-      params
-    );
+      // Contar total
+      const countResult = await client.query(
+        `SELECT COUNT(*) as total FROM leads WHERE ${whereClause}`,
+        params
+      );
 
-    const total = parseInt(countResult.rows[0]?.total || '0');
+      const total = parseInt(countResult.rows[0]?.total || '0');
 
-    // Formatar leads
-    const leads = leadsResult.rows.map((lead: any) => ({
-      id: lead.id,
-      nome: lead.nome,
-      email: lead.email,
-      whatsapp: lead.whatsapp,
-      imovel: {
-        id: lead.imovel_id,
-        nome: lead.imovel_nome,
-        preco: lead.imovel_preco,
-      },
-      filtros: lead.filtros ? JSON.parse(lead.filtros) : {},
-      score: lead.score,
-      qualificado: lead.qualificado,
-      status: lead.status,
-      interactions: lead.interaction_count,
-      lastInteraction: lead.last_interaction,
-      source: lead.source,
-      createdAt: lead.created_at,
-      updatedAt: lead.updated_at,
-    }));
+      // Formatar leads
+      const leads = leadsResult.rows.map((lead: any) => ({
+        id: lead.id,
+        nome: lead.nome,
+        email: lead.email,
+        whatsapp: lead.whatsapp,
+        imovel: {
+          id: lead.imovel_id,
+          nome: lead.imovel_nome,
+          preco: lead.imovel_preco,
+        },
+        filtros: lead.filtros ? JSON.parse(lead.filtros) : {},
+        score: lead.score,
+        qualificado: lead.qualificado,
+        status: lead.status,
+        interactions: lead.interaction_count,
+        lastInteraction: lead.last_interaction,
+        source: lead.source,
+        createdAt: lead.created_at,
+        updatedAt: lead.updated_at,
+      }));
 
-    return NextResponse.json({
-      success: true,
-      leads,
-      pagination: {
-        total,
-        limit,
-        offset,
-        pages: Math.ceil(total / limit),
-      },
+      return NextResponse.json({
+        success: true,
+        leads,
+        pagination: {
+          total,
+          limit,
+          offset,
+          pages: Math.ceil(total / limit),
+        },
+      });
     });
 
   } catch (error: any) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
 import { sendToClient, sendToCorretor } from '@/lib/evolution-helpers';
 
@@ -31,112 +32,114 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Buscar lead
-    const leadResult = await pool.query(
-      `SELECT * FROM leads WHERE id = $1 AND workspace_id = $2`,
-      [lead_id, workspace_id]
-    );
-
-    if (!leadResult.rows[0]) {
-      return NextResponse.json(
-        { error: 'Lead não encontrado' },
-        { status: 404 }
-      );
-    }
-
-    const lead = leadResult.rows[0];
-
-    // Combinar data e horário
-    const [hora, minuto] = horario.split(':').map(Number);
-    const dataAgendamento = new Date(data_visita);
-    dataAgendamento.setHours(hora, minuto, 0, 0);
-
-    // Criar agendamento de visita
-    const agendamentoResult = await pool.query(
-      `INSERT INTO leads_visits (
-        lead_id,
-        workspace_id,
-        scheduled_date,
-        status,
-        observacoes,
-        created_at,
-        updated_at
-      ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-      RETURNING *`,
-      [
-        lead_id,
-        workspace_id,
-        dataAgendamento.toISOString(),
-        'agendada',
-        observacoes || null,
-      ]
-    );
-
-    if (!agendamentoResult.rows[0]) {
-      throw new Error('Falha ao agendar visita');
-    }
-
-    // Atualizar status do lead
-    await pool.query(
-      `UPDATE leads SET status = 'agendado', updated_at = NOW() WHERE id = $1`,
-      [lead_id]
-    );
-
-    // Buscar corretor para enviar notificação
-    if (lead.corretor_id) {
-      const corretorResult = await pool.query(
-        `SELECT telefone, nome FROM users WHERE id = $1`,
-        [lead.corretor_id]
+    return await withTenant(workspace_id, async (client) => {
+      // Buscar lead
+      const leadResult = await client.query(
+        `SELECT * FROM leads WHERE id = $1 AND workspace_id = $2`,
+        [lead_id, workspace_id]
       );
 
-      if (corretorResult.rows[0]) {
-        const corretor = corretorResult.rows[0];
-        const dataFormatada = new Date(dataAgendamento).toLocaleDateString('pt-BR');
-        
-        try {
-          const msg = `📅 VISITA AGENDADA!\n\n👤 Cliente: ${lead.nome}\n📱 ${lead.whatsapp}\n🏢 Imóvel: ${lead.imovel_nome}\n📍 Data: ${dataFormatada} às ${horario}\n${observacoes ? `\n📝 Obs: ${observacoes}` : ''}\n\nNão se atrase! ⏰`;
-
-          await sendToCorretor(corretor.telefone, msg);
-
-          // Enviar também para o cliente confirmar (via WhatsApp do corretor)
-          const msgCliente = `Olá ${lead.nome}! 📅\n\nSua visita está confirmada!\n🏢 ${lead.imovel_nome}\n📍 ${dataFormatada} às ${horario}\n\nNos vemos lá! 🚀`;
-          await sendToClient(lead.whatsapp, msgCliente, lead.corretor_id);
-        } catch (err) {
-          console.warn('[Agendar Visita] Erro ao enviar notificação:', err);
-        }
+      if (!leadResult.rows[0]) {
+        return NextResponse.json(
+          { error: 'Lead não encontrado' },
+          { status: 404 }
+        );
       }
-    }
 
-    // Registrar interação
-    try {
-      await pool.query(
-        `INSERT INTO leads_interactions (
+      const lead = leadResult.rows[0];
+
+      // Combinar data e horário
+      const [hora, minuto] = horario.split(':').map(Number);
+      const dataAgendamento = new Date(data_visita);
+      dataAgendamento.setHours(hora, minuto, 0, 0);
+
+      // Criar agendamento de visita
+      const agendamentoResult = await client.query(
+        `INSERT INTO leads_visits (
           lead_id,
           workspace_id,
-          tipo,
-          descricao,
-          created_at
-        ) VALUES ($1, $2, $3, $4, NOW())`,
+          scheduled_date,
+          status,
+          observacoes,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        RETURNING *`,
         [
           lead_id,
           workspace_id,
-          'agendamento_visita',
-          `Visita agendada para ${new Date(dataAgendamento).toLocaleDateString('pt-BR')} às ${horario}`,
+          dataAgendamento.toISOString(),
+          'agendada',
+          observacoes || null,
         ]
       );
-    } catch (err) {
-      console.warn('[Agendar Visita] Erro ao registrar interação:', err);
-    }
 
-    return NextResponse.json({
-      success: true,
-      agendamento: {
-        id: agendamentoResult.rows[0].id,
-        lead_id: lead_id,
-        scheduled_date: dataAgendamento.toISOString(),
-        status: 'agendada',
-        notificacoes_enviadas: true,
-      },
+      if (!agendamentoResult.rows[0]) {
+        throw new Error('Falha ao agendar visita');
+      }
+
+      // Atualizar status do lead
+      await client.query(
+        `UPDATE leads SET status = 'agendado', updated_at = NOW() WHERE id = $1`,
+        [lead_id]
+      );
+
+      // Buscar corretor para enviar notificação (query users by ID - use pool)
+      if (lead.corretor_id) {
+        const corretorResult = await pool.query(
+          `SELECT telefone, nome FROM users WHERE id = $1`,
+          [lead.corretor_id]
+        );
+
+        if (corretorResult.rows[0]) {
+          const corretor = corretorResult.rows[0];
+          const dataFormatada = new Date(dataAgendamento).toLocaleDateString('pt-BR');
+
+          try {
+            const msg = `📅 VISITA AGENDADA!\n\n👤 Cliente: ${lead.nome}\n📱 ${lead.whatsapp}\n🏢 Imóvel: ${lead.imovel_nome}\n📍 Data: ${dataFormatada} às ${horario}\n${observacoes ? `\n📝 Obs: ${observacoes}` : ''}\n\nNão se atrase! ⏰`;
+
+            await sendToCorretor(corretor.telefone, msg);
+
+            // Enviar também para o cliente confirmar (via WhatsApp do corretor)
+            const msgCliente = `Olá ${lead.nome}! 📅\n\nSua visita está confirmada!\n🏢 ${lead.imovel_nome}\n📍 ${dataFormatada} às ${horario}\n\nNos vemos lá! 🚀`;
+            await sendToClient(lead.whatsapp, msgCliente, lead.corretor_id);
+          } catch (err) {
+            console.warn('[Agendar Visita] Erro ao enviar notificação:', err);
+          }
+        }
+      }
+
+      // Registrar interação
+      try {
+        await client.query(
+          `INSERT INTO leads_interactions (
+            lead_id,
+            workspace_id,
+            tipo,
+            descricao,
+            created_at
+          ) VALUES ($1, $2, $3, $4, NOW())`,
+          [
+            lead_id,
+            workspace_id,
+            'agendamento_visita',
+            `Visita agendada para ${new Date(dataAgendamento).toLocaleDateString('pt-BR')} às ${horario}`,
+          ]
+        );
+      } catch (err) {
+        console.warn('[Agendar Visita] Erro ao registrar interação:', err);
+      }
+
+      return NextResponse.json({
+        success: true,
+        agendamento: {
+          id: agendamentoResult.rows[0].id,
+          lead_id: lead_id,
+          scheduled_date: dataAgendamento.toISOString(),
+          status: 'agendada',
+          notificacoes_enviadas: true,
+        },
+      });
     });
 
   } catch (error: any) {

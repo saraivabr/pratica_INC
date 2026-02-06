@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getWorkspace, tenantQuery } from '@/lib/tenant-context';
+import { getWorkspace, tenantQuery, withTenant } from '@/lib/tenant-context';
 import { getAuthenticatedUser } from '@/lib/api-auth';
 import { findUserWorkspace } from '@/lib/tenant-context';
 import { syncChatsToDatabase, syncContactsToDatabase, syncMessagesToDatabase } from '@/lib/whatsapp-sync/fetch';
@@ -139,86 +139,88 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Criar registro de sync_run
-    const createRunResult = await pool.query<SyncRunResult>(
-      `INSERT INTO whatsapp_sync_runs (workspace_id, status, started_at, chats_synced, contacts_synced, leads_matched, opportunities_found)
-       VALUES ($1, 'running', NOW(), 0, 0, 0, 0)
-       RETURNING *`,
-      [workspaceId]
-    );
-    runId = createRunResult.rows[0].id;
+    return await withTenant(workspaceId, async (client) => {
+      // 1. Criar registro de sync_run
+      const createRunResult = await client.query<SyncRunResult>(
+        `INSERT INTO whatsapp_sync_runs (workspace_id, status, started_at, chats_synced, contacts_synced, leads_matched, opportunities_found)
+         VALUES ($1, 'running', NOW(), 0, 0, 0, 0)
+         RETURNING *`,
+        [workspaceId]
+      );
+      runId = createRunResult.rows[0].id;
 
-    console.log(`[Sync] Iniciando sincronização run_id=${runId} workspace_id=${workspaceId} instance=${instanceName}`);
+      console.log(`[Sync] Iniciando sincronização run_id=${runId} workspace_id=${workspaceId} instance=${instanceName}`);
 
-    // 2. Sincronizar chats
-    let chatsSynced = 0;
-    try {
-      const chatsResult = await syncChatsToDatabase(workspaceId, instanceName);
-      chatsSynced = chatsResult.synced || 0;
-      console.log(`[Sync] Chats sincronizados: ${chatsSynced}`);
-    } catch (chatError: any) {
-      console.error(`[Sync] Erro ao sincronizar chats:`, chatError.message);
-      // Continuar mesmo com erro nos chats
-    }
+      // 2. Sincronizar chats
+      let chatsSynced = 0;
+      try {
+        const chatsResult = await syncChatsToDatabase(workspaceId!, instanceName);
+        chatsSynced = chatsResult.synced || 0;
+        console.log(`[Sync] Chats sincronizados: ${chatsSynced}`);
+      } catch (chatError: any) {
+        console.error(`[Sync] Erro ao sincronizar chats:`, chatError.message);
+        // Continuar mesmo com erro nos chats
+      }
 
-    // 3. Sincronizar contatos
-    let contactsSynced = 0;
-    try {
-      const contactsResult = await syncContactsToDatabase(workspaceId, instanceName);
-      contactsSynced = contactsResult.synced || 0;
-      console.log(`[Sync] Contatos sincronizados: ${contactsSynced}`);
-    } catch (contactError: any) {
-      console.error(`[Sync] Erro ao sincronizar contatos:`, contactError.message);
-      // Continuar mesmo com erro nos contatos
-    }
+      // 3. Sincronizar contatos
+      let contactsSynced = 0;
+      try {
+        const contactsResult = await syncContactsToDatabase(workspaceId!, instanceName);
+        contactsSynced = contactsResult.synced || 0;
+        console.log(`[Sync] Contatos sincronizados: ${contactsSynced}`);
+      } catch (contactError: any) {
+        console.error(`[Sync] Erro ao sincronizar contatos:`, contactError.message);
+        // Continuar mesmo com erro nos contatos
+      }
 
-    // 3.5. Sincronizar mensagens históricas
-    let messagesSynced = 0;
-    try {
-      const messagesResult = await syncMessagesToDatabase(workspaceId, instanceName, 50);
-      messagesSynced = messagesResult.synced || 0;
-      console.log(`[Sync] Mensagens sincronizadas: ${messagesSynced} de ${messagesResult.chatsProcessed} chats`);
-    } catch (messagesError: any) {
-      console.error(`[Sync] Erro ao sincronizar mensagens:`, messagesError.message);
-      // Continuar mesmo com erro nas mensagens
-    }
+      // 3.5. Sincronizar mensagens históricas
+      let messagesSynced = 0;
+      try {
+        const messagesResult = await syncMessagesToDatabase(workspaceId!, instanceName, 50);
+        messagesSynced = messagesResult.synced || 0;
+        console.log(`[Sync] Mensagens sincronizadas: ${messagesSynced} de ${messagesResult.chatsProcessed} chats`);
+      } catch (messagesError: any) {
+        console.error(`[Sync] Erro ao sincronizar mensagens:`, messagesError.message);
+        // Continuar mesmo com erro nas mensagens
+      }
 
-    // 4. Analisar chats e cruzar com leads
-    let leadsMatched = 0;
-    let opportunitiesFound = 0;
-    try {
-      const analysisResult = await analyzeChats(workspaceId);
-      leadsMatched = analysisResult.leads_matched || 0;
-      opportunitiesFound = analysisResult.opportunities?.length || 0;
-      console.log(`[Sync] Análise: ${leadsMatched} leads, ${opportunitiesFound} oportunidades`);
-    } catch (analysisError: any) {
-      console.error(`[Sync] Erro ao analisar chats:`, analysisError.message);
-      // Continuar mesmo com erro na análise
-    }
+      // 4. Analisar chats e cruzar com leads
+      let leadsMatched = 0;
+      let opportunitiesFound = 0;
+      try {
+        const analysisResult = await analyzeChats(workspaceId!);
+        leadsMatched = analysisResult.leads_matched || 0;
+        opportunitiesFound = analysisResult.opportunities?.length || 0;
+        console.log(`[Sync] Análise: ${leadsMatched} leads, ${opportunitiesFound} oportunidades`);
+      } catch (analysisError: any) {
+        console.error(`[Sync] Erro ao analisar chats:`, analysisError.message);
+        // Continuar mesmo com erro na análise
+      }
 
-    // 5. Atualizar sync_run com resultados
-    await pool.query(
-      `UPDATE whatsapp_sync_runs
-       SET status = 'completed',
-           completed_at = NOW(),
-           chats_synced = $2,
-           contacts_synced = $3,
-           leads_matched = $4,
-           opportunities_found = $5
-       WHERE id = $1`,
-      [runId, chatsSynced, contactsSynced, leadsMatched, opportunitiesFound]
-    );
+      // 5. Atualizar sync_run com resultados
+      await client.query(
+        `UPDATE whatsapp_sync_runs
+         SET status = 'completed',
+             completed_at = NOW(),
+             chats_synced = $2,
+             contacts_synced = $3,
+             leads_matched = $4,
+             opportunities_found = $5
+         WHERE id = $1`,
+        [runId, chatsSynced, contactsSynced, leadsMatched, opportunitiesFound]
+      );
 
-    console.log(`[Sync] Sincronização concluída run_id=${runId}`);
+      console.log(`[Sync] Sincronização concluída run_id=${runId}`);
 
-    return NextResponse.json({
-      success: true,
-      run_id: runId,
-      chats_synced: chatsSynced,
-      contacts_synced: contactsSynced,
-      messages_synced: messagesSynced,
-      leads_matched: leadsMatched,
-      opportunities_found: opportunitiesFound,
+      return NextResponse.json({
+        success: true,
+        run_id: runId,
+        chats_synced: chatsSynced,
+        contacts_synced: contactsSynced,
+        messages_synced: messagesSynced,
+        leads_matched: leadsMatched,
+        opportunities_found: opportunitiesFound,
+      });
     });
   } catch (error: any) {
     console.error('[Sync] Erro na sincronização:', error);
@@ -284,90 +286,92 @@ export async function GET(request: NextRequest) {
       workspaceId = tenant.id;
     }
 
-    // Buscar última sincronização
-    const lastRunResult = await pool.query<SyncRunResult>(
-      `SELECT * FROM whatsapp_sync_runs
-       WHERE workspace_id = $1
-       ORDER BY started_at DESC
-       LIMIT 1`,
-      [workspaceId]
-    );
-    const lastRun = lastRunResult.rows[0] || null;
+    return await withTenant(workspaceId, async (client) => {
+      // Buscar última sincronização
+      const lastRunResult = await client.query<SyncRunResult>(
+        `SELECT * FROM whatsapp_sync_runs
+         WHERE workspace_id = $1
+         ORDER BY started_at DESC
+         LIMIT 1`,
+        [workspaceId]
+      );
+      const lastRun = lastRunResult.rows[0] || null;
 
-    // Buscar estatísticas gerais
-    const query = tenantQuery(workspaceId);
+      // Buscar estatísticas gerais
+      const query = tenantQuery(workspaceId);
 
-    // Contar chats
-    const chatsResult = await pool.query(
-      `SELECT COUNT(*) as total FROM whatsapp_chats WHERE workspace_id = $1`,
-      [workspaceId]
-    );
-    const totalChats = parseInt(chatsResult.rows[0]?.total || '0', 10);
+      // Contar chats
+      const chatsResult = await client.query(
+        `SELECT COUNT(*) as total FROM whatsapp_chats WHERE workspace_id = $1`,
+        [workspaceId]
+      );
+      const totalChats = parseInt(chatsResult.rows[0]?.total || '0', 10);
 
-    // Contar contatos
-    const contactsResult = await pool.query(
-      `SELECT COUNT(*) as total FROM whatsapp_contacts WHERE workspace_id = $1`,
-      [workspaceId]
-    );
-    const totalContacts = parseInt(contactsResult.rows[0]?.total || '0', 10);
+      // Contar contatos
+      const contactsResult = await client.query(
+        `SELECT COUNT(*) as total FROM whatsapp_contacts WHERE workspace_id = $1`,
+        [workspaceId]
+      );
+      const totalContacts = parseInt(contactsResult.rows[0]?.total || '0', 10);
 
-    // Contar mensagens
-    const messagesResult = await pool.query(
-      `SELECT COUNT(*) as total FROM whatsapp_messages WHERE workspace_id = $1`,
-      [workspaceId]
-    );
-    const totalMessages = parseInt(messagesResult.rows[0]?.total || '0', 10);
+      // Contar mensagens
+      const messagesResult = await client.query(
+        `SELECT COUNT(*) as total FROM whatsapp_messages WHERE workspace_id = $1`,
+        [workspaceId]
+      );
+      const totalMessages = parseInt(messagesResult.rows[0]?.total || '0', 10);
 
-    // Contar leads vinculados
-    const linkedLeadsResult = await pool.query(
-      `SELECT COUNT(DISTINCT lead_id) as total
-       FROM whatsapp_contacts
-       WHERE workspace_id = $1 AND lead_id IS NOT NULL`,
-      [workspaceId]
-    );
-    const linkedLeads = parseInt(linkedLeadsResult.rows[0]?.total || '0', 10);
+      // Contar leads vinculados
+      const linkedLeadsResult = await client.query(
+        `SELECT COUNT(DISTINCT lead_id) as total
+         FROM whatsapp_contacts
+         WHERE workspace_id = $1 AND lead_id IS NOT NULL`,
+        [workspaceId]
+      );
+      const linkedLeads = parseInt(linkedLeadsResult.rows[0]?.total || '0', 10);
 
-    // Buscar histórico de sincronizações (últimas 10)
-    const historyResult = await pool.query<SyncRunResult>(
-      `SELECT * FROM whatsapp_sync_runs
-       WHERE workspace_id = $1
-       ORDER BY started_at DESC
-       LIMIT 10`,
-      [workspaceId]
-    );
+      // Buscar histórico de sincronizações (últimas 10)
+      const historyResult = await client.query<SyncRunResult>(
+        `SELECT * FROM whatsapp_sync_runs
+         WHERE workspace_id = $1
+         ORDER BY started_at DESC
+         LIMIT 10`,
+        [workspaceId]
+      );
 
-    return NextResponse.json({
-      success: true,
-      last_sync: lastRun
-        ? {
-            run_id: lastRun.id,
-            status: lastRun.status,
-            started_at: lastRun.started_at,
-            completed_at: lastRun.completed_at,
-            chats_synced: lastRun.chats_synced,
-            contacts_synced: lastRun.contacts_synced,
-            leads_matched: lastRun.leads_matched,
-            opportunities_found: lastRun.opportunities_found,
-            error_message: lastRun.error_message,
-          }
-        : null,
-      statistics: {
-        total_chats: totalChats,
-        total_contacts: totalContacts,
-        total_messages: totalMessages,
-        linked_leads: linkedLeads,
-      },
-      history: historyResult.rows.map((run) => ({
-        run_id: run.id,
-        status: run.status,
-        started_at: run.started_at,
-        completed_at: run.completed_at,
-        chats_synced: run.chats_synced,
-        contacts_synced: run.contacts_synced,
-        leads_matched: run.leads_matched,
-        opportunities_found: run.opportunities_found,
-        error_message: run.error_message,
-      })),
+      return NextResponse.json({
+        success: true,
+        last_sync: lastRun
+          ? {
+              run_id: lastRun.id,
+              status: lastRun.status,
+              started_at: lastRun.started_at,
+              completed_at: lastRun.completed_at,
+              chats_synced: lastRun.chats_synced,
+              contacts_synced: lastRun.contacts_synced,
+              leads_matched: lastRun.leads_matched,
+              opportunities_found: lastRun.opportunities_found,
+              error_message: lastRun.error_message,
+            }
+          : null,
+        statistics: {
+          total_chats: totalChats,
+          total_contacts: totalContacts,
+          total_messages: totalMessages,
+          linked_leads: linkedLeads,
+        },
+        history: historyResult.rows.map((run) => ({
+          run_id: run.id,
+          status: run.status,
+          started_at: run.started_at,
+          completed_at: run.completed_at,
+          chats_synced: run.chats_synced,
+          contacts_synced: run.contacts_synced,
+          leads_matched: run.leads_matched,
+          opportunities_found: run.opportunities_found,
+          error_message: run.error_message,
+        })),
+      });
     });
   } catch (error: any) {
     console.error('[Sync] Erro ao buscar status:', error);

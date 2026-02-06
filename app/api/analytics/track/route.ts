@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { dbQuery } from "@/lib/db"
+import { withTenant } from "@/lib/tenant-context"
 import { requireWorkspaceContext } from "@/lib/api-helpers"
 import { validateRequest, TrackEventSchema } from "@/lib/validation-schemas"
 
@@ -26,30 +26,32 @@ export async function POST(request: NextRequest) {
 
   // 3. Database insert
   try {
-    const { name, category, properties, timestamp, url, userAgent } = data
+    return await withTenant(ctx.workspaceId, async (client) => {
+      const { name, category, properties, timestamp, url, userAgent } = data
 
-    await dbQuery(
-      `INSERT INTO analytics_events (
-        event_name,
-        category,
-        properties,
-        url,
-        user_agent,
-        created_at,
-        workspace_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        name,
-        category,
-        JSON.stringify(properties || {}),
-        url,
-        userAgent,
-        timestamp || new Date().toISOString(),
-        ctx.workspaceId
-      ]
-    )
+      await client.query(
+        `INSERT INTO analytics_events (
+          event_name,
+          category,
+          properties,
+          url,
+          user_agent,
+          created_at,
+          workspace_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          name,
+          category,
+          JSON.stringify(properties || {}),
+          url,
+          userAgent,
+          timestamp || new Date().toISOString(),
+          ctx.workspaceId
+        ]
+      )
 
-    return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true })
+    })
   } catch (error) {
     console.error('Analytics tracking error:', error)
     return NextResponse.json(

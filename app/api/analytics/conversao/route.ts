@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function GET(request: NextRequest) {
@@ -18,31 +18,33 @@ export async function GET(request: NextRequest) {
     };
     const dateFilter = periodoMap[periodo] || periodoMap['30d'];
 
-    const { rows: totalRows } = await dbQuery(`SELECT COUNT(*) as total FROM leads l WHERE l.workspace_id = $1 ${dateFilter}`, [ctx.workspaceId]);
-    const total_leads = parseInt(totalRows[0].total, 10);
+    return await withTenant(ctx.workspaceId, async (client) => {
+      const { rows: totalRows } = await client.query(`SELECT COUNT(*) as total FROM leads l WHERE l.workspace_id = $1 ${dateFilter}`, [ctx.workspaceId]);
+      const total_leads = parseInt(totalRows[0].total, 10);
 
-    const { rows: agendadosRows } = await dbQuery(
-      `SELECT COUNT(DISTINCT a.lead_id) as total FROM agendamentos a JOIN leads l ON a.lead_id = l.id WHERE l.workspace_id = $1 AND a.status IN ('confirmado', 'realizado') ${dateFilter}`,
-      [ctx.workspaceId]
-    );
-    const leads_agendados = parseInt(agendadosRows[0].total, 10);
+      const { rows: agendadosRows } = await client.query(
+        `SELECT COUNT(DISTINCT a.lead_id) as total FROM agendamentos a JOIN leads l ON a.lead_id = l.id WHERE l.workspace_id = $1 AND a.status IN ('confirmado', 'realizado') ${dateFilter}`,
+        [ctx.workspaceId]
+      );
+      const leads_agendados = parseInt(agendadosRows[0].total, 10);
 
-    const { rows: convertidosRows } = await dbQuery(
-      `SELECT COUNT(*) as total FROM leads l WHERE l.workspace_id = $1 AND (l.temperature = 'hot' OR l.score > 80) ${dateFilter}`,
-      [ctx.workspaceId]
-    );
-    const leads_convertidos = parseInt(convertidosRows[0].total, 10);
+      const { rows: convertidosRows } = await client.query(
+        `SELECT COUNT(*) as total FROM leads l WHERE l.workspace_id = $1 AND (l.temperature = 'hot' OR l.score > 80) ${dateFilter}`,
+        [ctx.workspaceId]
+      );
+      const leads_convertidos = parseInt(convertidosRows[0].total, 10);
 
-    const taxa_agendamento = total_leads > 0 ? (leads_agendados / total_leads) * 100 : 0;
-    const taxa_conversao = total_leads > 0 ? (leads_convertidos / total_leads) * 100 : 0;
+      const taxa_agendamento = total_leads > 0 ? (leads_agendados / total_leads) * 100 : 0;
+      const taxa_conversao = total_leads > 0 ? (leads_convertidos / total_leads) * 100 : 0;
 
-    return NextResponse.json({
-      periodo,
-      total_leads,
-      leads_agendados,
-      leads_convertidos,
-      taxa_agendamento: parseFloat(taxa_agendamento.toFixed(2)),
-      taxa_conversao: parseFloat(taxa_conversao.toFixed(2)),
+      return NextResponse.json({
+        periodo,
+        total_leads,
+        leads_agendados,
+        leads_convertidos,
+        taxa_agendamento: parseFloat(taxa_agendamento.toFixed(2)),
+        taxa_conversao: parseFloat(taxa_conversao.toFixed(2)),
+      });
     });
   } catch (error: any) {
     console.error('[GET /api/analytics/conversao] Error:', error);

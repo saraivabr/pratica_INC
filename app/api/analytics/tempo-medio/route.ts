@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function GET(request: NextRequest) {
@@ -18,22 +18,24 @@ export async function GET(request: NextRequest) {
     };
     const dateFilter = periodoMap[periodo] || periodoMap['30d'];
 
-    const { rows: tempoAgendamentoRows } = await dbQuery(
-      `SELECT AVG(EXTRACT(EPOCH FROM (a.created_at - l.created_at)) / 3600) as horas FROM leads l JOIN agendamentos a ON a.lead_id = l.id WHERE l.workspace_id = $1 ${dateFilter}`,
-      [ctx.workspaceId]
-    );
+    return await withTenant(ctx.workspaceId, async (client) => {
+      const { rows: tempoAgendamentoRows } = await client.query(
+        `SELECT AVG(EXTRACT(EPOCH FROM (a.created_at - l.created_at)) / 3600) as horas FROM leads l JOIN agendamentos a ON a.lead_id = l.id WHERE l.workspace_id = $1 ${dateFilter}`,
+        [ctx.workspaceId]
+      );
 
-    const { rows: tempoVisitaRows } = await dbQuery(
-      `SELECT AVG(EXTRACT(EPOCH FROM (a.data_visita - l.created_at)) / 86400) as dias FROM leads l JOIN agendamentos a ON a.lead_id = l.id WHERE l.workspace_id = $1 AND a.status = 'realizado' ${dateFilter}`,
-      [ctx.workspaceId]
-    );
+      const { rows: tempoVisitaRows } = await client.query(
+        `SELECT AVG(EXTRACT(EPOCH FROM (a.data_visita - l.created_at)) / 86400) as dias FROM leads l JOIN agendamentos a ON a.lead_id = l.id WHERE l.workspace_id = $1 AND a.status = 'realizado' ${dateFilter}`,
+        [ctx.workspaceId]
+      );
 
-    return NextResponse.json({
-      periodo,
-      resumo: {
-        horas_ate_agendamento: parseFloat((tempoAgendamentoRows[0]?.horas || 0).toFixed(2)),
-        dias_ate_visita: parseFloat((tempoVisitaRows[0]?.dias || 0).toFixed(2)),
-      },
+      return NextResponse.json({
+        periodo,
+        resumo: {
+          horas_ate_agendamento: parseFloat((tempoAgendamentoRows[0]?.horas || 0).toFixed(2)),
+          dias_ate_visita: parseFloat((tempoVisitaRows[0]?.dias || 0).toFixed(2)),
+        },
+      });
     });
   } catch (error: any) {
     console.error('[GET /api/analytics/tempo-medio] Error:', error);

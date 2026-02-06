@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { TabelaTemplate, SimulacaoTemplate, BookTemplate } from '@/components/pdf-templates';
 import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { getUserById } from '@/lib/supabase';
 import { sendTextMessage, sendDocument, sendActionButtons, withProvider } from '@/lib/whatsapp-sender';
 import { createElement } from 'react';
@@ -239,122 +240,125 @@ Veja todas as fotos, diferenciais e tabela de unidades!`;
     const token = randomBytes(24).toString('hex');
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-    await dbQuery(
-      `insert into materials (token, user_id, type, file_name, content_type, content, expires_at)
-       values ($1, $2, $3, $4, $5, $6, $7)`,
-      [token, userId, type, fileName, 'application/pdf', pdfBuffer, expiresAt]
-    );
-
-    const origin = new URL(request.url).origin;
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
-    const pdfUrl = `${baseUrl}/api/materials/${token}`;
-
-    // Gerar link da landing page
-    const landingUrl = `${baseUrl}/share/${empreendimento.id}?ref=${userId}`;
-
-    // Check if user has Evolution connected (corretor's own WhatsApp)
-    const { rows: evoRows } = await dbQuery(
-      `SELECT evolution_instance_name, evolution_connected FROM users WHERE id = $1`,
-      [userId]
-    );
-    const evoInstance = evoRows[0]?.evolution_connected && evoRows[0]?.evolution_instance_name
-      ? evoRows[0].evolution_instance_name as string
-      : null;
-
-    // Send function — routes to Evolution or Z-API
-    // Each step is wrapped in try/catch so a failure in one doesn't block the others
-    const sendAll = async () => {
-      // Enviar mensagem de texto
-      try {
-        const textResult = await sendTextMessage(user!.telefone, messageText);
-        if (textResult.error) {
-          console.error('Erro ao enviar texto:', textResult.error);
-        }
-      } catch (err: any) {
-        console.warn('[send-material] sendTextMessage failed, skipping:', err.message);
-      }
-
-      // Enviar PDF
-      const typeLabels: Record<MaterialType, string> = {
-        tabela: 'Tabela de Unidades',
-        simulacao: 'Simulação de Financiamento',
-        book: 'Book Completo',
-      };
-      try {
-        const docResult = await sendDocument(
-          user!.telefone,
-          pdfUrl,
-          fileName,
-          `${empreendimento.nome} - ${typeLabels[type]}`
-        );
-        if (docResult.error) {
-          console.error('Erro ao enviar documento:', docResult.error);
-        }
-      } catch (err: any) {
-        // Fallback: send PDF link as text message
-        console.warn('[send-material] sendDocument failed, falling back to text link:', err.message);
-        try {
-          await sendTextMessage(user!.telefone, `📄 ${empreendimento.nome} - ${typeLabels[type]}\n\nBaixe aqui: ${pdfUrl}`);
-        } catch (fallbackErr: any) {
-          console.error('[send-material] Document text fallback also failed:', fallbackErr.message);
-        }
-      }
-
-      // Enviar botão com link da landing page
-      try {
-        const buttonResult = await sendActionButtons(
-          user!.telefone,
-          'Veja todas as fotos e detalhes online:',
-          [
-            {
-              type: 'URL',
-              url: landingUrl,
-              label: '🏠 Ver Online',
-            },
-          ],
-          {
-            footer: 'Pratica Incorporadora',
-          }
-        );
-        if (buttonResult.error) {
-          console.error('Erro ao enviar botão:', buttonResult.error);
-        }
-      } catch (err: any) {
-        // Fallback: send landing link as plain text
-        console.warn('[send-material] sendActionButtons failed, falling back to text link:', err.message);
-        try {
-          await sendTextMessage(user!.telefone, `🏠 Ver Online: ${landingUrl}`);
-        } catch (fallbackErr: any) {
-          console.error('[send-material] Button text fallback also failed:', fallbackErr.message);
-        }
-      }
-    };
-
-    // Route through Evolution if corretor is connected, otherwise Z-API (default)
-    if (evoInstance) {
-      await withProvider('evolution', evoInstance, sendAll);
-    } else {
-      await sendAll();
-    }
-
-    // Registrar envio (silently fail if table doesn't exist)
-    try {
-      await dbQuery(
-        `insert into material_sends (user_id, empreendimento_id, type, pdf_url, landing_url)
-         values ($1, $2, $3, $4, $5)`,
-        [userId, empreendimento.id, type, pdfUrl, landingUrl]
+    return await withTenant(ctx.workspaceId, async (client) => {
+      await client.query(
+        `insert into materials (token, user_id, type, file_name, content_type, content, expires_at)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
+        [token, userId, type, fileName, 'application/pdf', pdfBuffer, expiresAt]
       );
-    } catch {
-      // Table may not exist yet
-    }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        pdfUrl,
-        landingUrl,
-        sentTo: user.telefone,
-      },
+      const origin = new URL(request.url).origin;
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
+      const pdfUrl = `${baseUrl}/api/materials/${token}`;
+
+      // Gerar link da landing page
+      const landingUrl = `${baseUrl}/share/${empreendimento.id}?ref=${userId}`;
+
+      // Check if user has Evolution connected (corretor's own WhatsApp)
+      // Query users by ID - use dbQuery (non-workspace-scoped)
+      const { rows: evoRows } = await dbQuery(
+        `SELECT evolution_instance_name, evolution_connected FROM users WHERE id = $1`,
+        [userId]
+      );
+      const evoInstance = evoRows[0]?.evolution_connected && evoRows[0]?.evolution_instance_name
+        ? evoRows[0].evolution_instance_name as string
+        : null;
+
+      // Send function — routes to Evolution or Z-API
+      // Each step is wrapped in try/catch so a failure in one doesn't block the others
+      const sendAll = async () => {
+        // Enviar mensagem de texto
+        try {
+          const textResult = await sendTextMessage(user!.telefone, messageText);
+          if (textResult.error) {
+            console.error('Erro ao enviar texto:', textResult.error);
+          }
+        } catch (err: any) {
+          console.warn('[send-material] sendTextMessage failed, skipping:', err.message);
+        }
+
+        // Enviar PDF
+        const typeLabels: Record<MaterialType, string> = {
+          tabela: 'Tabela de Unidades',
+          simulacao: 'Simulação de Financiamento',
+          book: 'Book Completo',
+        };
+        try {
+          const docResult = await sendDocument(
+            user!.telefone,
+            pdfUrl,
+            fileName,
+            `${empreendimento.nome} - ${typeLabels[type]}`
+          );
+          if (docResult.error) {
+            console.error('Erro ao enviar documento:', docResult.error);
+          }
+        } catch (err: any) {
+          // Fallback: send PDF link as text message
+          console.warn('[send-material] sendDocument failed, falling back to text link:', err.message);
+          try {
+            await sendTextMessage(user!.telefone, `📄 ${empreendimento.nome} - ${typeLabels[type]}\n\nBaixe aqui: ${pdfUrl}`);
+          } catch (fallbackErr: any) {
+            console.error('[send-material] Document text fallback also failed:', fallbackErr.message);
+          }
+        }
+
+        // Enviar botão com link da landing page
+        try {
+          const buttonResult = await sendActionButtons(
+            user!.telefone,
+            'Veja todas as fotos e detalhes online:',
+            [
+              {
+                type: 'URL',
+                url: landingUrl,
+                label: '🏠 Ver Online',
+              },
+            ],
+            {
+              footer: 'Pratica Incorporadora',
+            }
+          );
+          if (buttonResult.error) {
+            console.error('Erro ao enviar botão:', buttonResult.error);
+          }
+        } catch (err: any) {
+          // Fallback: send landing link as plain text
+          console.warn('[send-material] sendActionButtons failed, falling back to text link:', err.message);
+          try {
+            await sendTextMessage(user!.telefone, `🏠 Ver Online: ${landingUrl}`);
+          } catch (fallbackErr: any) {
+            console.error('[send-material] Button text fallback also failed:', fallbackErr.message);
+          }
+        }
+      };
+
+      // Route through Evolution if corretor is connected, otherwise Z-API (default)
+      if (evoInstance) {
+        await withProvider('evolution', evoInstance, sendAll);
+      } else {
+        await sendAll();
+      }
+
+      // Registrar envio (silently fail if table doesn't exist)
+      try {
+        await client.query(
+          `insert into material_sends (user_id, empreendimento_id, type, pdf_url, landing_url)
+           values ($1, $2, $3, $4, $5)`,
+          [userId, empreendimento.id, type, pdfUrl, landingUrl]
+        );
+      } catch {
+        // Table may not exist yet
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          pdfUrl,
+          landingUrl,
+          sentTo: user.telefone,
+        },
+      });
     });
   } catch (error) {
     console.error('Erro ao enviar material:', error);
