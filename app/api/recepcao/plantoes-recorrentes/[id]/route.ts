@@ -61,8 +61,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           (SELECT MAX(data) FROM recepcao_plantoes_criados_auto ca WHERE ca.recorrente_id = r.id) AS ultimo_plantao_criado
         FROM recepcao_plantoes_recorrentes r
         JOIN recepcao_locais l ON l.id = r.local_id
-        WHERE r.id = $1 AND r.workspace_id = $2`,
-        [id, workspaceId]
+        WHERE r.id = $1`,
+        [id]
       );
 
       if (result.rows.length === 0) {
@@ -140,8 +140,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return await withTenant(workspaceId, async (client) => {
       // Verificar se existe
       const existing = await client.query(
-        'SELECT id FROM recepcao_plantoes_recorrentes WHERE id = $1 AND workspace_id = $2',
-        [id, workspaceId]
+        'SELECT id FROM recepcao_plantoes_recorrentes WHERE id = $1',
+        [id]
       );
 
       if (existing.rows.length === 0) {
@@ -202,12 +202,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
 
       updates.push(`updated_at = NOW()`);
-      values.push(id, workspaceId);
+      values.push(id);
 
       const result = await client.query(
         `UPDATE recepcao_plantoes_recorrentes
          SET ${updates.join(', ')}
-         WHERE id = $${paramIndex++} AND workspace_id = $${paramIndex}
+         WHERE id = $${paramIndex}
          RETURNING *`,
         values
       );
@@ -254,9 +254,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       const result = await client.query(
         `UPDATE recepcao_plantoes_recorrentes
          SET is_active = false, updated_at = NOW()
-         WHERE id = $1 AND workspace_id = $2
+         WHERE id = $1
          RETURNING id`,
-        [id, workspaceId]
+        [id]
       );
 
       if (result.rows.length === 0) {

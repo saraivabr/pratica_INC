@@ -60,9 +60,9 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0);
 
     return await withTenant(workspaceId, async (client) => {
-      let whereClause = 'WHERE p.workspace_id = $1';
-      const params: any[] = [workspaceId];
-      let paramIndex = 2;
+      let whereClause = 'WHERE 1=1';
+      const params: any[] = [];
+      let paramIndex = 1;
 
       if (data) {
         whereClause += ` AND p.data = $${paramIndex++}`;
@@ -164,10 +164,10 @@ export async function POST(request: NextRequest) {
     }
 
     return await withTenant(workspaceId, async (client) => {
-      // Verificar se local existe e pertence ao workspace
+      // Verificar se local existe e está ativo
       const localCheck = await client.query(
-        'SELECT id FROM recepcao_locais WHERE id = $1 AND workspace_id = $2 AND is_active = true',
-        [local_id, workspaceId]
+        'SELECT id FROM recepcao_locais WHERE id = $1 AND is_active = true',
+        [local_id]
       );
 
       if (localCheck.rows.length === 0) {

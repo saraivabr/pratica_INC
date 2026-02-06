@@ -97,10 +97,10 @@ export async function GET(
           FROM recepcao_atribuicoes a
           WHERE a.plantao_id = p.id
         ) atr ON true
-        WHERE p.id = $1 AND p.workspace_id = $2
+        WHERE p.id = $1
       `;
 
-      const result = await client.query<PlantaoWithStats>(query, [id, workspaceId]);
+      const result = await client.query<PlantaoWithStats>(query, [id]);
 
       if (result.rows.length === 0) {
         return NextResponse.json(
@@ -164,8 +164,8 @@ export async function PUT(
     return await withTenant(workspaceId, async (client) => {
       // Verificar se plantão existe
       const checkResult = await client.query<{ status: string; hora_inicio: string; hora_fim: string }>(
-        'SELECT status, hora_inicio, hora_fim FROM recepcao_plantoes WHERE id = $1 AND workspace_id = $2',
-        [id, workspaceId]
+        'SELECT status, hora_inicio, hora_fim FROM recepcao_plantoes WHERE id = $1',
+        [id]
       );
 
       if (checkResult.rows.length === 0) {
@@ -232,12 +232,12 @@ export async function PUT(
         );
       }
 
-      values.push(id, workspaceId);
+      values.push(id);
 
       const result = await client.query<PlantaoDB>(
         `UPDATE recepcao_plantoes
          SET ${updates.join(', ')}, updated_at = NOW()
-         WHERE id = $${paramIndex} AND workspace_id = $${paramIndex + 1}
+         WHERE id = $${paramIndex}
          RETURNING *`,
         values
       );
@@ -282,9 +282,9 @@ export async function DELETE(
       const result = await client.query<PlantaoDB>(
         `UPDATE recepcao_plantoes
          SET status = 'cancelado', updated_at = NOW()
-         WHERE id = $1 AND workspace_id = $2 AND status = 'ativo'
+         WHERE id = $1 AND status = 'ativo'
          RETURNING *`,
-        [id, workspaceId]
+        [id]
       );
 
       if (result.rows.length === 0) {

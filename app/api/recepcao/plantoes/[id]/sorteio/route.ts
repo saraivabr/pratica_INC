@@ -40,15 +40,15 @@ export async function POST(
     }
 
     return await withTenant(workspaceId, async (client) => {
-      // Verificar se plantao existe e pertence ao workspace
+      // Verificar se plantao existe e está ativo
       const plantaoCheck = await client.query<{
         id: string;
         sorteio_realizado: boolean;
         sorteio_at: string | null;
       }>(
         `SELECT id, sorteio_realizado, sorteio_at FROM recepcao_plantoes
-         WHERE id = $1 AND workspace_id = $2 AND status = 'ativo'`,
-        [plantao_id, workspaceId]
+         WHERE id = $1 AND status = 'ativo'`,
+        [plantao_id]
       );
 
       if (plantaoCheck.rows.length === 0) {
@@ -138,8 +138,8 @@ export async function GET(
         sorteio_at: string | null;
       }>(
         `SELECT sorteio_realizado, sorteio_at FROM recepcao_plantoes
-         WHERE id = $1 AND workspace_id = $2`,
-        [plantao_id, workspaceId]
+         WHERE id = $1`,
+        [plantao_id]
       );
 
       if (plantaoResult.rows.length === 0) {

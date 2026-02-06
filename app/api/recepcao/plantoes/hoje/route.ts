@@ -46,14 +46,13 @@ export async function GET(request: NextRequest) {
 
     return await withTenant(workspaceId, async (client) => {
       let whereClause = `
-        WHERE p.workspace_id = $1
-          AND p.data = CURRENT_DATE
+        WHERE p.data = CURRENT_DATE
           AND p.status = 'ativo'
       `;
-      const params: any[] = [workspaceId];
+      const params: any[] = [];
 
       if (localId) {
-        whereClause += ` AND p.local_id = $2`;
+        whereClause += ` AND p.local_id = $1`;
         params.push(localId);
       }
 
