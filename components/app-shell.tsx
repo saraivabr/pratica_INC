@@ -86,7 +86,7 @@ const corretorSecondaryItems = [
   { href: "/corretor/assistente", icon: Sparkles, label: "Assistente IA", highlight: true, description: "Tire dúvidas com a IA" },
   { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads", description: "Follow-up automático" },
   { href: "/corretor/disparador", icon: Send, label: "Disparador", description: "Envios em massa" },
-  { href: "/corretor/chat", icon: MessageSquare, label: "Conversas", description: "Chat com leads" },
+  { href: "/corretor/whatsapp", icon: Smartphone, label: "WhatsApp", description: "Chat e automações" },
   { href: "/corretor/agenda", icon: Calendar, label: "Agenda", description: "Visitas e compromissos" },
   { href: "/corretor/configuracoes", icon: Settings, label: "Configurações", description: "Perfil e preferências" },
 ]

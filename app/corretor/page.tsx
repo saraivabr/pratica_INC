@@ -910,7 +910,7 @@ export default function CorretorDashboard() {
             )}
             {whatsappData.status === "disconnected" && (
               <Link
-                href="/onboarding/whatsapp"
+                href="/corretor/whatsapp"
                 className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-medium hover:shadow-md hover:shadow-green-500/20 transition-all"
               >
                 <Zap className="h-3.5 w-3.5" />
