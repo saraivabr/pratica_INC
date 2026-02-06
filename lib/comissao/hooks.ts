@@ -439,6 +439,57 @@ export function useBuscarReservas(
   };
 }
 
+// ============================================
+// Hooks de Webropay
+// ============================================
+
+export function useEnviarWebropay() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vendaId: number) => comissaoApi.webropay.enviar(vendaId),
+    onSuccess: (_, vendaId) => {
+      queryClient.invalidateQueries({ queryKey: comissaoKeys.venda(vendaId) });
+      queryClient.invalidateQueries({ queryKey: comissaoKeys.vendas() });
+    },
+  });
+}
+
+export function useLiberarWebropay() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vendaId: number) => comissaoApi.webropay.liberar(vendaId),
+    onSuccess: (_, vendaId) => {
+      queryClient.invalidateQueries({ queryKey: comissaoKeys.venda(vendaId) });
+    },
+  });
+}
+
+export function useDistratarWebropay() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ vendaId, motivo }: { vendaId: number; motivo: string }) =>
+      comissaoApi.webropay.distratar(vendaId, motivo),
+    onSuccess: (_, { vendaId }) => {
+      queryClient.invalidateQueries({ queryKey: comissaoKeys.venda(vendaId) });
+      queryClient.invalidateQueries({ queryKey: comissaoKeys.vendas() });
+    },
+  });
+}
+
+export function useBloquearWebropay() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vendaId: number) => comissaoApi.webropay.bloquear(vendaId),
+    onSuccess: (_, vendaId) => {
+      queryClient.invalidateQueries({ queryKey: comissaoKeys.venda(vendaId) });
+    },
+  });
+}
+
 export function useBuscarClientePorCpf(cpf: string, enabled: boolean = true) {
   const cpfLimpo = cpf.replace(/\D/g, "");
 

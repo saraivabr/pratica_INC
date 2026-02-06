@@ -283,6 +283,45 @@ export const buscaApi = {
 };
 
 // ============================================
+// Webropay API
+// ============================================
+
+export const webropayApi = {
+  enviar: async (vendaId: number): Promise<{ success: boolean; message: string; webropay_response?: any; payload_enviado?: any }> => {
+    return fetchApi(`${BASE_URL}/vendas/${vendaId}/webropay/enviar`, {
+      method: 'POST',
+    });
+  },
+
+  liberar: async (vendaId: number): Promise<{ success: boolean; message: string }> => {
+    return fetchApi(`${BASE_URL}/vendas/${vendaId}/webropay/liberar`, {
+      method: 'PUT',
+    });
+  },
+
+  distratar: async (vendaId: number, motivo: string): Promise<{ success: boolean; message: string }> => {
+    return fetchApi(`${BASE_URL}/vendas/${vendaId}/webropay/distratar`, {
+      method: 'PUT',
+      body: JSON.stringify({ motivo }),
+    });
+  },
+
+  bloquear: async (vendaId: number): Promise<{ success: boolean; message: string }> => {
+    return fetchApi(`${BASE_URL}/vendas/${vendaId}/webropay/bloquear`, {
+      method: 'PUT',
+    });
+  },
+
+  boleto: async (vendaId: number, parcelaId: string): Promise<{ urlBoleto: string }> => {
+    return fetchApi(`${BASE_URL}/vendas/${vendaId}/webropay/boleto?parcelaId=${encodeURIComponent(parcelaId)}`);
+  },
+
+  status: async (vendaId: number): Promise<any> => {
+    return fetchApi(`${BASE_URL}/vendas/${vendaId}/webropay/status`);
+  },
+};
+
+// ============================================
 // Export consolidado
 // ============================================
 
@@ -293,4 +332,5 @@ export const comissaoApi = {
   matriz: matrizApi,
   exportar: exportarApi,
   busca: buscaApi,
+  webropay: webropayApi,
 };

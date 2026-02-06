@@ -88,6 +88,16 @@ export const comissaoVendaUpdateSchema = z.object({
   observacoes: z.string().max(1000).optional(),
   referencia: z.string().max(100).optional(),
   status: comissaoVendaStatusSchema.optional(),
+  // Webropay address fields
+  cliente_email: z.string().max(100).optional(),
+  cliente_telefone: z.string().max(20).optional(),
+  cliente_logradouro: z.string().max(255).optional(),
+  cliente_numero: z.string().max(20).optional(),
+  cliente_complemento: z.string().max(100).optional(),
+  cliente_bairro: z.string().max(100).optional(),
+  cliente_cidade: z.string().max(100).optional(),
+  cliente_uf: z.string().max(2).optional(),
+  cliente_cep: z.string().max(10).optional(),
 });
 
 // =============================================================================

@@ -199,6 +199,18 @@ export async function PUT(request: NextRequest, { params }: Params) {
         updates.push(`status = $${paramIndex++}`);
         values.push(data.status);
       }
+      // Webropay address fields
+      const addressFields = [
+        'cliente_email', 'cliente_telefone', 'cliente_logradouro',
+        'cliente_numero', 'cliente_complemento', 'cliente_bairro',
+        'cliente_cidade', 'cliente_uf', 'cliente_cep'
+      ] as const;
+      for (const field of addressFields) {
+        if ((data as any)[field] !== undefined) {
+          updates.push(`${field} = $${paramIndex++}`);
+          values.push((data as any)[field]);
+        }
+      }
 
       if (updates.length === 0) {
         return NextResponse.json(

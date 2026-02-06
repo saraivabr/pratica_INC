@@ -467,6 +467,97 @@ export interface ValidacaoInteligente {
   campo?: string;
 }
 
+// ============================================================================
+// WEBROPAY INTEGRATION TYPES
+// ============================================================================
+
+export type WebropayStatus = 'pendente' | 'enviada' | 'liberada' | 'distratada' | 'bloqueada'
+
+export const WEBROPAY_STATUS_LABELS: Record<WebropayStatus, string> = {
+  pendente: 'Pendente',
+  enviada: 'Enviada',
+  liberada: 'Liberada',
+  distratada: 'Distratada',
+  bloqueada: 'Bloqueada',
+}
+
+export const WEBROPAY_STATUS_COLORS: Record<WebropayStatus, string> = {
+  pendente: 'yellow',
+  enviada: 'blue',
+  liberada: 'green',
+  distratada: 'red',
+  bloqueada: 'orange',
+}
+
+export interface WebropayEndereco {
+  logradouro: string
+  numero: string
+  complemento?: string
+  bairro: string
+  cidade: string
+  uf: string
+  cep: string
+}
+
+export interface WebropayPagador {
+  nome: string
+  cpfCnpj: string
+  email: string
+  telefone?: string
+  endereco: WebropayEndereco
+}
+
+export interface WebropayRecebivel {
+  cpfCnpjCorretor: string
+  valor: number // centavos
+}
+
+export interface WebropayParcela {
+  idParcela: string
+  vencimentoParcela: string
+  meioPagamento: 'boleto' | 'todos'
+  recebiveisCorretores: WebropayRecebivel[]
+}
+
+export interface WebropayVendaPayload {
+  idVenda: string
+  cpfCnpjVendedor?: string
+  nomeEmpreendimento: string
+  nomeUnidade: string
+  enderecoEmpreendimento?: WebropayEndereco
+  dataVenda: string
+  valorTotalVenda: number // centavos
+  pagador: WebropayPagador
+  compradores: WebropayPagador[]
+  parcelas: WebropayParcela[]
+}
+
+export interface WebropayApiResponse {
+  statusCode: number
+  message: string
+}
+
+// Extended venda with Webropay fields
+export interface ComissaoVendaWebropay extends ComissaoVenda {
+  webropay_id?: string
+  webropay_status?: WebropayStatus
+  webropay_enviada_at?: string
+  webropay_response?: WebropayApiResponse
+  cliente_logradouro?: string
+  cliente_numero?: string
+  cliente_complemento?: string
+  cliente_bairro?: string
+  cliente_cidade?: string
+  cliente_uf?: string
+  cliente_cep?: string
+  cliente_email?: string
+  cliente_telefone?: string
+}
+
+// ============================================================================
+// VALIDACOES INTELIGENTES
+// ============================================================================
+
 export const LIMITES_VALIDACAO = {
   comissao_minima: 3, // % mínimo de comissão (aviso abaixo)
   comissao_maxima: 8, // % máximo de comissão (aviso acima)

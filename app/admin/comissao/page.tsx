@@ -22,6 +22,12 @@ import {
   Loader2,
   GripVertical,
   Zap,
+  Send,
+  Ban,
+  Unlock,
+  Lock,
+  ExternalLink,
+  Building2,
 } from "lucide-react"
 import {
   DndContext,
@@ -51,14 +57,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { arredondarValor, formatarMoeda } from "@/lib/comissao/calculations"
-import { TEMPLATES_PARCELAS, type TemplateParcelaItem } from "@/lib/comissao/types"
+import { TEMPLATES_PARCELAS, type TemplateParcelaItem, type WebropayStatus, WEBROPAY_STATUS_LABELS } from "@/lib/comissao/types"
 import {
   BENEFICIARIOS_PADRAO_PRT,
   CARGOS_PRT,
   formatarDocumento,
 } from "@/lib/comissao/beneficiarios-padrao"
+import { comissaoApi } from "@/lib/comissao/api"
+import { toast } from "sonner"
 
 // ============================================================================
 // TYPES
@@ -82,6 +102,7 @@ interface Autonomo {
   percentual: number
   valorBruto: number
   prioridade: number
+  documento: string
 }
 
 interface CelulaRateio {
@@ -163,6 +184,23 @@ function formatCpfMask(value: string): string {
   if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`
   if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
+}
+
+function formatDocMask(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 14)
+  if (digits.length <= 11) return formatCpfMask(digits)
+  // CNPJ
+  if (digits.length <= 2) return digits
+  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`
+  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`
+  if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
+}
+
+function formatCepMask(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8)
+  if (digits.length <= 5) return digits
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`
 }
 
 // ============================================================================
@@ -374,7 +412,7 @@ function SortableAutonomoRow({
   return (
     <div ref={setNodeRef} style={style}>
       {/* Desktop */}
-      <div className="hidden sm:grid grid-cols-[28px_1fr_140px_80px_1fr_40px] gap-2 items-center bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-2">
+      <div className="hidden sm:grid grid-cols-[28px_1fr_140px_140px_80px_1fr_40px] gap-2 items-center bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-2">
         <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-600 flex items-center justify-center">
           <GripVertical className="h-4 w-4" />
         </button>
@@ -387,6 +425,11 @@ function SortableAutonomoRow({
             {CARGOS_PADRAO.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
           </SelectContent>
         </Select>
+
+        <Input
+          placeholder="CPF/CNPJ" className={cn("h-9 text-xs", !autonomo.documento && "border-amber-300 dark:border-amber-600")}
+          value={autonomo.documento || ""} onChange={e => onUpdate(autonomo.id, "documento", formatDocMask(e.target.value))} maxLength={18}
+        />
 
         <Input
           type="number" step="0.1" min="0" max="100" className="h-9"
@@ -421,6 +464,12 @@ function SortableAutonomoRow({
               {CARGOS_PADRAO.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
             </SelectContent>
           </Select>
+          <Input
+            placeholder="CPF/CNPJ" className={cn("h-9 text-xs", !autonomo.documento && "border-amber-300")}
+            value={autonomo.documento || ""} onChange={e => onUpdate(autonomo.id, "documento", formatDocMask(e.target.value))} maxLength={18}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
           <div className="relative">
             <Input
               type="number" step="0.1" min="0" max="100" className="h-9 pr-6"
@@ -428,8 +477,8 @@ function SortableAutonomoRow({
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400">%</span>
           </div>
+          <CurrencyInput value={autonomo.valorBruto} onChange={v => onUpdate(autonomo.id, "valorBruto", v)} />
         </div>
-        <CurrencyInput value={autonomo.valorBruto} onChange={v => onUpdate(autonomo.id, "valorBruto", v)} />
       </div>
     </div>
   )
@@ -448,6 +497,24 @@ export default function ComissaoCalculadoraPage() {
   const [clienteCpf, setClienteCpf] = useState("")
   const [valorImovel, setValorImovel] = useState(0)
   const [percentualComissao, setPercentualComissao] = useState(5)
+
+  // ── Section 1 extras: Cliente address ──
+  const [clienteEmail, setClienteEmail] = useState("")
+  const [clienteTelefone, setClienteTelefone] = useState("")
+  const [clienteLogradouro, setClienteLogradouro] = useState("")
+  const [clienteNumero, setClienteNumero] = useState("")
+  const [clienteComplemento, setClienteComplemento] = useState("")
+  const [clienteBairro, setClienteBairro] = useState("")
+  const [clienteCidade, setClienteCidade] = useState("")
+  const [clienteUf, setClienteUf] = useState("")
+  const [clienteCep, setClienteCep] = useState("")
+
+  // ── Database persistence ──
+  const [vendaId, setVendaId] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [webropayStatus, setWebropayStatus] = useState<WebropayStatus | null>(null)
+  const [webropayLoading, setWebropayLoading] = useState(false)
+  const [distratoMotivo, setDistratoMotivo] = useState("")
 
   // ── Section 2: Proposta do Cliente ──
   const [series, setSeries] = useState<SerieParcela[]>([])
@@ -476,6 +543,17 @@ export default function ComissaoCalculadoraPage() {
         if (data.percentualComissao) setPercentualComissao(data.percentualComissao)
         if (data.series) setSeries(data.series)
         if (data.autonomos) setAutonomos(data.autonomos)
+        if (data.clienteEmail) setClienteEmail(data.clienteEmail)
+        if (data.clienteTelefone) setClienteTelefone(data.clienteTelefone)
+        if (data.clienteLogradouro) setClienteLogradouro(data.clienteLogradouro)
+        if (data.clienteNumero) setClienteNumero(data.clienteNumero)
+        if (data.clienteComplemento) setClienteComplemento(data.clienteComplemento)
+        if (data.clienteBairro) setClienteBairro(data.clienteBairro)
+        if (data.clienteCidade) setClienteCidade(data.clienteCidade)
+        if (data.clienteUf) setClienteUf(data.clienteUf)
+        if (data.clienteCep) setClienteCep(data.clienteCep)
+        if (data.vendaId) setVendaId(data.vendaId)
+        if (data.webropayStatus) setWebropayStatus(data.webropayStatus)
       }
     } catch { /* ignore */ }
     setLoaded(true)
@@ -488,9 +566,12 @@ export default function ComissaoCalculadoraPage() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         empreendimento, unidade, clienteNome, clienteCpf,
         valorImovel, percentualComissao, series, autonomos,
+        clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero,
+        clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep,
+        vendaId, webropayStatus,
       }))
     } catch { /* ignore */ }
-  }, [loaded, empreendimento, unidade, clienteNome, clienteCpf, valorImovel, percentualComissao, series, autonomos])
+  }, [loaded, empreendimento, unidade, clienteNome, clienteCpf, valorImovel, percentualComissao, series, autonomos, clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero, clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep, vendaId, webropayStatus])
 
   // ── DnD sensors ──
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -550,6 +631,17 @@ export default function ComissaoCalculadoraPage() {
     setAutonomos([])
     setRateioGrid({})
     setRateioCalculado(false)
+    setClienteEmail("")
+    setClienteTelefone("")
+    setClienteLogradouro("")
+    setClienteNumero("")
+    setClienteComplemento("")
+    setClienteBairro("")
+    setClienteCidade("")
+    setClienteUf("")
+    setClienteCep("")
+    setVendaId(null)
+    setWebropayStatus(null)
     localStorage.removeItem(STORAGE_KEY)
   }, [])
 
@@ -625,7 +717,7 @@ export default function ComissaoCalculadoraPage() {
 
   // ── Autonomos helpers ──
   const addAutonomo = useCallback(() => {
-    setAutonomos(prev => [...prev, { id: generateId(), nome: "", cargo: "Corretor", percentual: 0, valorBruto: 0, prioridade: prev.length + 1 }])
+    setAutonomos(prev => [...prev, { id: generateId(), nome: "", cargo: "Corretor", percentual: 0, valorBruto: 0, prioridade: prev.length + 1, documento: "" }])
     setRateioCalculado(false)
   }, [])
 
@@ -665,6 +757,7 @@ export default function ComissaoCalculadoraPage() {
         percentual: pctOfComissao,
         valorBruto: arredondarValor(valorImovel * b.percentual_vgv),
         prioridade: i + 1,
+        documento: b.documento || "",
       }
     })
     setAutonomos(newAutonomos)
@@ -727,6 +820,160 @@ export default function ComissaoCalculadoraPage() {
     window.print()
   }, [])
 
+  // ── Webropay data completeness check ──
+  const webropayDadosCompletos = useMemo(() => {
+    if (!clienteNome || !clienteCpf || !clienteEmail) return false
+    if (!clienteLogradouro || !clienteNumero || !clienteBairro || !clienteCidade || !clienteUf || !clienteCep) return false
+    const allDocsOk = autonomos.every(a => a.documento && a.documento.replace(/\D/g, "").length >= 11)
+    return allDocsOk && autonomos.length > 0 && series.length > 0
+  }, [clienteNome, clienteCpf, clienteEmail, clienteLogradouro, clienteNumero, clienteBairro, clienteCidade, clienteUf, clienteCep, autonomos, series])
+
+  // ── Save to database ──
+  const handleSave = useCallback(async () => {
+    if (!empreendimento || !valorImovel || series.length === 0 || autonomos.length === 0) {
+      toast.error("Preencha os dados do imóvel, parcelas e autônomos antes de salvar")
+      return
+    }
+
+    setSaving(true)
+    try {
+      const vendaData = {
+        venda: {
+          valor_venda: valorImovel,
+          percentual_comissao: percentualComissao / 100,
+          empreendimento,
+          unidade,
+          cliente_nome: clienteNome || undefined,
+          cliente_cpf: clienteCpf?.replace(/\D/g, "") || undefined,
+          data_venda: new Date().toISOString().split("T")[0],
+          observacoes: undefined,
+          referencia: undefined,
+        },
+        corretores: autonomos.map((a, i) => ({
+          nome: a.nome,
+          cpf: a.documento?.replace(/\D/g, "") || undefined,
+          percentual_participacao: a.percentual / 100,
+          valor_comissao: a.valorBruto,
+          prioridade: i + 1,
+        })),
+        parcelas: series.flatMap(s => {
+          const items = []
+          for (let i = 0; i < s.quantidade; i++) {
+            items.push({
+              numero: items.length + 1,
+              descricao: s.quantidade === 1 ? TIPO_PARCELA_LABELS[s.tipo] : `${TIPO_PARCELA_LABELS[s.tipo]} ${i + 1}`,
+              valor_parcela: s.valorUnitario,
+              percentual_comissao: s.percentualDoImovel / s.quantidade,
+              data_prevista: new Date(Date.now() + (items.length + 1) * 30 * 86400000).toISOString().split("T")[0],
+            })
+          }
+          return items
+        }),
+      }
+
+      const result = await comissaoApi.vendas.createCompleta(vendaData)
+      const newId = (result as any).id || (result as any).data?.id
+
+      if (newId) {
+        setVendaId(newId)
+
+        // Save address fields to venda
+        try {
+          await fetch(`/api/comissao/vendas/${newId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cliente_email: clienteEmail,
+              cliente_telefone: clienteTelefone,
+              cliente_logradouro: clienteLogradouro,
+              cliente_numero: clienteNumero,
+              cliente_complemento: clienteComplemento,
+              cliente_bairro: clienteBairro,
+              cliente_cidade: clienteCidade,
+              cliente_uf: clienteUf,
+              cliente_cep: clienteCep?.replace(/\D/g, ""),
+            }),
+          })
+        } catch { /* address save is optional */ }
+
+        // Trigger calculation
+        try {
+          await comissaoApi.matriz.calcular(newId)
+        } catch { /* calc is optional */ }
+      }
+
+      toast.success("Comissão salva com sucesso!")
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao salvar comissão")
+    } finally {
+      setSaving(false)
+    }
+  }, [empreendimento, valorImovel, percentualComissao, unidade, clienteNome, clienteCpf, autonomos, series, clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero, clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep])
+
+  // ── Webropay handlers ──
+  const handleEnviarWebropay = useCallback(async () => {
+    if (!vendaId) {
+      toast.error("Salve a comissão antes de enviar para a Webropay")
+      return
+    }
+    setWebropayLoading(true)
+    try {
+      await comissaoApi.webropay.enviar(vendaId)
+      setWebropayStatus("enviada")
+      toast.success("Venda enviada para Webropay com sucesso!")
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao enviar para Webropay")
+    } finally {
+      setWebropayLoading(false)
+    }
+  }, [vendaId])
+
+  const handleLiberarWebropay = useCallback(async () => {
+    if (!vendaId) return
+    setWebropayLoading(true)
+    try {
+      await comissaoApi.webropay.liberar(vendaId)
+      setWebropayStatus("liberada")
+      toast.success("Pagamento liberado com sucesso!")
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao liberar pagamento")
+    } finally {
+      setWebropayLoading(false)
+    }
+  }, [vendaId])
+
+  const handleDistratarWebropay = useCallback(async () => {
+    if (!vendaId || !distratoMotivo.trim()) {
+      toast.error("Informe o motivo do distrato")
+      return
+    }
+    setWebropayLoading(true)
+    try {
+      await comissaoApi.webropay.distratar(vendaId, distratoMotivo.trim())
+      setWebropayStatus("distratada")
+      setDistratoMotivo("")
+      toast.success("Venda distratada com sucesso")
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao distratar")
+    } finally {
+      setWebropayLoading(false)
+    }
+  }, [vendaId, distratoMotivo])
+
+  const handleBloquearWebropay = useCallback(async () => {
+    if (!vendaId) return
+    setWebropayLoading(true)
+    try {
+      await comissaoApi.webropay.bloquear(vendaId)
+      setWebropayStatus("bloqueada")
+      toast.success("Venda bloqueada com sucesso")
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao bloquear")
+    } finally {
+      setWebropayLoading(false)
+    }
+  }, [vendaId])
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -741,6 +988,10 @@ export default function ComissaoCalculadoraPage() {
             <Button variant="outline" size="sm" onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-1.5" />
               <span className="hidden sm:inline">Imprimir</span>
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={saving || !empreendimento || valorImovel <= 0}>
+              {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
+              <span className="hidden sm:inline">{vendaId ? "Atualizar" : "Salvar"}</span>
             </Button>
             <Button variant="outline" size="sm" onClick={resetAll} className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
               <RotateCcw className="h-4 w-4 mr-1.5" />
@@ -824,6 +1075,51 @@ export default function ComissaoCalculadoraPage() {
                   value={percentualComissao || ""} onChange={e => setPercentualComissao(parseFloat(e.target.value) || 0)}
                 />
                 <Badge variant="secondary" className="shrink-0 text-sm px-3 py-1.5">{formatarMoeda(valorComissao)}</Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Dados adicionais do cliente (Webropay) */}
+          <div className="mt-4 pt-4 border-t border-zinc-200/60 dark:border-zinc-800/60">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5" /> Dados para Pagadoria (Webropay)
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Email do Cliente</Label>
+                <Input placeholder="email@exemplo.com" className="h-9" value={clienteEmail} onChange={e => setClienteEmail(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Telefone</Label>
+                <Input placeholder="(11) 99999-9999" className="h-9" value={clienteTelefone} onChange={e => setClienteTelefone(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Logradouro</Label>
+                <Input placeholder="Rua, Av..." className="h-9" value={clienteLogradouro} onChange={e => setClienteLogradouro(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Numero</Label>
+                <Input placeholder="123" className="h-9" value={clienteNumero} onChange={e => setClienteNumero(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Complemento</Label>
+                <Input placeholder="Apto, Bloco..." className="h-9" value={clienteComplemento} onChange={e => setClienteComplemento(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Bairro</Label>
+                <Input placeholder="Bairro" className="h-9" value={clienteBairro} onChange={e => setClienteBairro(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Cidade</Label>
+                <Input placeholder="Cidade" className="h-9" value={clienteCidade} onChange={e => setClienteCidade(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">UF</Label>
+                <Input placeholder="SP" maxLength={2} className="h-9 uppercase" value={clienteUf} onChange={e => setClienteUf(e.target.value.toUpperCase().slice(0, 2))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">CEP</Label>
+                <Input placeholder="00000-000" className="h-9" value={clienteCep} onChange={e => setClienteCep(formatCepMask(e.target.value))} maxLength={9} />
               </div>
             </div>
           </div>
@@ -1144,9 +1440,158 @@ export default function ComissaoCalculadoraPage() {
               <StatusPill ok={series.length > 0 && Math.abs(totalPercentualProposta - 100) < 0.5} label="Proposta completa" />
               <StatusPill ok={autonomos.length > 0 && totalPercentualAutonomos <= 100.1} label="Comissoes validas" />
               <StatusPill ok={rateioCalculado} label="Rateio calculado" />
+              <StatusPill ok={webropayDadosCompletos} label="Dados Webropay completos" />
+              {webropayStatus && <StatusPill ok={webropayStatus === 'enviada' || webropayStatus === 'liberada'} label={`Pagadoria: ${WEBROPAY_STATUS_LABELS[webropayStatus]}`} />}
             </div>
           </div>
         </Section>
+        {/* ── Section 6: Webropay (appears after save) ── */}
+        {vendaId && (
+          <Section title="Envio para Pagadoria (Webropay)" icon={Send} number={6} defaultOpen={true}>
+            <div className="pt-4 space-y-4">
+              {/* Status bar */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Status:</span>
+                {!webropayStatus ? (
+                  <Badge variant="secondary">Pendente de envio</Badge>
+                ) : webropayStatus === "enviada" ? (
+                  <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Enviada</Badge>
+                ) : webropayStatus === "liberada" ? (
+                  <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Liberada</Badge>
+                ) : webropayStatus === "distratada" ? (
+                  <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">Distratada</Badge>
+                ) : webropayStatus === "bloqueada" ? (
+                  <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">Bloqueada</Badge>
+                ) : null}
+                {vendaId && <span className="text-xs text-zinc-400">ID: {vendaId}</span>}
+              </div>
+
+              {/* Validation warnings */}
+              {!webropayDadosCompletos && !webropayStatus && (
+                <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-3 text-sm text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium">Dados incompletos para envio</p>
+                    <ul className="mt-1 text-xs space-y-0.5">
+                      {!clienteEmail && <li>- Email do cliente obrigatório</li>}
+                      {!clienteLogradouro && <li>- Endereço do cliente obrigatório</li>}
+                      {autonomos.some(a => !a.documento || a.documento.replace(/\D/g, "").length < 11) && <li>- Todos os autônomos devem ter CPF/CNPJ</li>}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Enviar */}
+                {(!webropayStatus || webropayStatus === "bloqueada") && (
+                  <Button
+                    size="sm"
+                    onClick={handleEnviarWebropay}
+                    disabled={webropayLoading || !webropayDadosCompletos}
+                  >
+                    {webropayLoading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Send className="h-4 w-4 mr-1.5" />}
+                    Enviar para Webropay
+                  </Button>
+                )}
+
+                {/* Liberar */}
+                {webropayStatus === "enviada" && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="text-emerald-600" disabled={webropayLoading}>
+                        <Unlock className="h-4 w-4 mr-1.5" />
+                        Liberar Pagamento
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Liberar pagamento?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Isso liberará os boletos para pagamento dos corretores. Esta ação não pode ser desfeita facilmente.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleLiberarWebropay}>Confirmar Liberação</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+
+                {/* Bloquear */}
+                {webropayStatus === "enviada" && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="text-orange-600" disabled={webropayLoading}>
+                        <Lock className="h-4 w-4 mr-1.5" />
+                        Bloquear
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Bloquear venda?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Isso bloqueará todos os pagamentos desta venda na Webropay.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleBloquearWebropay}>Confirmar Bloqueio</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+
+                {/* Distratar */}
+                {(webropayStatus === "enviada" || webropayStatus === "liberada") && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="text-red-600" disabled={webropayLoading}>
+                        <Ban className="h-4 w-4 mr-1.5" />
+                        Distratar
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Distratar venda?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Informe o motivo do distrato. A venda será cancelada na Webropay.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <div className="px-6 pb-2">
+                        <Textarea
+                          placeholder="Motivo do distrato..."
+                          value={distratoMotivo}
+                          onChange={e => setDistratoMotivo(e.target.value)}
+                          className="min-h-[80px]"
+                        />
+                      </div>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setDistratoMotivo("")}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDistratarWebropay}
+                          disabled={!distratoMotivo.trim()}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          Confirmar Distrato
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+
+              {/* Loading indicator */}
+              {webropayLoading && (
+                <div className="flex items-center gap-2 text-sm text-zinc-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processando...
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
       </div>
 
       {/* Print styles */}
