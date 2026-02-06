@@ -47,6 +47,7 @@ import {
   Table,
   Plus,
   UserPlus,
+  FileText,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -81,6 +82,7 @@ const corretorPrimaryItems = [
 ]
 
 const corretorSecondaryItems = [
+  { href: "/corretor/propostas", icon: FileText, label: "Propostas", description: "Propostas comerciais" },
   { href: "/corretor/assistente", icon: Sparkles, label: "Assistente IA", highlight: true, description: "Tire dúvidas com a IA" },
   { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads", description: "Follow-up automático" },
   { href: "/corretor/disparador", icon: Send, label: "Disparador", description: "Envios em massa" },
