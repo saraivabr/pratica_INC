@@ -2,6 +2,7 @@
  * API: Buscar Unidades de um Empreendimento
  *
  * GET /api/comissao/buscar/unidades/[empreendimentoId] - Lista unidades
+ * empreendimentoId = cvcrm_id do empreendimento (integer)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,9 +22,9 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (ctx.error) return ctx.error;
 
     const { empreendimentoId } = await params;
-    const empId = parseInt(empreendimentoId);
+    const empCvCrmId = parseInt(empreendimentoId);
 
-    if (isNaN(empId)) {
+    if (isNaN(empCvCrmId)) {
       return NextResponse.json(
         { success: false, error: "ID do empreendimento invalido" },
         { status: 400 }
@@ -32,35 +33,41 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const { searchParams } = new URL(request.url);
     const busca = searchParams.get("busca");
+    const showAll = searchParams.get("all") === "true";
 
     return await withTenant(ctx.workspaceId, async (client) => {
-      // Buscar em cvcrm_unidades
       let query = `
         SELECT
           u.id,
-          u.nome as codigo,
+          u.cvcrm_id,
+          u.codigo,
+          u.nome,
           u.bloco,
           u.andar,
-          u.area,
-          u.tipologia,
-          u.valor as valor_tabela,
-          u.status,
-          e.id as empreendimento_id,
-          e.nome as empreendimento_nome
+          u.area_privativa,
+          u.dormitorios,
+          COALESCE(u.cvcrm_data->>'tipologia', u.tipo) as tipologia,
+          u.valor_venda,
+          u.situacao,
+          u.empreendimento_id,
+          u.empreendimento_nome
         FROM cvcrm_unidades u
-        JOIN cvcrm_empreendimentos e ON e.id = u.empreendimento_id
         WHERE u.empreendimento_id = $1
       `;
-      const params_query: any[] = [empId];
+      const params_query: any[] = [empCvCrmId];
       let paramIndex = 2;
 
+      if (!showAll) {
+        query += ` AND u.situacao = 'Disponivel'`;
+      }
+
       if (busca) {
-        query += ` AND (u.nome ILIKE $${paramIndex} OR u.bloco ILIKE $${paramIndex})`;
+        query += ` AND (u.nome ILIKE $${paramIndex} OR u.bloco ILIKE $${paramIndex} OR u.codigo ILIKE $${paramIndex})`;
         params_query.push(`%${busca}%`);
         paramIndex++;
       }
 
-      query += ` ORDER BY u.bloco, u.nome LIMIT 100`;
+      query += ` ORDER BY u.bloco, u.andar, u.codigo, u.nome LIMIT 500`;
 
       const { rows } = await client.query(query, params_query);
 
@@ -68,8 +75,8 @@ export async function GET(request: NextRequest, { params }: Params) {
         success: true,
         data: rows.map((row: any) => ({
           ...row,
-          valor_tabela: row.valor_tabela ? parseFloat(row.valor_tabela) : null,
-          area: row.area ? parseFloat(row.area) : null,
+          valor_venda: row.valor_venda ? parseFloat(row.valor_venda) : null,
+          area_privativa: row.area_privativa ? parseFloat(row.area_privativa) : null,
         })),
       });
     });

@@ -30,6 +30,7 @@ import {
   Lock,
   ExternalLink,
   Building2,
+  Home,
 } from "lucide-react"
 import {
   DndContext,
@@ -114,20 +115,26 @@ interface CelulaRateio {
 
 interface EmpreendimentoBusca {
   id: string
+  cvcrm_id: number
   nome: string
   cidade?: string
   uf?: string
+  total_unidades?: number
 }
 
-interface UnidadeBusca {
+interface UnidadeDisponivel {
   id: string
+  cvcrm_id: number
   codigo?: string
+  nome?: string
   bloco?: string
   andar?: string
-  area?: number
+  area_privativa?: number
+  dormitorios?: number
   tipologia?: string
-  valor_tabela?: number
-  empreendimento_nome: string
+  valor_venda?: number
+  situacao?: string
+  empreendimento_nome?: string
 }
 
 // ============================================================================
@@ -158,6 +165,16 @@ const CARGOS_PADRAO = [
   "Imobiliaria",
   "Corretor",
 ]
+
+// Cargos that belong to "Equipe Pratica" group
+const CARGOS_EQUIPE_PRT = new Set([
+  "Gerente de Produto",
+  "Gerente Pratica",
+  "Coordenador 1",
+  "Coordenador 2",
+  "Secretaria",
+  "Tributos",
+])
 
 const STORAGE_KEY = "pratica_comissao_simulacao"
 
@@ -339,50 +356,53 @@ function AutocompleteInput({
 }
 
 // ============================================================================
-// SECTION WRAPPER
+// UNIT CARD (for Step 1 grid)
 // ============================================================================
 
-function Section({
-  title,
-  icon: Icon,
-  number,
-  children,
-  defaultOpen = true,
-  actions,
+function UnitCard({
+  unit,
+  selected,
+  onSelect,
 }: {
-  title: string
-  icon: React.ElementType
-  number: number
-  children: React.ReactNode
-  defaultOpen?: boolean
-  actions?: React.ReactNode
+  unit: UnidadeDisponivel
+  selected: boolean
+  onSelect: () => void
 }) {
-  const [open, setOpen] = useState(defaultOpen)
+  const label = unit.codigo || unit.nome || "—"
+  const price = unit.valor_venda
 
   return (
-    <Card className="overflow-hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-bold">
-            {number}
-          </div>
-          <Icon className="h-5 w-5 text-zinc-500" />
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100">{title}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {actions && open && <div onClick={e => e.stopPropagation()}>{actions}</div>}
-          {open ? <ChevronUp className="h-5 w-5 text-zinc-400" /> : <ChevronDown className="h-5 w-5 text-zinc-400" />}
-        </div>
-      </button>
-      {open && (
-        <CardContent className="px-5 pb-5 pt-0 border-t border-zinc-200/60 dark:border-zinc-800/60">
-          {children}
-        </CardContent>
+    <button
+      onClick={onSelect}
+      className={cn(
+        "text-left p-3 rounded-lg border-2 transition-all hover:shadow-sm",
+        selected
+          ? "border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800 ring-1 ring-zinc-900/10 dark:ring-white/10"
+          : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500"
       )}
-    </Card>
+    >
+      <div className="flex items-start justify-between gap-1 mb-1.5">
+        <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 truncate">{label}</span>
+        {selected && <Check className="h-4 w-4 text-zinc-900 dark:text-white shrink-0" />}
+      </div>
+      {unit.bloco && (
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">Bloco {unit.bloco}{unit.andar ? ` / ${unit.andar}° andar` : ""}</p>
+      )}
+      {unit.tipologia && (
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">{unit.tipologia}{unit.dormitorios ? ` - ${unit.dormitorios} dorm.` : ""}</p>
+      )}
+      {unit.area_privativa && (
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">{unit.area_privativa}m²</p>
+      )}
+      {price && price > 0 ? (
+        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mt-1.5 tabular-nums">{formatarMoeda(price)}</p>
+      ) : (
+        <p className="text-xs text-zinc-400 mt-1.5">Sem preço</p>
+      )}
+      {unit.situacao && unit.situacao !== "Disponivel" && (
+        <Badge variant="secondary" className="text-[10px] mt-1">{unit.situacao}</Badge>
+      )}
+    </button>
   )
 }
 
@@ -528,23 +548,22 @@ function WizardNavigation({
 }
 
 // ============================================================================
-// SORTABLE AUTONOMO ROW
+// SORTABLE AUTONOMO CARD (new design for Step 3)
 // ============================================================================
 
-function SortableAutonomoRow({
+function SortableAutonomoCard({
   autonomo,
-  totalAutonomos,
   valorComissao,
   onUpdate,
   onRemove,
 }: {
   autonomo: Autonomo
-  totalAutonomos: number
   valorComissao: number
   onUpdate: (id: string, field: keyof Autonomo, value: string | number) => void
   onRemove: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: autonomo.id })
+  const [showDoc, setShowDoc] = useState(false)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -552,77 +571,77 @@ function SortableAutonomoRow({
     opacity: isDragging ? 0.5 : 1,
   }
 
+  const computedValue = arredondarValor(valorComissao * (autonomo.percentual / 100))
+
   return (
-    <div ref={setNodeRef} style={style}>
-      {/* Desktop */}
-      <div className="hidden sm:grid grid-cols-[28px_1fr_140px_140px_80px_1fr_40px] gap-2 items-center bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-2">
-        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-600 flex items-center justify-center">
+    <div ref={setNodeRef} style={style} className="bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-3 space-y-2">
+      {/* Line 1: drag + name + cargo + delete */}
+      <div className="flex items-center gap-2">
+        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-600 shrink-0">
           <GripVertical className="h-4 w-4" />
         </button>
-
-        <Input placeholder="Nome" className="h-9" value={autonomo.nome} onChange={e => onUpdate(autonomo.id, "nome", e.target.value)} />
-
+        <Input
+          placeholder="Nome"
+          className="h-8 flex-1 text-sm"
+          value={autonomo.nome}
+          onChange={e => onUpdate(autonomo.id, "nome", e.target.value)}
+        />
         <Select value={autonomo.cargo} onValueChange={v => onUpdate(autonomo.id, "cargo", v)}>
-          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 w-[140px] text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             {CARGOS_PADRAO.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
           </SelectContent>
         </Select>
-
-        <Input
-          placeholder="CPF/CNPJ" className={cn("h-9 text-xs", !autonomo.documento && "border-amber-300 dark:border-amber-600")}
-          value={autonomo.documento || ""} onChange={e => onUpdate(autonomo.id, "documento", formatDocMask(e.target.value))} maxLength={18}
-        />
-
-        <Input
-          type="number" step="0.1" min="0" max="100" className="h-9"
-          value={autonomo.percentual || ""} onChange={e => onUpdate(autonomo.id, "percentual", parseFloat(e.target.value) || 0)}
-        />
-
-        <CurrencyInput className="h-9" value={autonomo.valorBruto} onChange={v => onUpdate(autonomo.id, "valorBruto", v)} />
-
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-red-500" onClick={() => onRemove(autonomo.id)}>
-          <Trash2 className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-red-500 shrink-0" onClick={() => onRemove(autonomo.id)}>
+          <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
 
-      {/* Mobile */}
-      <div className="sm:hidden bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-zinc-400">
-              <GripVertical className="h-4 w-4" />
-            </button>
-            <Badge variant="secondary" className="text-xs">#{autonomo.prioridade}</Badge>
-          </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-red-500" onClick={() => onRemove(autonomo.id)}>
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        <Input placeholder="Nome" className="h-9" value={autonomo.nome} onChange={e => onUpdate(autonomo.id, "nome", e.target.value)} />
-        <div className="grid grid-cols-2 gap-2">
-          <Select value={autonomo.cargo} onValueChange={v => onUpdate(autonomo.id, "cargo", v)}>
-            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CARGOS_PADRAO.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
-            </SelectContent>
-          </Select>
+      {/* Line 2: percentage input + computed value + doc toggle */}
+      <div className="flex items-center gap-2 pl-6">
+        <div className="relative w-20">
           <Input
-            placeholder="CPF/CNPJ" className={cn("h-9 text-xs", !autonomo.documento && "border-amber-300")}
-            value={autonomo.documento || ""} onChange={e => onUpdate(autonomo.id, "documento", formatDocMask(e.target.value))} maxLength={18}
+            type="number"
+            step="0.1"
+            min="0"
+            max="100"
+            className="h-8 text-sm pr-6"
+            value={autonomo.percentual || ""}
+            onChange={e => onUpdate(autonomo.id, "percentual", parseFloat(e.target.value) || 0)}
           />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400">%</span>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="relative">
-            <Input
-              type="number" step="0.1" min="0" max="100" className="h-9 pr-6"
-              value={autonomo.percentual || ""} onChange={e => onUpdate(autonomo.id, "percentual", parseFloat(e.target.value) || 0)}
-            />
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400">%</span>
-          </div>
-          <CurrencyInput value={autonomo.valorBruto} onChange={v => onUpdate(autonomo.id, "valorBruto", v)} />
+        <span className="text-sm text-zinc-400">=</span>
+        <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 tabular-nums">
+          {formatarMoeda(computedValue)}
+        </span>
+        <div className="ml-auto">
+          <button
+            onClick={() => setShowDoc(!showDoc)}
+            className={cn(
+              "text-[10px] px-2 py-0.5 rounded-full border transition-colors",
+              autonomo.documento
+                ? "border-emerald-300 text-emerald-600 dark:border-emerald-700 dark:text-emerald-400"
+                : "border-zinc-300 text-zinc-400 dark:border-zinc-600 hover:border-zinc-400"
+            )}
+          >
+            {autonomo.documento ? (autonomo.documento.replace(/\D/g, "").length > 11 ? "CNPJ" : "CPF") : "CPF/CNPJ"}
+          </button>
         </div>
       </div>
+
+      {/* Line 3: collapsible document input */}
+      {showDoc && (
+        <div className="pl-6">
+          <Input
+            placeholder="CPF ou CNPJ"
+            className={cn("h-8 text-xs", !autonomo.documento && "border-amber-300 dark:border-amber-600")}
+            value={autonomo.documento || ""}
+            onChange={e => onUpdate(autonomo.id, "documento", formatDocMask(e.target.value))}
+            maxLength={18}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -738,11 +757,17 @@ export default function ComissaoCalculadoraPage() {
   // ── Section 1: Dados do Imovel e Cliente ──
   const [empreendimento, setEmpreendimento] = useState("")
   const [empreendimentoId, setEmpreendimentoId] = useState<string | null>(null)
+  const [empreendimentoCvCrmId, setEmpreendimentoCvCrmId] = useState<number | null>(null)
   const [unidade, setUnidade] = useState("")
   const [clienteNome, setClienteNome] = useState("")
   const [clienteCpf, setClienteCpf] = useState("")
   const [valorImovel, setValorImovel] = useState(0)
   const [percentualComissao, setPercentualComissao] = useState(5)
+
+  // ── Unit grid states ──
+  const [unidadesDisponiveis, setUnidadesDisponiveis] = useState<UnidadeDisponivel[]>([])
+  const [loadingUnidades, setLoadingUnidades] = useState(false)
+  const [unidadeSelecionada, setUnidadeSelecionada] = useState<string | null>(null)
 
   // ── Section 1 extras: Cliente address ──
   const [clienteEmail, setClienteEmail] = useState("")
@@ -786,6 +811,7 @@ export default function ComissaoCalculadoraPage() {
       if (saved) {
         const data = JSON.parse(saved)
         if (data.empreendimento) setEmpreendimento(data.empreendimento)
+        if (data.empreendimentoCvCrmId) setEmpreendimentoCvCrmId(data.empreendimentoCvCrmId)
         if (data.unidade) setUnidade(data.unidade)
         if (data.clienteNome) setClienteNome(data.clienteNome)
         if (data.clienteCpf) setClienteCpf(data.clienteCpf)
@@ -815,14 +841,38 @@ export default function ComissaoCalculadoraPage() {
     if (!loaded) return
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        empreendimento, unidade, clienteNome, clienteCpf,
+        empreendimento, empreendimentoCvCrmId, unidade, clienteNome, clienteCpf,
         valorImovel, percentualComissao, series, autonomos,
         clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero,
         clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep,
         vendaId, webropayStatus, currentStep,
       }))
     } catch { /* ignore */ }
-  }, [loaded, empreendimento, unidade, clienteNome, clienteCpf, valorImovel, percentualComissao, series, autonomos, clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero, clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep, vendaId, webropayStatus, currentStep])
+  }, [loaded, empreendimento, empreendimentoCvCrmId, unidade, clienteNome, clienteCpf, valorImovel, percentualComissao, series, autonomos, clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero, clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep, vendaId, webropayStatus, currentStep])
+
+  // ── Auto-fetch unidades when empreendimento changes ──
+  useEffect(() => {
+    if (!empreendimentoCvCrmId) {
+      setUnidadesDisponiveis([])
+      setUnidadeSelecionada(null)
+      return
+    }
+
+    let cancelled = false
+    setLoadingUnidades(true)
+
+    fetch(`/api/comissao/buscar/unidades/${empreendimentoCvCrmId}`)
+      .then(res => res.json())
+      .then(json => {
+        if (!cancelled && json.success && json.data) {
+          setUnidadesDisponiveis(json.data)
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingUnidades(false) })
+
+    return () => { cancelled = true }
+  }, [empreendimentoCvCrmId])
 
   // ── DnD sensors ──
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -858,6 +908,24 @@ export default function ComissaoCalculadoraPage() {
     [totalProposta, totalValorAutonomos]
   )
 
+  // ── Step 3: Derived groups (just for rendering, data stays flat) ──
+  const equipePratica = useMemo(
+    () => autonomos.filter(a => CARGOS_EQUIPE_PRT.has(a.cargo)),
+    [autonomos]
+  )
+  const comissaoVendas = useMemo(
+    () => autonomos.filter(a => !CARGOS_EQUIPE_PRT.has(a.cargo)),
+    [autonomos]
+  )
+  const totalEquipePrt = useMemo(
+    () => arredondarValor(equipePratica.reduce((acc, a) => acc + a.valorBruto, 0)),
+    [equipePratica]
+  )
+  const totalComissaoVendas = useMemo(
+    () => arredondarValor(comissaoVendas.reduce((acc, a) => acc + a.valorBruto, 0)),
+    [comissaoVendas]
+  )
+
   // ── Parcela labels for rateio ──
   const parcelaLabels = useMemo(() => {
     const labels: string[] = []
@@ -873,6 +941,7 @@ export default function ComissaoCalculadoraPage() {
   const resetAll = useCallback(() => {
     setEmpreendimento("")
     setEmpreendimentoId(null)
+    setEmpreendimentoCvCrmId(null)
     setUnidade("")
     setClienteNome("")
     setClienteCpf("")
@@ -894,6 +963,8 @@ export default function ComissaoCalculadoraPage() {
     setVendaId(null)
     setWebropayStatus(null)
     setCurrentStep(1)
+    setUnidadesDisponiveis([])
+    setUnidadeSelecionada(null)
     localStorage.removeItem(STORAGE_KEY)
   }, [])
 
@@ -968,8 +1039,8 @@ export default function ComissaoCalculadoraPage() {
   }, [valorImovel])
 
   // ── Autonomos helpers ──
-  const addAutonomo = useCallback(() => {
-    setAutonomos(prev => [...prev, { id: generateId(), nome: "", cargo: "Corretor", percentual: 0, valorBruto: 0, prioridade: prev.length + 1, documento: "" }])
+  const addAutonomo = useCallback((cargo?: string) => {
+    setAutonomos(prev => [...prev, { id: generateId(), nome: "", cargo: cargo || "Corretor", percentual: 0, valorBruto: 0, prioridade: prev.length + 1, documento: "" }])
     setRateioCalculado(false)
   }, [])
 
@@ -1009,12 +1080,24 @@ export default function ComissaoCalculadoraPage() {
         percentual: pctOfComissao,
         valorBruto: arredondarValor(valorImovel * b.percentual_vgv),
         prioridade: i + 1,
-        documento: b.documento || "",
+        documento: "",
       }
     })
     setAutonomos(newAutonomos)
     setRateioCalculado(false)
   }, [valorImovel, valorComissao])
+
+  // ── Auto-load default team when entering Step 3 ──
+  const autoLoadedRef = useRef(false)
+  useEffect(() => {
+    if (currentStep === 3 && autonomos.length === 0 && valorImovel > 0 && !autoLoadedRef.current) {
+      autoLoadedRef.current = true
+      loadDefaultTeam()
+    }
+    if (currentStep !== 3) {
+      autoLoadedRef.current = false
+    }
+  }, [currentStep, autonomos.length, valorImovel, loadDefaultTeam])
 
   // ── DnD handler ──
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -1109,7 +1192,7 @@ export default function ComissaoCalculadoraPage() {
           prioridade: i + 1,
         })),
         parcelas: series.flatMap(s => {
-          const items = []
+          const items: any[] = []
           for (let i = 0; i < s.quantidade; i++) {
             items.push({
               numero: items.length + 1,
@@ -1257,6 +1340,16 @@ export default function ComissaoCalculadoraPage() {
     if (step < currentStep) setCurrentStep(step)
   }, [currentStep])
 
+  // ── Select unit from grid ──
+  const handleSelectUnit = useCallback((unit: UnidadeDisponivel) => {
+    const label = [unit.bloco, unit.codigo || unit.nome].filter(Boolean).join(" - ")
+    setUnidade(label || unit.id)
+    setUnidadeSelecionada(unit.id)
+    if (unit.valor_venda && unit.valor_venda > 0) {
+      setValorImovel(unit.valor_venda)
+    }
+  }, [])
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -1322,43 +1415,33 @@ export default function ComissaoCalculadoraPage() {
                     fetchUrl={(q) => `/api/comissao/buscar/empreendimentos?busca=${encodeURIComponent(q)}`}
                     onSelect={(item: EmpreendimentoBusca) => {
                       setEmpreendimentoId(item.id)
+                      setEmpreendimentoCvCrmId(item.cvcrm_id)
                       setEmpreendimento(item.nome)
+                      setUnidade("")
+                      setUnidadeSelecionada(null)
                     }}
                     getId={(item: EmpreendimentoBusca) => item.id}
                     getLabel={(item: EmpreendimentoBusca) => item.nome}
                     renderItem={(item: EmpreendimentoBusca) => (
-                      <div>
-                        <p className="font-medium">{item.nome}</p>
-                        {item.cidade && <p className="text-xs text-zinc-500">{item.cidade}{item.uf ? ` - ${item.uf}` : ""}</p>}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{item.nome}</p>
+                          {item.cidade && <p className="text-xs text-zinc-500">{item.cidade}{item.uf ? ` - ${item.uf}` : ""}</p>}
+                        </div>
+                        {item.total_unidades != null && (
+                          <span className="text-[10px] text-zinc-400 shrink-0">{item.total_unidades} un.</span>
+                        )}
                       </div>
                     )}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Unidade</Label>
-                  {empreendimentoId ? (
-                    <AutocompleteInput
-                      value={unidade}
-                      onChange={setUnidade}
-                      placeholder="Buscar unidade..."
-                      fetchUrl={(q) => `/api/comissao/buscar/unidades/${empreendimentoId}?busca=${encodeURIComponent(q)}`}
-                      onSelect={(item: UnidadeBusca) => {
-                        const label = [item.bloco, item.codigo].filter(Boolean).join(" - ")
-                        setUnidade(label || item.id)
-                        if (item.valor_tabela && item.valor_tabela > 0) setValorImovel(item.valor_tabela)
-                      }}
-                      getId={(item: UnidadeBusca) => item.id}
-                      getLabel={(item: UnidadeBusca) => [item.bloco, item.codigo].filter(Boolean).join(" - ") || item.id}
-                      renderItem={(item: UnidadeBusca) => (
-                        <div className="flex items-center justify-between">
-                          <span>{[item.bloco, item.codigo].filter(Boolean).join(" - ")}{item.tipologia ? ` (${item.tipologia})` : ""}</span>
-                          {item.valor_tabela && <span className="text-xs text-zinc-500">{formatarMoeda(item.valor_tabela)}</span>}
-                        </div>
-                      )}
-                    />
-                  ) : (
-                    <Input placeholder="Selecione o empreendimento primeiro" value={unidade} onChange={e => setUnidade(e.target.value)} />
-                  )}
+                  <Input
+                    placeholder={empreendimentoCvCrmId ? "Selecione no grid abaixo ou digite" : "Selecione o empreendimento primeiro"}
+                    value={unidade}
+                    onChange={e => { setUnidade(e.target.value); setUnidadeSelecionada(null) }}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Nome do Cliente</Label>
@@ -1388,6 +1471,46 @@ export default function ComissaoCalculadoraPage() {
                   </div>
                 </div>
               </div>
+
+              {/* ── Unit Grid ── */}
+              {empreendimentoCvCrmId && (
+                <div className="mt-5 pt-4 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Home className="h-4 w-4 text-zinc-400" />
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">
+                        Unidades Disponiveis
+                      </span>
+                      {unidadesDisponiveis.length > 0 && (
+                        <Badge variant="secondary" className="text-[10px]">{unidadesDisponiveis.length}</Badge>
+                      )}
+                    </div>
+                    {loadingUnidades && <Loader2 className="h-4 w-4 text-zinc-400 animate-spin" />}
+                  </div>
+
+                  {loadingUnidades ? (
+                    <div className="flex items-center justify-center py-8 text-sm text-zinc-400">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Carregando unidades...
+                    </div>
+                  ) : unidadesDisponiveis.length === 0 ? (
+                    <div className="text-center py-6 text-sm text-zinc-400">
+                      Nenhuma unidade disponivel encontrada para este empreendimento.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {unidadesDisponiveis.map(unit => (
+                        <UnitCard
+                          key={unit.id}
+                          unit={unit}
+                          selected={unidadeSelecionada === unit.id}
+                          onSelect={() => handleSelectUnit(unit)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Dados adicionais do cliente (Webropay) - collapsible */}
               <CollapsibleWebropay
@@ -1547,7 +1670,7 @@ export default function ComissaoCalculadoraPage() {
           </Card>
         )}
 
-        {/* ── Step 3: Comissoes ── */}
+        {/* ── Step 3: Comissoes (Redesigned) ── */}
         {currentStep === 3 && (
           <Card>
             <div className="px-5 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
@@ -1555,65 +1678,125 @@ export default function ComissaoCalculadoraPage() {
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-bold">3</div>
                   <Users className="h-5 w-5 text-zinc-500" />
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Comissoes dos Autonomos</span>
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Distribuicao de Comissoes</span>
                 </div>
-                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={loadDefaultTeam}>
-                  <Zap className="h-3.5 w-3.5 mr-1" />
-                  Equipe Padrao
+                <Button variant="ghost" size="sm" className="h-8 text-xs text-zinc-500" onClick={loadDefaultTeam}>
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                  Resetar Equipe
                 </Button>
               </div>
             </div>
             <CardContent className="px-5 pb-5 pt-4">
-              <div className="space-y-3">
-                {autonomos.length === 0 ? (
-                  <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
-                    Nenhum autonomo adicionado. Use &quot;Equipe Padrao&quot; ou adicione manualmente.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {/* Desktop header */}
-                    <div className="hidden sm:grid grid-cols-[28px_1fr_140px_140px_80px_1fr_40px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                      <span></span>
-                      <span>Nome</span>
-                      <span>Cargo</span>
-                      <span>CPF/CNPJ</span>
-                      <span>%</span>
-                      <span>Valor Bruto</span>
-                      <span></span>
+              <div className="space-y-4">
+                {/* ── Context bar ── */}
+                {valorComissao > 0 && (
+                  <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Comissao Total</p>
+                        <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
+                          {formatarMoeda(valorComissao)}
+                          <span className="text-sm font-normal text-zinc-400 ml-2">({percentualComissao}% de {formatarMoeda(valorImovel)})</span>
+                        </p>
+                      </div>
                     </div>
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                      <SortableContext items={autonomos.map(a => a.id)} strategy={verticalListSortingStrategy}>
-                        {autonomos.map(a => (
-                          <SortableAutonomoRow
-                            key={a.id}
-                            autonomo={a}
-                            totalAutonomos={autonomos.length}
-                            valorComissao={valorComissao}
-                            onUpdate={updateAutonomo}
-                            onRemove={removeAutonomo}
+                    {/* Progress bar */}
+                    {autonomos.length > 0 && (
+                      <>
+                        <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-300",
+                              totalPercentualAutonomos > 100.1 ? "bg-red-500" : totalPercentualAutonomos > 95 ? "bg-emerald-500" : "bg-zinc-500"
+                            )}
+                            style={{ width: `${Math.min(totalPercentualAutonomos, 100)}%` }}
                           />
-                        ))}
-                      </SortableContext>
-                    </DndContext>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-zinc-500">
+                            Distribuido: <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatarMoeda(totalValorAutonomos)}</span>
+                            <span className="text-zinc-400 ml-1">({totalPercentualAutonomos.toFixed(1)}%)</span>
+                          </span>
+                          <span className="text-zinc-500">
+                            Disponivel: <span className={cn("font-semibold", (valorComissao - totalValorAutonomos) < 0 ? "text-red-600" : "text-emerald-600 dark:text-emerald-400")}>
+                              {formatarMoeda(arredondarValor(valorComissao - totalValorAutonomos))}
+                            </span>
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-2">
-                  <Button variant="outline" size="sm" onClick={addAutonomo}>
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    Adicionar Autonomo
-                  </Button>
-                  {autonomos.length > 0 && (
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-zinc-500">
-                        Total: <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatarMoeda(totalValorAutonomos)}</span>
-                      </span>
-                      <Badge variant={Math.abs(totalPercentualAutonomos - 100) < 0.1 ? "default" : "secondary"} className="text-xs">
-                        {totalPercentualAutonomos.toFixed(1)}%
-                      </Badge>
-                    </div>
-                  )}
-                </div>
+                {autonomos.length === 0 ? (
+                  <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
+                    Sua equipe sera carregada automaticamente ao entrar neste passo.
+                  </div>
+                ) : (
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={autonomos.map(a => a.id)} strategy={verticalListSortingStrategy}>
+                      {/* ── Equipe Pratica Group ── */}
+                      {equipePratica.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Equipe Pratica</span>
+                            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 tabular-nums">
+                              {formatarMoeda(totalEquipePrt)}
+                            </span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {equipePratica.map(a => (
+                              <SortableAutonomoCard
+                                key={a.id}
+                                autonomo={a}
+                                valorComissao={valorComissao}
+                                onUpdate={updateAutonomo}
+                                onRemove={removeAutonomo}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── Comissao de Vendas Group ── */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Comissao de Vendas</span>
+                          <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 tabular-nums">
+                            {formatarMoeda(totalComissaoVendas)}
+                          </span>
+                        </div>
+                        {comissaoVendas.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {comissaoVendas.map(a => (
+                              <SortableAutonomoCard
+                                key={a.id}
+                                autonomo={a}
+                                valorComissao={valorComissao}
+                                onUpdate={updateAutonomo}
+                                onRemove={removeAutonomo}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-4 text-zinc-400 dark:text-zinc-500 text-sm border-2 border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg">
+                            Adicione o corretor e imobiliaria
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => addAutonomo("Corretor")}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Corretor
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => addAutonomo("Imobiliaria")}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Imobiliaria
+                          </Button>
+                        </div>
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
 
                 {autonomos.length > 0 && totalPercentualAutonomos > 100.1 && (
                   <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">

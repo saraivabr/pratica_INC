@@ -25,11 +25,13 @@ export async function GET(request: NextRequest) {
       let query = `
         SELECT
           id,
+          cvcrm_id,
           nome,
           cidade,
           uf,
           endereco_completo as endereco,
-          status
+          status,
+          total_unidades
         FROM cvcrm_empreendimentos
         WHERE 1=1
       `;
