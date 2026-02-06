@@ -5,11 +5,12 @@ import { ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-interface NavGroupProps {
+export interface NavGroupProps {
   title: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
   badge?: number;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 export function NavGroup({ title, children, defaultOpen = false, badge }: NavGroupProps) {

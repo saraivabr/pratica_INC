@@ -21,12 +21,15 @@ import {
   Flame,
   Thermometer,
   Snowflake,
+  Target,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { useAuth, usePageTracking } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { AnimatedBackground } from "@/components/animated-background"
+import { GlowButton } from "@/components/ui/glow-button"
+import { EmptyState } from "@/components/ui/empty-state"
 import { LeadScoreBadge } from "@/components/lead"
 import { calculateLeadScore } from "@/utils/leadScore"
 import type { Lead as LeadType } from "@/types/lead"
@@ -52,94 +55,6 @@ interface LeadWithScore extends Lead {
   lastInteraction?: { descricao?: string }
   daysSince?: number | null
   leadScore?: LeadScore
-}
-
-// Glow button component with animated gradient
-function GlowButton({
-  children,
-  onClick,
-  disabled,
-  className,
-  variant = "primary",
-}: {
-  children: React.ReactNode
-  onClick?: () => void
-  disabled?: boolean
-  className?: string
-  variant?: "primary" | "secondary" | "amber" | "red"
-}) {
-  const gradients = {
-    primary: "from-emerald-500 via-green-500 to-teal-500",
-    secondary: "from-gray-400 via-gray-500 to-gray-600",
-    amber: "from-amber-500 via-orange-500 to-yellow-500",
-    red: "from-red-500 via-rose-500 to-pink-500",
-  }
-
-  const bgGradients = {
-    primary: "from-emerald-500 via-green-500 to-emerald-600",
-    secondary: "from-gray-500 via-gray-600 to-gray-700",
-    amber: "from-amber-500 via-orange-500 to-amber-600",
-    red: "from-red-500 via-rose-500 to-red-600",
-  }
-
-  const shadowColors = {
-    primary: "hover:shadow-emerald-500/25",
-    secondary: "hover:shadow-gray-500/25",
-    amber: "hover:shadow-amber-500/25",
-    red: "hover:shadow-red-500/25",
-  }
-
-  return (
-    <div className="relative group">
-      {/* Outer glow */}
-      <div
-        className={cn(
-          "absolute -inset-1 bg-gradient-to-r rounded-xl blur-lg opacity-40 transition-all duration-500",
-          gradients[variant],
-          disabled ? "opacity-10" : "group-hover:opacity-70 group-hover:blur-xl"
-        )}
-      />
-
-      {/* Inner glow ring */}
-      <div
-        className={cn(
-          "absolute -inset-0.5 bg-gradient-to-r rounded-lg opacity-0 transition-opacity duration-300",
-          gradients[variant],
-          !disabled && "group-hover:opacity-60"
-        )}
-      />
-
-      {/* Button */}
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={cn(
-          "relative w-full h-10 px-4 rounded-lg font-medium text-sm",
-          "bg-gradient-to-r",
-          bgGradients[variant],
-          "text-white shadow-lg",
-          "transform transition-all duration-300",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
-          !disabled && `hover:scale-[1.02] hover:shadow-xl ${shadowColors[variant]} active:scale-[0.98]`,
-          className
-        )}
-      >
-        <span className="relative z-10 flex items-center justify-center gap-2">
-          {children}
-        </span>
-
-        {/* Shine effect */}
-        <div className="absolute inset-0 rounded-lg overflow-hidden">
-          <div
-            className={cn(
-              "absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/20 to-transparent",
-              !disabled && "group-hover:animate-shine"
-            )}
-          />
-        </div>
-      </button>
-    </div>
-  )
 }
 
 // Glassmorphism stat card
@@ -169,7 +84,7 @@ function StatCard({
         )}
       />
 
-      <div className="relative bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-white/60 dark:border-zinc-700/60 p-4 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+      <div className="relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-xl rounded-2xl border border-white/60 dark:border-zinc-700/60 p-4 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 will-change-[backdrop-filter]">
         <div className="flex items-center gap-4">
           <div
             className={cn(
@@ -189,7 +104,7 @@ function StatCard({
             <Icon className="relative h-6 w-6 text-white" />
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
             <p className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
               {value}
             </p>
@@ -232,7 +147,7 @@ function LeadCard({
         )}
       />
 
-      <div className="relative bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-white/60 dark:border-zinc-700/60 p-4 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+      <div className="relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-xl rounded-2xl border border-white/60 dark:border-zinc-700/60 p-4 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 will-change-[backdrop-filter]">
         {/* Animated top border */}
         <div
           className={cn(
@@ -258,7 +173,7 @@ function LeadCard({
                 <p className="font-semibold text-gray-900 dark:text-white leading-tight">
                   {lead.nome}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
                   {lead.telefone}
                 </p>
               </div>
@@ -331,7 +246,7 @@ function LeadCard({
 
           {/* Actions */}
           <div className="grid grid-cols-2 gap-2 pt-2">
-            <GlowButton variant="secondary" onClick={onSimulate}>
+            <GlowButton variant="secondary" size="sm" onClick={onSimulate}>
               {actionStatus?.includes("Simulando") ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -341,7 +256,7 @@ function LeadCard({
                 </>
               )}
             </GlowButton>
-            <GlowButton variant="primary" onClick={onSend}>
+            <GlowButton variant="primary" size="sm" onClick={onSend}>
               {actionStatus?.includes("Enviando") ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -411,7 +326,7 @@ function StatusColumnHeader({
           <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
             {title}
           </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400">{description}</p>
         </div>
         <div
           className={cn(
@@ -612,7 +527,7 @@ export default function LeadsPage() {
             {/* Card glow effect */}
             <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-[2rem] blur-xl opacity-20" />
 
-            <div className="relative bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-emerald-900/10 border border-white/60 dark:border-zinc-700/60 overflow-hidden">
+            <div className="relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-2xl rounded-3xl shadow-2xl shadow-emerald-900/10 border border-white/60 dark:border-zinc-700/60 overflow-hidden">
               {/* Animated top border */}
               <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-500 to-teal-400 animate-gradient" />
 
@@ -635,7 +550,7 @@ export default function LeadsPage() {
                         Recuperacao IA
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       Acoes rapidas e simulacao de recuperacao de leads
                     </p>
                   </div>
@@ -705,8 +620,14 @@ export default function LeadsPage() {
                 <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full blur-xl opacity-30 animate-pulse" />
                 <div className="relative h-14 w-14 rounded-full border-4 border-emerald-100 dark:border-emerald-900 border-t-emerald-500 animate-spin" />
               </div>
-              <p className="mt-4 text-gray-500 dark:text-gray-400">Carregando leads...</p>
+              <p className="mt-4 text-gray-600 dark:text-gray-400">Carregando leads...</p>
             </div>
+          ) : leads.length === 0 ? (
+            <EmptyState
+              icon={Target}
+              title="Nenhum lead neste filtro"
+              description="Tente ajustar os filtros ou aguarde novos leads."
+            />
           ) : (
             <div className="grid md:grid-cols-3 gap-6">
               {(Object.keys(grouped) as LeadStatus[]).map((status, columnIndex) => (
@@ -737,8 +658,8 @@ export default function LeadsPage() {
 
                     <div className="relative space-y-4">
                       {grouped[status].length === 0 ? (
-                        <div className="relative bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-white/60 dark:border-zinc-700/60 p-8 text-center">
-                          <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
+                        <div className="relative bg-white/80 md:bg-white/50 dark:bg-zinc-900/80 md:dark:bg-zinc-900/50 backdrop-blur-sm md:backdrop-blur-xl rounded-2xl border border-white/60 dark:border-zinc-700/60 p-8 text-center">
+                          <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-500">
                             <div
                               className={cn(
                                 "h-12 w-12 rounded-full flex items-center justify-center opacity-50",

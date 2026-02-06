@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   TrendingUp,
   ChevronRight,
+  ChevronDown,
   Building2,
   MessageSquare,
   Sparkles,
@@ -20,6 +21,7 @@ import {
   ShieldAlert,
   CalendarX,
   ArrowUpRight,
+  X,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { useAuth, usePageTracking } from "@/lib/auth-context"
@@ -27,6 +29,7 @@ import { AnimatedBackground } from "@/components/animated-background"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { UrgentLeadsQueue } from "@/components/dashboard/urgent-leads-queue"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface Lead {
   id: string
@@ -128,7 +131,7 @@ function GlowCard({
       {/* Card */}
       <div
         className={cn(
-          "relative bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl rounded-2xl shadow-xl border border-white/60 dark:border-zinc-800/60 overflow-hidden",
+          "relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-2xl rounded-2xl shadow-xl border border-white/60 dark:border-zinc-800/60 overflow-hidden will-change-[backdrop-filter]",
           className
         )}
       >
@@ -181,7 +184,7 @@ function MetricCard({
               >
                 <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
-              <span className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+              <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">
                 {title}
               </span>
             </div>
@@ -190,7 +193,7 @@ function MetricCard({
                 {value}
               </p>
               {subtitle && (
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1 truncate">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5 sm:mt-1 truncate">
                   {subtitle}
                 </p>
               )}
@@ -236,7 +239,7 @@ function UrgentLeadCard({
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm sm:text-base text-gray-900 dark:text-white truncate">{lead.nome}</p>
-        <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 truncate">
+        <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 truncate">
           {urgency || lead.empreendimento?.nome || "Sem empreendimento"}
         </p>
       </div>
@@ -258,53 +261,62 @@ function UrgentLeadCard({
 function DashboardSection({
   title,
   subtitle,
-  icon: Icon,
-  glowColor,
   count,
   emptyMessage,
   emptyIcon: EmptyIcon,
+  priority = 4,
+  accentColor = "gray",
+  dotColor = "bg-gray-400",
   children,
 }: {
   title: string
   subtitle: string
-  icon: React.ElementType
-  glowColor: string
+  icon?: React.ElementType
+  glowColor?: string
   count: number
   emptyMessage: string
   emptyIcon: React.ElementType
+  priority?: 1 | 2 | 3 | 4
+  accentColor?: string
+  dotColor?: string
   children?: React.ReactNode
 }) {
+  const borderAccentColors: Record<string, string> = {
+    red: "border-l-red-500",
+    amber: "border-l-amber-500",
+    emerald: "border-l-emerald-500",
+    gray: "border-l-gray-400",
+  }
+
+  const titleSizeClass = priority === 1 ? "text-base sm:text-lg" : "text-sm sm:text-base"
+  const opacityClass = priority === 4 ? "opacity-90" : ""
+
   return (
-    <div className="relative group mb-4 sm:mb-6">
-      <div
-        className={cn(
-          "absolute -inset-0.5 bg-gradient-to-r rounded-xl sm:rounded-2xl blur opacity-10 group-hover:opacity-20 transition-all duration-500",
-          glowColor
-        )}
-      />
-      <div className="relative bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl rounded-xl sm:rounded-2xl shadow-xl border border-white/60 dark:border-zinc-800/60 overflow-hidden">
+    <div className={cn("relative group mb-4 sm:mb-6", opacityClass)}>
+      <div className={cn(
+        "relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-2xl rounded-xl sm:rounded-2xl shadow-lg border border-white/60 dark:border-zinc-800/60 overflow-hidden border-l-4 will-change-[backdrop-filter]",
+        borderAccentColors[accentColor] || borderAccentColors.gray
+      )}>
         <div className="p-3 sm:p-4 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className={cn("h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg flex-shrink-0", glowColor)}>
-              <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-            </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white truncate">{title}</h3>
+                <span className={cn("h-2 w-2 rounded-full flex-shrink-0", dotColor)} />
+                <h3 className={cn("font-semibold text-gray-900 dark:text-white truncate", titleSizeClass)}>{title}</h3>
                 {count > 0 && (
                   <span className="px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex-shrink-0">
                     {count}
                   </span>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{subtitle}</p>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate ml-3.5 sm:ml-4">{subtitle}</p>
             </div>
           </div>
         </div>
         {count === 0 ? (
           <div className="p-4 sm:p-6 text-center">
             <EmptyIcon className="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-green-500 mb-1.5 sm:mb-2" />
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{emptyMessage}</p>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{emptyMessage}</p>
           </div>
         ) : (
           children
@@ -321,6 +333,8 @@ export default function CorretorDashboard() {
 
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
+  const [aiSummaryExpanded, setAiSummaryExpanded] = useState(false)
+  const [whatsappBannerDismissed, setWhatsappBannerDismissed] = useState(false)
   const [whatsappData, setWhatsappData] = useState<{
     status: "loading" | "connected" | "disconnected"
     pairedPhone?: string | null
@@ -467,7 +481,7 @@ export default function CorretorDashboard() {
                   <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white truncate">
                     {user?.nome?.split(" ")[0] || "Corretor"}!
                   </h1>
-                  <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 max-w-md line-clamp-2 sm:line-clamp-none">
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-md line-clamp-2 sm:line-clamp-none">
                     Aqui esta o resumo da sua performance. Acompanhe seus leads
                     e conquiste mais vendas.
                   </p>
@@ -485,7 +499,7 @@ export default function CorretorDashboard() {
                         <span className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
                           {metrics.score}
                         </span>
-                        <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
                           Score
                         </span>
                       </div>
@@ -495,7 +509,7 @@ export default function CorretorDashboard() {
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
                       Performance
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
                       {metrics.score >= 80
                         ? "Excelente!"
                         : metrics.score >= 60
@@ -513,7 +527,7 @@ export default function CorretorDashboard() {
             <section className="animate-fadeInUp" style={{ animationDelay: "50ms" }}>
               <div className="relative group">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-all duration-500" />
-                <div className="relative bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50 backdrop-blur-xl rounded-2xl border border-green-200 dark:border-green-800 p-5 overflow-hidden">
+                <div className="relative bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50 backdrop-blur-sm md:backdrop-blur-xl rounded-2xl border border-green-200 dark:border-green-800 p-5 overflow-hidden">
                   {/* Decorative background */}
                   <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-green-400/20 to-emerald-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
@@ -552,63 +566,44 @@ export default function CorretorDashboard() {
             </section>
           )}
 
-          {/* WhatsApp Connection Card - Connected */}
-          {whatsappData.status === "connected" && (
+          {/* WhatsApp Connection Bar - Connected (compact) */}
+          {whatsappData.status === "connected" && !whatsappBannerDismissed && (
             <section className="animate-fadeInUp" style={{ animationDelay: "50ms" }}>
-              <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 rounded-2xl blur opacity-20 group-hover:opacity-40 transition-all duration-500" />
-                <div className="relative bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl rounded-2xl border border-green-200 dark:border-green-800/50 p-4 sm:p-5 overflow-hidden">
-                  <div className="flex items-center gap-4">
-                    {/* Profile Picture */}
-                    <div className="relative flex-shrink-0">
-                      <div className="absolute inset-0 bg-green-500 rounded-full blur-md opacity-30" />
-                      {whatsappData.profilePicUrl ? (
-                        <img
-                          src={whatsappData.profilePicUrl}
-                          alt="WhatsApp"
-                          className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-full object-cover border-2 border-green-500 shadow-lg"
-                        />
-                      ) : (
-                        <div className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg border-2 border-green-400">
-                          <MessageSquare className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
-                        </div>
-                      )}
-                      {/* Online indicator */}
-                      <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-green-500 border-2 border-white dark:border-zinc-900 flex items-center justify-center">
-                        <CheckCircle2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-white" />
-                      </div>
-                    </div>
+              <div className="relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm rounded-xl border border-green-200 dark:border-green-800/50 px-3 sm:px-4 h-10 flex items-center gap-2 sm:gap-3">
+                {/* Green dot */}
+                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
 
-                    {/* Profile Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                          {whatsappData.profileName || "WhatsApp Conectado"}
-                        </h3>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium flex-shrink-0">
-                          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                          Online
-                        </span>
-                      </div>
-                      {whatsappData.pairedPhone && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {whatsappData.pairedPhone}
-                        </p>
-                      )}
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        Pronto para enviar mensagens aos seus leads
-                      </p>
-                    </div>
+                {/* Status text */}
+                <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  WhatsApp conectado
+                </span>
 
-                    {/* Action Button */}
-                    <Link
-                      href="/onboarding/whatsapp"
-                      className="flex-shrink-0 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                      title="Gerenciar conexão"
-                    >
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
-                    </Link>
-                  </div>
+                {/* Profile name / phone */}
+                {(whatsappData.profileName || whatsappData.pairedPhone) && (
+                  <span className="text-xs text-gray-600 dark:text-gray-400 truncate hidden sm:inline">
+                    {whatsappData.profileName}
+                    {whatsappData.profileName && whatsappData.pairedPhone ? " - " : ""}
+                    {whatsappData.pairedPhone}
+                  </span>
+                )}
+
+                <div className="ml-auto flex items-center gap-1 flex-shrink-0">
+                  {/* Manage link */}
+                  <Link
+                    href="/onboarding/whatsapp"
+                    className="text-xs text-green-600 dark:text-green-400 hover:underline hidden sm:inline"
+                  >
+                    Gerenciar
+                  </Link>
+
+                  {/* Dismiss button */}
+                  <button
+                    onClick={() => setWhatsappBannerDismissed(true)}
+                    className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    title="Ocultar"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
             </section>
@@ -667,59 +662,89 @@ export default function CorretorDashboard() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
               </div>
+            ) : leads.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="Nenhum lead encontrado"
+                description="Seus leads aparecerão aqui quando forem atribuídos a você."
+                action={{ label: "Ver empreendimentos", href: "/corretor/imoveis" }}
+              />
             ) : (
               <>
-                {/* AI Summary Banner */}
+                {/* AI Summary Banner - Collapsible */}
                 {urgencyStats && (urgencyStats.criticalActions > 0 || urgencyStats.atRisk > 0 || urgencyStats.hotOpportunities > 0) && (
                   <section className="animate-fadeInUp">
-                    <GlowCard glowColor="purple" className="p-4 sm:p-6">
-                      <div className="flex items-start gap-3 sm:gap-4">
-                        <div className="relative flex-shrink-0 hidden sm:block">
-                          <div className="absolute inset-0 bg-purple-500 rounded-xl blur-lg opacity-40 animate-pulse" />
-                          <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-purple-400 to-violet-500 flex items-center justify-center shadow-lg">
-                            <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                          </div>
+                    <div className="relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-xl rounded-xl sm:rounded-2xl border border-purple-100 dark:border-purple-900/30 overflow-hidden will-change-[backdrop-filter]">
+                      <button
+                        onClick={() => setAiSummaryExpanded(!aiSummaryExpanded)}
+                        className="w-full p-3 sm:p-4 flex items-center gap-2 sm:gap-3 text-left hover:bg-gray-50/50 dark:hover:bg-zinc-800/50 transition-colors"
+                      >
+                        <Sparkles className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1">
+                          Resumo de Urgencia
+                        </span>
+                        <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 flex-shrink-0">
+                          {urgencyStats.criticalActions > 0 && (
+                            <span className="flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                              {urgencyStats.criticalActions}
+                            </span>
+                          )}
+                          {urgencyStats.atRisk > 0 && (
+                            <span className="flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              {urgencyStats.atRisk}
+                            </span>
+                          )}
+                          {urgencyStats.hotOpportunities > 0 && (
+                            <span className="flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              {urgencyStats.hotOpportunities}
+                            </span>
+                          )}
+                          <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", aiSummaryExpanded && "rotate-180")} />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-                            <Sparkles className="h-4 w-4 sm:hidden text-purple-500" />
-                            Resumo de Urgência
-                          </h3>
-                          <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
-                            <p className="font-medium">
-                              <strong className="text-red-600 dark:text-red-400">Contatar: </strong>
+                      </button>
+                      {aiSummaryExpanded && (
+                        <div className="px-3 sm:px-4 pb-3 sm:pb-4 border-t border-gray-100 dark:border-gray-800 pt-3">
+                          <div className="space-y-1.5 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+                            <p>
+                              <span className="text-red-600 dark:text-red-400 font-medium">Contatar: </span>
                               {urgencyStats.criticalActions > 0
-                                ? `${urgencyStats.criticalActions} lead(s) URGENTE`
-                                : "Nenhuma ação crítica"}
+                                ? `${urgencyStats.criticalActions} lead(s) urgente(s)`
+                                : "Nenhuma acao critica"}
                             </p>
-                            <p className="font-medium">
-                              <strong className="text-amber-600 dark:text-amber-400">Em risco: </strong>
+                            <p>
+                              <span className="text-amber-600 dark:text-amber-400 font-medium">Em risco: </span>
                               {urgencyStats.atRisk > 0
                                 ? `${urgencyStats.atRisk} lead(s) esfriando`
                                 : "Nenhum em risco"}
                             </p>
-                            <p className="font-medium">
-                              <strong className="text-emerald-600 dark:text-emerald-400">Quentes: </strong>
+                            <p>
+                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Quentes: </span>
                               {urgencyStats.hotOpportunities > 0
                                 ? `${urgencyStats.hotOpportunities} oportunidade(s)`
                                 : "Continue aquecendo"}
                             </p>
                           </div>
                         </div>
-                      </div>
-                    </GlowCard>
+                      )}
+                    </div>
                   </section>
                 )}
 
-                {/* 1. CONTATE AGORA - Critical Actions */}
+                {/* 1. Contatar Agora - Critical Actions */}
                 <DashboardSection
-                  title="🔥 CONTATE AGORA"
-                  subtitle="Estes leads precisam de atenção imediata para não esfriar"
+                  title="Contatar Agora"
+                  subtitle="Leads que precisam de atenção imediata"
                   icon={Flame}
                   glowColor="from-red-400 via-rose-400 to-pink-400"
                   count={categorizedLeads?.contactNow.length || 0}
-                  emptyMessage="🎉 Ótimo! Nenhuma ação crítica pendente no momento."
+                  emptyMessage="Nenhuma ação critica pendente no momento."
                   emptyIcon={CheckCircle2}
+                  priority={1}
+                  accentColor="red"
+                  dotColor="bg-red-500"
                 >
                   {categorizedLeads && categorizedLeads.contactNow.length > 0 && (
                     <div className="p-4 space-y-3">
@@ -736,15 +761,18 @@ export default function CorretorDashboard() {
                   )}
                 </DashboardSection>
 
-                {/* 2. RISCOS DE PERDA - Loss Risks */}
+                {/* 2. Riscos de Perda - Loss Risks */}
                 <DashboardSection
-                  title="⚠️ RISCOS DE PERDA"
-                  subtitle="Leads valiosos que estão esfriando - recupere-os hoje!"
+                  title="Riscos de Perda"
+                  subtitle="Leads esfriando que precisam de recuperação"
                   icon={ShieldAlert}
                   glowColor="from-amber-400 via-orange-400 to-yellow-400"
                   count={categorizedLeads?.lossRisks.length || 0}
-                  emptyMessage="✅ Sem leads em risco. Continue mantendo o ritmo!"
+                  emptyMessage="Sem leads em risco. Continue mantendo o ritmo!"
                   emptyIcon={CheckCircle2}
+                  priority={2}
+                  accentColor="amber"
+                  dotColor="bg-amber-500"
                 >
                   {categorizedLeads && categorizedLeads.lossRisks.length > 0 && (
                     <div className="p-4 space-y-3">
@@ -761,15 +789,18 @@ export default function CorretorDashboard() {
                   )}
                 </DashboardSection>
 
-                {/* 3. OPORTUNIDADES HOJE - Hot Opportunities */}
+                {/* 3. Oportunidades - Hot Opportunities */}
                 <DashboardSection
-                  title="💰 OPORTUNIDADES HOJE"
-                  subtitle="Leads quentes prontos para conversão - feche essas vendas!"
+                  title="Oportunidades"
+                  subtitle="Leads quentes prontos para conversão"
                   icon={TrendingUp}
                   glowColor="from-emerald-400 via-green-400 to-teal-400"
                   count={categorizedLeads?.opportunities.length || 0}
                   emptyMessage="Continue prospectando para encontrar mais oportunidades."
                   emptyIcon={Target}
+                  priority={3}
+                  accentColor="emerald"
+                  dotColor="bg-emerald-500"
                 >
                   {categorizedLeads && categorizedLeads.opportunities.length > 0 && (
                     <div className="p-4 space-y-3">
@@ -786,15 +817,18 @@ export default function CorretorDashboard() {
                   )}
                 </DashboardSection>
 
-                {/* 4. AÇÕES ATRASADAS - Overdue Actions */}
+                {/* 4. Follow-ups Atrasados - Overdue Actions */}
                 <DashboardSection
-                  title="⏰ AÇÕES ATRASADAS"
-                  subtitle="Follow-ups que deveriam ter sido feitos - retome agora!"
+                  title="Follow-ups Atrasados"
+                  subtitle="Ações pendentes que precisam ser retomadas"
                   icon={CalendarX}
-                  glowColor="from-purple-400 via-violet-400 to-indigo-400"
+                  glowColor="from-gray-400 via-slate-400 to-zinc-400"
                   count={categorizedLeads?.overdue.length || 0}
-                  emptyMessage="🎯 Perfeito! Todas as ações estão em dia."
+                  emptyMessage="Todas as ações estão em dia."
                   emptyIcon={CheckCircle2}
+                  priority={4}
+                  accentColor="gray"
+                  dotColor="bg-gray-400"
                 >
                   {categorizedLeads && categorizedLeads.overdue.length > 0 && (
                     <div className="p-4 space-y-3">
@@ -823,7 +857,7 @@ export default function CorretorDashboard() {
                           <h3 className="font-semibold text-gray-900 dark:text-white text-xs sm:text-sm">
                             Ações Rápidas
                           </h3>
-                          <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
+                          <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
                             Ferramentas importantes
                           </p>
                         </div>

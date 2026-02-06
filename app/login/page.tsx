@@ -9,64 +9,9 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import { AnimatedBackground } from "@/components/animated-background";
+import { GlowButton } from "@/components/ui/glow-button";
 
 type LoginStep = "phone" | "link_sent" | "not_registered" | "register";
-
-// Glow button component with animated gradient
-function GlowButton({
-  children,
-  onClick,
-  disabled,
-  className
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  className?: string;
-}) {
-  return (
-    <div className="relative group">
-      {/* Outer glow */}
-      <div className={cn(
-        "absolute -inset-1 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 rounded-2xl blur-lg opacity-60 transition-all duration-500",
-        disabled ? "opacity-20" : "group-hover:opacity-100 group-hover:blur-xl"
-      )} />
-
-      {/* Inner glow ring */}
-      <div className={cn(
-        "absolute -inset-0.5 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-xl opacity-0 transition-opacity duration-300",
-        !disabled && "group-hover:opacity-75"
-      )} />
-
-      {/* Button */}
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={cn(
-          "relative w-full h-14 px-8 rounded-xl font-medium text-base",
-          "bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600",
-          "text-white shadow-lg",
-          "transform transition-all duration-300",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
-          !disabled && "hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/25 active:scale-[0.98]",
-          className
-        )}
-      >
-        <span className="relative z-10 flex items-center justify-center gap-2">
-          {children}
-        </span>
-
-        {/* Shine effect */}
-        <div className="absolute inset-0 rounded-xl overflow-hidden">
-          <div className={cn(
-            "absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/20 to-transparent",
-            !disabled && "group-hover:animate-shine"
-          )} />
-        </div>
-      </button>
-    </div>
-  );
-}
 
 // Animated OTP Input with individual boxes
 function OTPInput({

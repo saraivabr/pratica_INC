@@ -9,7 +9,6 @@ function getBaseUrl(request: NextRequest): string {
 
 // Routes that require authentication
 const protectedRoutes = [
-  '/',
   '/empreendimentos',
   '/calculadora',
   '/chat',
@@ -17,12 +16,14 @@ const protectedRoutes = [
   '/corretor',
   '/leads',
   '/onboarding/whatsapp',
+  '/recepcionista',
 ]
 
 // Route prefixes that require authentication
 const protectedPrefixes = [
   '/empreendimentos/',
   '/admin/',
+  '/recepcionista/',
 ]
 
 // Routes that are always public (no auth required)
@@ -92,7 +93,7 @@ function isProtectedRoute(pathname: string): boolean {
 interface SessionData {
   userId?: string
   phone?: string
-  role?: 'corretor' | 'gerente' | 'admin'
+  role?: 'corretor' | 'gerente' | 'admin' | 'recepcionista'
   workspaceId?: number  // NEW: User Workspace Architecture
 }
 
@@ -170,6 +171,18 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/corretor', baseUrl))
   }
 
+  // Homepage: show landing for visitors, redirect authenticated users
+  if (pathname === '/') {
+    if (session) {
+      if (session.role === 'recepcionista') {
+        return NextResponse.redirect(new URL('/recepcionista', baseUrl))
+      }
+      const isAdminOrGerente = session.role === 'admin' || session.role === 'gerente'
+      return NextResponse.redirect(new URL(isAdminOrGerente ? '/admin' : '/corretor', baseUrl))
+    }
+    return NextResponse.next()
+  }
+
   // Always allow public routes
   if (isPublicRoute(pathname)) {
     return NextResponse.next()
@@ -194,15 +207,6 @@ export function middleware(request: NextRequest) {
       // return NextResponse.redirect(new URL('/onboarding/workspace', baseUrl))
     }
 
-    // Role-based redirects for homepage
-    if (pathname === '/') {
-      const isAdminOrGerente = session.role === 'admin' || session.role === 'gerente'
-      if (isAdminOrGerente) {
-        return NextResponse.redirect(new URL('/admin', baseUrl))
-      } else {
-        return NextResponse.redirect(new URL('/corretor', baseUrl))
-      }
-    }
   }
 
   // Allow the request to proceed

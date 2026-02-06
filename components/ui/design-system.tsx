@@ -3,6 +3,9 @@
 import { cn } from "@/lib/utils";
 import React from "react";
 
+// Re-export GlowButton from its dedicated module
+export { GlowButton } from "@/components/ui/glow-button";
+
 /**
  * Design System Components
  * 
@@ -23,88 +26,6 @@ export function AnimatedBackground({ className }: { className?: string }) {
       <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-emerald-300/40 to-green-400/40 rounded-full blur-3xl animate-blob will-change-transform" />
       <div className="absolute top-1/2 -left-40 w-96 h-96 bg-gradient-to-br from-green-300/30 to-teal-400/30 rounded-full blur-3xl animate-blob animation-delay-2000 will-change-transform" />
       <div className="absolute -bottom-40 right-1/3 w-96 h-96 bg-gradient-to-br from-emerald-200/30 to-cyan-300/30 rounded-full blur-3xl animate-blob animation-delay-4000 will-change-transform" />
-    </div>
-  );
-}
-
-// ============================================
-// GLOW BUTTON
-// ============================================
-
-interface GlowButtonProps {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  className?: string;
-  type?: "button" | "submit" | "reset";
-  variant?: "primary" | "secondary";
-}
-
-export function GlowButton({
-  children,
-  onClick,
-  disabled,
-  className,
-  type = "button",
-  variant = "primary",
-}: GlowButtonProps) {
-  const isPrimary = variant === "primary";
-  
-  return (
-    <div className="relative group">
-      {/* Outer glow */}
-      <div
-        className={cn(
-          "absolute -inset-1 rounded-2xl blur-lg transition-all duration-500",
-          isPrimary
-            ? "bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 opacity-60"
-            : "bg-gradient-to-r from-gray-400 via-gray-500 to-gray-600 opacity-40",
-          disabled ? "opacity-20" : "group-hover:opacity-100 group-hover:blur-xl"
-        )}
-      />
-
-      {/* Inner glow ring */}
-      <div
-        className={cn(
-          "absolute -inset-0.5 rounded-xl opacity-0 transition-opacity duration-300",
-          isPrimary
-            ? "bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400"
-            : "bg-gradient-to-r from-gray-300 via-gray-400 to-gray-500",
-          !disabled && "group-hover:opacity-75"
-        )}
-      />
-
-      {/* Button */}
-      <button
-        type={type}
-        onClick={onClick}
-        disabled={disabled}
-        className={cn(
-          "relative w-full h-14 px-8 rounded-xl font-medium text-base",
-          isPrimary
-            ? "bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600"
-            : "bg-gradient-to-r from-gray-600 via-gray-700 to-gray-800",
-          "text-white shadow-lg",
-          "transform transition-all duration-300",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
-          !disabled && "hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/25 active:scale-[0.98]",
-          className
-        )}
-      >
-        <span className="relative z-10 flex items-center justify-center gap-2">
-          {children}
-        </span>
-
-        {/* Shine effect */}
-        <div className="absolute inset-0 rounded-xl overflow-hidden">
-          <div
-            className={cn(
-              "absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/20 to-transparent",
-              !disabled && "group-hover:animate-shine"
-            )}
-          />
-        </div>
-      </button>
     </div>
   );
 }

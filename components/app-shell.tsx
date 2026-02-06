@@ -36,6 +36,7 @@ import {
   CircleDollarSign,
   ClipboardList,
   ClipboardCheck,
+  Clock,
   PartyPopper,
   Gauge,
   PanelLeft,
@@ -134,22 +135,29 @@ const adminGroups = {
       { href: "/admin/eventos", icon: PartyPopper, label: "Eventos", description: "Criar e gerenciar eventos" },
       { href: "/admin/recepcao", icon: ClipboardCheck, label: "Roleta", description: "Controle de plantão e fila" },
       { href: "/admin/comissao", icon: Calculator, label: "Comissão", description: "Cálculo de comissões" },
+      { href: "/admin/agenda", icon: Calendar, label: "Agenda", description: "Visitas da equipe" },
     ],
   },
-  mais: {
-    title: "Mais",
-    icon: Settings,
+  imoveis: {
+    title: "Imóveis",
+    icon: Building2,
     defaultOpen: false,
     items: [
       { href: "/empreendimentos", icon: Building2, label: "Empreendimentos", description: "Imóveis e unidades" },
-      { href: "/admin/chat", icon: MessageSquare, label: "Chat", description: "Conversas com leads" },
-      { href: "/admin/agenda", icon: Calendar, label: "Agenda", description: "Visitas da equipe" },
-      { href: "/calculadora/juncao", icon: Merge, label: "Junção de Lotes", description: "Calculadora de junção" },
       { href: "/calculadora", icon: CircleDollarSign, label: "Simulador", description: "Simular financiamento" },
+      { href: "/calculadora/juncao", icon: Merge, label: "Junção de Lotes", description: "Calculadora de junção" },
+    ],
+  },
+  configuracoes: {
+    title: "Configurações",
+    icon: Settings,
+    defaultOpen: false,
+    items: [
       { href: "/admin/permissoes", icon: Shield, label: "Permissões", description: "Controle de acesso" },
       { href: "/admin/automations", icon: Zap, label: "Automações", description: "Regras automáticas" },
       { href: "/admin/reports", icon: BarChart3, label: "Relatórios", description: "Exportação e análises" },
       { href: "/admin/status", icon: Activity, label: "Status do Sistema", description: "Status das integrações" },
+      { href: "/admin/chat", icon: MessageSquare, label: "Chat", description: "Conversas com leads" },
     ],
   },
 }
@@ -179,10 +187,12 @@ const adminMobileNavItems = [
 // ────────────────────────────────────────────────────────
 const recepcionistaNavItems = [
   { href: "/recepcionista", icon: ClipboardList, label: "Cadastro de Leads", description: "Registrar novos leads" },
+  { href: "/recepcionista/historico", icon: Clock, label: "Histórico", description: "Leads cadastrados" },
 ]
 
 const recepcionistaMobileNavItems = [
   { href: "/recepcionista", icon: ClipboardList, label: "Leads" },
+  { href: "/recepcionista/historico", icon: Clock, label: "Histórico" },
 ]
 
 // ────────────────────────────────────────────────────────
@@ -1093,7 +1103,7 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
               <div className="flex items-center gap-3">
                 {/* Role Switch - only for admin/gerente */}
                 {canSwitchRoles && (
-                  <RoleSwitch currentView={currentView} onSwitch={handleRoleSwitch} />
+                  <RoleSwitch currentView={currentView as "admin" | "corretor"} onSwitch={handleRoleSwitch} />
                 )}
 
                 <Button

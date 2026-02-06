@@ -7,6 +7,7 @@ import { useAuth, usePageTracking } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { AnimatedBackground } from "@/components/animated-background"
 import { cn } from "@/lib/utils"
+import { GlowButton } from "@/components/ui/glow-button"
 import {
   Loader2,
   QrCode,
@@ -30,78 +31,6 @@ type StatusPayload = {
   deviceName?: string
   lastQr?: string
   error?: string
-}
-
-// Glow button component with animated gradient
-function GlowButton({
-  children,
-  onClick,
-  disabled,
-  className,
-  variant = "primary",
-}: {
-  children: React.ReactNode
-  onClick?: () => void
-  disabled?: boolean
-  className?: string
-  variant?: "primary" | "secondary" | "success"
-}) {
-  const gradients = {
-    primary: "from-emerald-500 via-green-500 to-teal-500",
-    secondary: "from-gray-400 via-gray-500 to-gray-600",
-    success: "from-green-500 via-emerald-500 to-teal-500",
-  }
-
-  return (
-    <div className="relative group">
-      {/* Outer glow */}
-      <div
-        className={cn(
-          "absolute -inset-1 bg-gradient-to-r rounded-2xl blur-lg opacity-60 transition-all duration-500",
-          gradients[variant],
-          disabled ? "opacity-20" : "group-hover:opacity-100 group-hover:blur-xl"
-        )}
-      />
-
-      {/* Inner glow ring */}
-      <div
-        className={cn(
-          "absolute -inset-0.5 bg-gradient-to-r rounded-xl opacity-0 transition-opacity duration-300",
-          gradients[variant],
-          !disabled && "group-hover:opacity-75"
-        )}
-      />
-
-      {/* Button */}
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={cn(
-          "relative w-full h-14 px-8 rounded-xl font-medium text-base",
-          "bg-gradient-to-r text-white shadow-lg",
-          gradients[variant],
-          "transform transition-all duration-300",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
-          !disabled && "hover:scale-[1.02] hover:shadow-2xl active:scale-[0.98]",
-          className
-        )}
-      >
-        <span className="relative z-10 flex items-center justify-center gap-2">
-          {children}
-        </span>
-
-        {/* Shine effect */}
-        <div className="absolute inset-0 rounded-xl overflow-hidden">
-          <div
-            className={cn(
-              "absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/20 to-transparent",
-              !disabled && "group-hover:animate-shine"
-            )}
-          />
-        </div>
-      </button>
-    </div>
-  )
 }
 
 // Step indicator component

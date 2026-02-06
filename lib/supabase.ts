@@ -21,7 +21,7 @@ export interface User {
   id: string;
   telefone: string;
   nome: string;
-  role: "corretor" | "gerente" | "admin";
+  role: "corretor" | "gerente" | "admin" | "recepcionista";
   imobiliaria_id?: string;
   gerente_id?: string;
   avatar_url?: string;
@@ -131,6 +131,8 @@ function mapUserRow(row: any): User {
       role = "admin";
     } else if (hierarquia.slug === "gerente") {
       role = "gerente";
+    } else if (hierarquia.slug === "recepcionista") {
+      role = "recepcionista";
     } else {
       role = "corretor";
     }

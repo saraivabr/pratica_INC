@@ -29,6 +29,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Slider } from "@/components/ui/slider"
 import { formatCurrency } from "@/lib/data"
 import { cn } from "@/lib/utils"
+import { GlowButton } from "@/components/ui/glow-button"
+import { EmptyState } from "@/components/ui/empty-state"
 
 // Skeleton Card Component matching new design
 function SkeletonCard({ delay = 0 }: { delay?: number }) {
@@ -57,62 +59,6 @@ function SkeletonCard({ delay = 0 }: { delay?: number }) {
           </div>
         ))}
       </div>
-    </div>
-  )
-}
-
-// Glow Button Component (matching login page style)
-function GlowButton({
-  children,
-  onClick,
-  disabled,
-  className
-}: {
-  children: React.ReactNode
-  onClick?: () => void
-  disabled?: boolean
-  className?: string
-}) {
-  return (
-    <div className="relative group">
-      {/* Outer glow */}
-      <div className={cn(
-        "absolute -inset-1 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 rounded-2xl blur-lg opacity-60 transition-all duration-500",
-        disabled ? "opacity-20" : "group-hover:opacity-100 group-hover:blur-xl"
-      )} />
-
-      {/* Inner glow ring */}
-      <div className={cn(
-        "absolute -inset-0.5 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-xl opacity-0 transition-opacity duration-300",
-        !disabled && "group-hover:opacity-75"
-      )} />
-
-      {/* Button */}
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={cn(
-          "relative w-full h-14 px-8 rounded-xl font-medium text-base",
-          "bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600",
-          "text-white shadow-lg",
-          "transform transition-all duration-300",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
-          !disabled && "hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/25 active:scale-[0.98]",
-          className
-        )}
-      >
-        <span className="relative z-10 flex items-center justify-center gap-2">
-          {children}
-        </span>
-
-        {/* Shine effect */}
-        <div className="absolute inset-0 rounded-xl overflow-hidden">
-          <div className={cn(
-            "absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/20 to-transparent",
-            !disabled && "group-hover:animate-shine"
-          )} />
-        </div>
-      </button>
     </div>
   )
 }
@@ -307,7 +253,7 @@ function EnhancedSearchFilters({
                         <span className="px-3 py-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-sm text-emerald-600 dark:text-emerald-400">
                           {formatCurrency(precoRange[0])}
                         </span>
-                        <span className="text-gray-400">ate</span>
+                        <span className="text-gray-500">ate</span>
                         <span className="px-3 py-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-sm text-emerald-600 dark:text-emerald-400">
                           {formatCurrency(precoRange[1])}
                         </span>
@@ -394,7 +340,7 @@ function EnhancedSearchFilters({
                   >
                     Limpar Filtros
                   </button>
-                  <GlowButton onClick={() => setIsOpen(false)} className="flex-1 h-12">
+                  <GlowButton onClick={() => setIsOpen(false)} size="md" className="flex-1">
                     Aplicar Filtros
                   </GlowButton>
                 </div>
@@ -740,21 +686,13 @@ export default function EmpreendimentosPage() {
           </>
         ) : (
           /* Empty State */
-          <div className="text-center py-16 sm:py-20 animate-fadeInUp">
-            <div className="relative inline-block mb-6">
-              <div className="absolute inset-0 bg-gradient-to-br from-gray-300 to-gray-400 rounded-2xl blur-xl opacity-30" />
-              <div className="relative h-20 w-20 rounded-2xl bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center">
-                <Building2 className="h-10 w-10 text-gray-400 dark:text-gray-600" />
-              </div>
-            </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-700 dark:text-gray-300 mb-2">
-              Nenhum empreendimento encontrado
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-              Tente ajustar os filtros de busca ou limpar alguns criterios para ver mais resultados
-            </p>
-            <button
-              onClick={() => {
+          <EmptyState
+            icon={Building2}
+            title="Nenhum empreendimento encontrado"
+            description="Os empreendimentos cadastrados no CRM aparecerão aqui."
+            action={{
+              label: "Limpar todos os filtros",
+              onClick: () => {
                 setCidade("todas")
                 setTipo("todos")
                 setPrecoRange([0, 3000000])
@@ -762,13 +700,9 @@ export default function EmpreendimentosPage() {
                 setQuartos("todos")
                 setStatusUnidade("todos")
                 setOrdenacao("relevancia")
-              }}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-xl font-medium shadow-lg shadow-emerald-500/30 hover:scale-105 transition-transform duration-300"
-            >
-              <X className="h-4 w-4" />
-              Limpar todos os filtros
-            </button>
-          </div>
+              },
+            }}
+          />
         )}
       </div>
 
