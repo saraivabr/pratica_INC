@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import {
   Megaphone,
   Send,
@@ -333,7 +333,8 @@ export default function DisparadorPage() {
     return () => clearInterval(interval)
   }, [activeDisparo?.id, activeDisparo?.status, fetchDisparos])
 
-  // Check WhatsApp connection
+  // Check WhatsApp connection (with polling retry when disconnected)
+  const whatsappConnectedRef = useRef(false)
   useEffect(() => {
     const checkWhatsApp = async () => {
       try {
@@ -342,14 +343,26 @@ export default function DisparadorPage() {
         if (data.status === "ready") {
           setWhatsappStatus("connected")
           setWhatsappPhone(data.pairedPhone || null)
+          whatsappConnectedRef.current = true
         } else {
           setWhatsappStatus("disconnected")
+          whatsappConnectedRef.current = false
         }
       } catch {
         setWhatsappStatus("disconnected")
+        whatsappConnectedRef.current = false
       }
     }
+
     checkWhatsApp()
+    // Retry every 10s until connected
+    const intervalId = setInterval(() => {
+      if (!whatsappConnectedRef.current) {
+        checkWhatsApp()
+      }
+    }, 10000)
+
+    return () => clearInterval(intervalId)
   }, [])
 
   // Initial load
