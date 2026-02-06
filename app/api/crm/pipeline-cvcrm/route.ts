@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     // Buscar leads do CV CRM
     let query = `
       SELECT
-        idlead as id,
+        id_lead as id,
         nome as name,
         email,
         telefone as phone,

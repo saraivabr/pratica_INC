@@ -236,7 +236,7 @@ export async function buscarImovelsCVCRM(filtros: FiltrosImovel): Promise<Imovel
       const { rows: unidades } = await dbQuery(
         `SELECT COUNT(*) as total, quartos, area_util as metragem
          FROM cvcrm_unidades
-         WHERE idempreendimento = $1 
+         WHERE id_empreendimento = $1
          AND situacao NOT IN ('V', 'R', 'B')
          GROUP BY quartos, area_util
          ORDER BY quartos, area_util

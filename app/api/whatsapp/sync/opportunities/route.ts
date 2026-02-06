@@ -28,7 +28,7 @@ export const runtime = 'nodejs';
  *     recovery_potential: string,
  *     suggested_message: string,
  *     lead: {
- *       idlead: string,
+ *       id_lead: string,
  *       nome: string,
  *       situacao: string,
  *       empreendimento: string
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
         wsc.suggested_message,
         wsc.matched_lead_id,
         wsc.matched_lead_name,
-        l.idlead as lead_idlead,
+        l.id_lead as lead_idlead,
         l.nome as lead_nome,
         l.situacao_nome as lead_situacao,
         CASE
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
           ELSE (l.empreendimento->>'nome')::text
         END as lead_empreendimento
       FROM whatsapp_synced_chats wsc
-      LEFT JOIN cvcrm_leads l ON l.workspace_id = wsc.workspace_id AND l.idlead::text = wsc.matched_lead_id
+      LEFT JOIN cvcrm_leads l ON l.workspace_id = wsc.workspace_id AND l.id_lead::text = wsc.matched_lead_id
       WHERE ${whereClause}
       ORDER BY
         CASE wsc.recovery_potential
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
       recovery_potential: row.recovery_potential,
       suggested_message: row.suggested_message,
       lead: row.matched_lead_id ? {
-        idlead: row.lead_idlead || row.matched_lead_id,
+        id_lead: row.lead_idlead || row.matched_lead_id,
         nome: row.lead_nome || row.matched_lead_name,
         situacao: row.lead_situacao || null,
         empreendimento: row.lead_empreendimento || null

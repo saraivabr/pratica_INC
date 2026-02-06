@@ -121,7 +121,7 @@ const get_cliente_historico: VoiceAgentToolDefinition = {
       // Get leads by corretor assignment or direct ID match
       const leadsResult = await dbQuery(`
         SELECT
-          idlead,
+          id_lead,
           nome,
           email,
           telefone,
@@ -132,7 +132,7 @@ const get_cliente_historico: VoiceAgentToolDefinition = {
           valor_negocio,
           corretor
         FROM cvcrm_leads
-        WHERE workspace_id = $1 AND idlead = $2
+        WHERE workspace_id = $1 AND id_lead = $2
         ORDER BY data_cad DESC
         LIMIT 20
       `, [workspaceId, cliente_id])
@@ -185,7 +185,7 @@ const get_cliente_historico: VoiceAgentToolDefinition = {
       // Get leads by phone
       const leadsResult = await dbQuery(`
         SELECT
-          idlead,
+          id_lead,
           nome,
           email,
           telefone,
@@ -210,7 +210,7 @@ const get_cliente_historico: VoiceAgentToolDefinition = {
         }
 
         // Get cliente IDs from leads
-        const clienteIds = result.leads.map((l: any) => l.idlead)
+        const clienteIds = result.leads.map((l: any) => l.id_lead)
 
         if (clienteIds.length > 0) {
           // Get reservas for these clients

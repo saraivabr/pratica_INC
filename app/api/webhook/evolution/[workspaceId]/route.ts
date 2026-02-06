@@ -545,12 +545,12 @@ async function handleNewMessage(workspaceId: number, data: any) {
 
     if (leads.length > 0) {
       const lead = leads[0];
-      console.log(`[Message] Matched to lead: ${lead.nome} (${lead.idlead})`);
+      console.log(`[Message] Matched to lead: ${lead.nome} (${lead.id_lead})`);
 
       // Criar interação no CV CRM
       try {
         await query.insert('cvcrm_leads_interacoes', {
-          idlead: lead.idlead,
+          id_lead: lead.id_lead,
           tipo: 'whatsapp',
           titulo: 'Mensagem WhatsApp Recebida',
           descricao: messageText,
@@ -564,7 +564,7 @@ async function handleNewMessage(workspaceId: number, data: any) {
           }),
         });
 
-        console.log(`[Message] Interaction created for lead ${lead.idlead}`);
+        console.log(`[Message] Interaction created for lead ${lead.id_lead}`);
       } catch (error) {
         console.error('[Message] Error creating interaction:', error);
       }

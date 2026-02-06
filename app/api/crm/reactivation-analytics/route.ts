@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
 
       return {
         id: lead.id,
-        idlead: lead.idlead,
+        idlead: lead.id_lead,
         nome: lead.nome || 'Sem nome',
         telefone: lead.telefone,
         email: lead.email,
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
         corretor: lead.corretor?.nome || null,
         imobiliaria: imobNome,
         origem: lead.origem,
-        linkCvcrm: `https://pratica.cvcrm.com.br/gestor/comercial/leads/${lead.idlead}/administrar`
+        linkCvcrm: `https://pratica.cvcrm.com.br/gestor/comercial/leads/${lead.id_lead}/administrar`
       }
     })
 

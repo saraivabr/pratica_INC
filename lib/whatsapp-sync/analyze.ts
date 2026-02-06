@@ -116,7 +116,7 @@ export async function analyzeChats(workspaceId: number): Promise<SyncAnalysisRes
 
           // Atualizar chat com dados de analise
           await updateChatAnalysis(chat.id, {
-            matched_lead_id: lead.idlead,
+            matched_lead_id: lead.id_lead,
             matched_lead_name: lead.nome,
             days_without_response: daysSinceLastMessage,
             recovery_potential: recoveryPotential,
@@ -134,14 +134,14 @@ export async function analyzeChats(workspaceId: number): Promise<SyncAnalysisRes
           opportunities.push({
             chat: {
               ...chat,
-              matched_lead_id: lead.idlead,
+              matched_lead_id: lead.id_lead,
               matched_lead_name: lead.nome,
               days_without_response: daysSinceLastMessage,
               recovery_potential: recoveryPotential,
               suggested_message: suggestedMessage,
             },
             lead: {
-              idlead: lead.idlead,
+              id_lead: lead.id_lead,
               nome: lead.nome,
               telefone: lead.telefone,
               situacao: lead.situacao,
@@ -157,7 +157,7 @@ export async function analyzeChats(workspaceId: number): Promise<SyncAnalysisRes
         } else {
           // Atualizar chat mesmo sem potencial de recuperacao
           await updateChatAnalysis(chat.id, {
-            matched_lead_id: lead.idlead,
+            matched_lead_id: lead.id_lead,
             matched_lead_name: lead.nome,
             days_without_response: daysSinceLastMessage,
             recovery_potential: 'none',
@@ -211,7 +211,7 @@ export async function matchChatToLead(
   workspaceId: number,
   phoneNumber: string
 ): Promise<{
-  idlead: string;
+  id_lead: string;
   nome: string;
   telefone: string;
   situacao: string;
@@ -230,14 +230,14 @@ export async function matchChatToLead(
   // Buscar leads que contenham o telefone
   // Usamos LIKE com os ultimos digitos para flexibilidade
   const result = await pool.query<{
-    idlead: number;
+    id_lead: number;
     nome: string;
     telefone: string;
     situacao_nome: any;
     empreendimento: any;
   }>(
     `SELECT
-       idlead,
+       id_lead,
        nome,
        telefone,
        situacao_nome,
@@ -283,16 +283,16 @@ export async function matchChatToLead(
   const interacaoResult = await pool.query<{ data_cad: string }>(
     `SELECT data_cad
      FROM cvcrm_leads_interacoes
-     WHERE workspace_id = $1 AND idlead = $2
+     WHERE workspace_id = $1 AND id_lead = $2
      ORDER BY data_cad DESC
      LIMIT 1`,
-    [workspaceId, lead.idlead]
+    [workspaceId, lead.id_lead]
   );
 
   const ultimaInteracao = interacaoResult.rows[0]?.data_cad;
 
   return {
-    idlead: String(lead.idlead),
+    id_lead: String(lead.id_lead),
     nome: lead.nome || 'Lead sem nome',
     telefone: lead.telefone || phoneNumber,
     situacao: situacaoNome,

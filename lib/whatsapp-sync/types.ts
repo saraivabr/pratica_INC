@@ -222,7 +222,7 @@ export interface RecoveryOpportunity {
   /** Dados do lead correspondente (null se nao encontrado no CRM) */
   lead: {
     /** ID do lead no CV CRM */
-    idlead: string;
+    id_lead: string;
     /** Nome do lead */
     nome: string;
     /** Telefone do lead */
