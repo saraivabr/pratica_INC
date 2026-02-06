@@ -54,9 +54,10 @@ export async function GET(request: NextRequest) {
     const query = tenantQuery(workspaceId);
 
     // Se phone number foi especificado, buscar mensagens dessa conversa
+    // Note: we filter by workspace_id (via RLS) only, not instance_name,
+    // because users may reconnect with a new instance but want all history
     if (phoneNumber) {
       const messages = await query.select('whatsapp_messages', {
-        instance_name: instanceName,
         phone_number: phoneNumber,
       });
 
@@ -91,9 +92,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Caso contrário, listar todas as conversas (últimas mensagens por telefone)
-    const allMessages = await query.select('whatsapp_messages', {
-      instance_name: instanceName,
-    });
+    // Filter by workspace_id only (via RLS), not instance_name,
+    // so users see all their history across instance reconnections
+    const allMessages = await query.select('whatsapp_messages');
 
     // Agrupar por telefone e pegar a última mensagem de cada
     const conversationsMap = new Map<string, any>();
@@ -253,9 +254,8 @@ export async function PATCH(request: NextRequest) {
 
     const query = tenantQuery(workspaceId);
 
-    // Buscar mensagens não lidas desta conversa
+    // Buscar mensagens não lidas desta conversa (workspace-scoped, not instance-scoped)
     const messages = await query.select('whatsapp_messages', {
-      instance_name: instanceName,
       phone_number: phoneNumber,
     });
 
