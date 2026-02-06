@@ -25,7 +25,8 @@ import {
   MessageCircle,
   MapPin,
   TrendingUp,
-  Sparkles
+  Sparkles,
+  Check
 } from "lucide-react"
 import { AnimatedBackground } from "@/components/animated-background"
 import { Input } from "@/components/ui/input"
@@ -83,6 +84,9 @@ function UnitDetailModal({
   open: boolean
   onClose: () => void
 }) {
+  const router = useRouter()
+  const [copied, setCopied] = useState(false)
+
   if (!unit || !empreendimento) return null
 
   const statusConfig = {
@@ -91,6 +95,27 @@ function UnitDetailModal({
     vendida: { gradient: "from-rose-500 to-red-500", bg: "bg-rose-500" }
   }
   const config = statusConfig[unit.status]
+  const empId = empreendimento.id
+
+  const handleWhatsApp = () => {
+    const text = `Olá! Tenho interesse na unidade ${unit.numero} do ${empreendimento.nome} - ${unit.quartos} quartos, ${unit.area}m², ${formatCurrency(unit.valor)}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank")
+  }
+
+  const handleSimular = () => {
+    router.push(`/empreendimentos/${empId}?tab=simulacao`)
+  }
+
+  const handleCompartilhar = async () => {
+    const url = `${window.location.origin}/empreendimentos/${empId}?tab=lista`
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleVerPlanta = () => {
+    router.push(`/empreendimentos/${empId}`)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -162,11 +187,11 @@ function UnitDetailModal({
 
           {unit.status === "disponivel" && (
             <div className="grid grid-cols-2 gap-3">
-              <button className="flex items-center justify-center gap-2 h-12 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-medium transition-colors">
+              <button onClick={handleWhatsApp} className="flex items-center justify-center gap-2 h-12 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-medium transition-colors">
                 <MessageCircle className="h-5 w-5" />
                 WhatsApp
               </button>
-              <button className="flex items-center justify-center gap-2 h-12 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors">
+              <button onClick={handleSimular} className="flex items-center justify-center gap-2 h-12 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors">
                 <FileText className="h-5 w-5" />
                 Simular
               </button>
@@ -174,11 +199,11 @@ function UnitDetailModal({
           )}
 
           <div className="flex gap-3">
-            <button className="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors">
-              <Share2 className="h-4 w-4" />
-              Compartilhar
+            <button onClick={handleCompartilhar} className="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors">
+              {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Share2 className="h-4 w-4" />}
+              {copied ? "Copiado!" : "Compartilhar"}
             </button>
-            <button className="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors">
+            <button onClick={handleVerPlanta} className="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors">
               <Eye className="h-4 w-4" />
               Ver Planta
             </button>

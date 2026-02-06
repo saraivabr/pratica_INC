@@ -73,8 +73,6 @@ import {
 // ────────────────────────────────────────────────────────
 const corretorListItems = [
   { href: "/corretor/imoveis", icon: Building2, label: "Catálogo", description: "Imóveis e lançamentos" },
-  { href: "/corretor/espelho", icon: Grid3X3, label: "Mapa de Vendas", description: "Disponibilidade de unidades" },
-  { href: "/corretor/tabela", icon: Table, label: "Preços", description: "Tabela de preços" },
   { href: "/corretor/propostas", icon: FileText, label: "Propostas", description: "Propostas comerciais" },
   { href: "/corretor/assistente", icon: Sparkles, label: "Sofia", highlight: true, description: "Sua assistente inteligente" },
   { href: "/corretor/salva-leads", icon: Bot, label: "Meu Assistente", description: "Follow-up automático de leads" },
@@ -156,8 +154,8 @@ const adminItems = Object.values(adminGroups).flatMap(g => g.items)
 const corretorMobileNavItems = [
   { href: "/corretor", icon: Gauge, label: "Início" },
   { href: "/corretor/imoveis", icon: Building2, label: "Catálogo" },
-  { href: "/corretor/espelho", icon: Grid3X3, label: "Vendas" },
   { href: "/corretor/clientes", icon: Contact, label: "Clientes" },
+  { href: "/corretor/whatsapp", icon: MessageSquare, label: "WhatsApp" },
   { href: "/corretor/assistente", icon: Sparkles, label: "Sofia", highlight: true },
 ]
 

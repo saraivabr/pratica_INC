@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { ImageIcon, Bed, Car, Ruler } from "lucide-react"
+import { ImageIcon, Bed, Car, Ruler, Grid3X3, Table, Calculator } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { type Empreendimento, formatCurrency } from "@/lib/data"
@@ -120,9 +120,26 @@ export function EmpreendimentoCard({ empreendimento }: EmpreendimentoCardProps) 
                 </div>
             </div>
 
-            {/* Footer / Delivery */}
+            {/* Footer / Delivery + Quick Actions */}
             <div className="mt-auto pt-1 sm:pt-2 flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground">
                 <span className="truncate">Entrega: {empreendimento.previsaoEntrega || "Sob consulta"}</span>
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                  {[
+                    { icon: Grid3X3, tab: "espelho", title: "Espelho" },
+                    { icon: Table, tab: "lista", title: "Tabela" },
+                    { icon: Calculator, tab: "simulacao", title: "Simular" },
+                  ].map(({ icon: Icon, tab, title }) => (
+                    <Link
+                      key={tab}
+                      href={`/empreendimentos/${empreendimento.id}?tab=${tab}`}
+                      onClick={(e) => e.stopPropagation()}
+                      title={title}
+                      className="p-1 rounded-md hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                    </Link>
+                  ))}
+                </div>
             </div>
         </div>
 
