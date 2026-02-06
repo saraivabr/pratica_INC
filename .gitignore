@@ -48,6 +48,7 @@ flutter_app/
 # Large files
 downloads/
 public/materiais/
+public/media/whatsapp/
 supabase/migrations/full_migration/
 .gemini-clipboard/
 playwright-report/
