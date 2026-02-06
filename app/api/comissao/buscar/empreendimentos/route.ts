@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         nome,
         cidade,
         uf,
-        endereco,
+        endereco_completo as endereco,
         status
       FROM cvcrm_empreendimentos
       WHERE workspace_id = $1
