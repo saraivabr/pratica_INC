@@ -31,15 +31,22 @@ export async function GET(request: NextRequest) {
     }
 
     const workspaceId = tenant.id;
+    const userInstanceName = user.evolution_instance_name;
     const q = request.nextUrl.searchParams.get("q")?.trim();
 
     if (!q || q.length < 2) {
       return NextResponse.json({ success: true, data: [] });
     }
 
+    // If user has no instance connected, return empty
+    if (!userInstanceName) {
+      return NextResponse.json({ success: true, data: [] });
+    }
+
     const es = getElasticsearch();
 
     // Search contacts (autocomplete on name) — deduplicate by phone
+    // Filtered by instance_name for corretor isolation
     const contactResult = await es.search({
       index: ES_INDEX,
       body: {
@@ -48,6 +55,7 @@ export async function GET(request: NextRequest) {
           bool: {
             must: [
               { term: { workspace_id: workspaceId } },
+              { term: { instance_name: userInstanceName } },
               {
                 bool: {
                   should: [

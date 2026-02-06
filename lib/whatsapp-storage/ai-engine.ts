@@ -253,6 +253,83 @@ Regras:
   }
 }
 
+// ── Suggest Quick Reply (Smart Reply Bar) ───────────────────────────
+
+/**
+ * Generate short quick-reply suggestions (1-2 sentences each).
+ * Optimized for the smart reply bar above the chat input.
+ */
+export async function suggestQuickReply(
+  workspaceId: number,
+  phoneNumber: string,
+  contextMessages: number = 5
+): Promise<string[]> {
+  const db = getMongoDb();
+
+  const messages = await db
+    .collection("messages")
+    .find({ workspace_id: workspaceId, phone_number: phoneNumber })
+    .sort({ timestamp: -1 })
+    .limit(contextMessages)
+    .toArray();
+
+  if (messages.length === 0) {
+    return ["Ola! Como posso ajudar?", "Bom dia! Em que posso te ajudar?", "Oi! Tudo bem?"];
+  }
+
+  const conv = await db.collection("conversations").findOne({
+    workspace_id: workspaceId,
+    phone_number: phoneNumber,
+  });
+  const analysis = conv?.ai_analysis;
+
+  const transcript = messages
+    .reverse()
+    .map((m) => {
+      const sender = m.is_from_me ? "Corretor" : "Cliente";
+      return `${sender}: ${m.message_text || `[${m.message_type}]`}`;
+    })
+    .join("\n");
+
+  try {
+    const response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.7,
+      max_tokens: 200,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `Voce e um assistente de corretor imobiliario. Sugira 3 respostas CURTAS (1 frase cada, max 80 caracteres) para enviar ao cliente.
+
+${analysis ? `Contexto: ${analysis.summary}\nSentimento: ${analysis.sentiment}` : ""}
+
+Retorne JSON: { "suggestions": ["resposta1", "resposta2", "resposta3"] }
+
+Regras:
+- Portugues brasileiro, tom profissional mas amigavel
+- Cada resposta com NO MAXIMO 1-2 frases curtas
+- Respostas praticas e diretas (nao genericas)
+- Sem formatacao WhatsApp (sem *negrito* ou _italico_)`,
+        },
+        {
+          role: "user",
+          content: transcript,
+        },
+      ],
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) return [];
+
+    const parsed = JSON.parse(content);
+    return (parsed.suggestions || []).slice(0, 3);
+  } catch (err: any) {
+    console.error("[AI Engine] Quick suggest error:", err.message);
+    return [];
+  }
+}
+
 // ── Should Re-analyze ───────────────────────────────────────────────
 
 /**

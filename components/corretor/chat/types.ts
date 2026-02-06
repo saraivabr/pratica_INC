@@ -23,6 +23,9 @@ export interface Conversation {
   unread_count: number;
   lead_id?: number;
   is_lead?: boolean;
+  ai_summary?: string | null;
+  ai_sentiment?: string | null;
+  ai_temperature?: string | null;
 }
 
 export interface SearchResult {

@@ -4,6 +4,9 @@
  * GET /api/whatsapp/messages?instance=xxx          → lista conversas (agregado)
  * GET /api/whatsapp/messages?instance=xxx&phone=xxx → mensagens de uma conversa
  * PATCH /api/whatsapp/messages                     → marcar como lidas
+ *
+ * SECURITY: All queries filter by instance_name to ensure corretors
+ * only see their own conversations within a workspace.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -26,6 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     const workspaceId = tenant.id;
+    const userInstanceName = user.evolution_instance_name;
 
     const searchParams = request.nextUrl.searchParams;
     const instanceName = searchParams.get('instance');
@@ -60,14 +64,32 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Security: ensure the user can only query their own instance
+    if (userInstanceName && instanceName !== userInstanceName) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado: instância não pertence a este usuário' },
+        { status: 403 }
+      );
+    }
+
+    // If user has no instance connected, return empty
+    if (!userInstanceName) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        total: 0,
+        total_unread: 0,
+      });
+    }
+
     // ── Single conversation: return messages ────────────────────────────
     if (phoneNumber) {
       return await withTenant(workspaceId, async (client) => {
         const { rows: messages } = await client.query(
           `SELECT * FROM whatsapp_messages
-           WHERE workspace_id = $1 AND phone_number = $2
+           WHERE workspace_id = $1 AND instance_name = $2 AND phone_number = $3
            ORDER BY timestamp ASC`,
-          [workspaceId, phoneNumber]
+          [workspaceId, instanceName, phoneNumber]
         );
 
         const unreadCount = messages.filter(
@@ -99,7 +121,7 @@ export async function GET(request: NextRequest) {
 
     // ── Conversation list: use efficient SQL aggregation ─────────────────
     return await withTenant(workspaceId, async (client) => {
-      // Single SQL query with DISTINCT ON to get last message per phone
+      // Single SQL query with DISTINCT ON — filtered by instance_name
       const { rows: conversations } = await client.query(
         `SELECT DISTINCT ON (m.phone_number)
            m.phone_number,
@@ -113,19 +135,22 @@ export async function GET(request: NextRequest) {
            c.lead_id
          FROM whatsapp_messages m
          LEFT JOIN whatsapp_contacts c
-           ON c.phone_number = m.phone_number AND c.workspace_id = m.workspace_id
-         WHERE m.workspace_id = $1
+           ON c.phone_number = m.phone_number
+           AND c.workspace_id = m.workspace_id
+           AND c.instance_name = m.instance_name
+         WHERE m.workspace_id = $1 AND m.instance_name = $2
          ORDER BY m.phone_number, m.timestamp DESC`,
-        [workspaceId]
+        [workspaceId, instanceName]
       );
 
-      // Unread counts in a single query
+      // Unread counts — filtered by instance_name
       const { rows: unreadRows } = await client.query(
         `SELECT phone_number, COUNT(*) as unread
          FROM whatsapp_messages
-         WHERE workspace_id = $1 AND is_from_me = false AND status != 'read'
+         WHERE workspace_id = $1 AND instance_name = $2
+           AND is_from_me = false AND status != 'read'
          GROUP BY phone_number`,
-        [workspaceId]
+        [workspaceId, instanceName]
       );
       const unreadMap = new Map(unreadRows.map((r: any) => [r.phone_number, parseInt(r.unread)]));
 
@@ -249,32 +274,43 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    // Security: ensure user can only mark-read their own instance's messages
+    const userInstanceName = user.evolution_instance_name;
+    if (userInstanceName && instanceName !== userInstanceName) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado' },
+        { status: 403 }
+      );
+    }
+
     return await withTenant(workspaceId, async (client) => {
       let updatedCount = 0;
 
       if (messageIds && Array.isArray(messageIds) && messageIds.length > 0) {
-        // Mark specific messages as read
+        // Mark specific messages as read — filtered by instance_name
         const result = await client.query(
           `UPDATE whatsapp_messages
            SET status = 'read'
            WHERE workspace_id = $1
-             AND phone_number = $2
-             AND message_id = ANY($3)
+             AND instance_name = $2
+             AND phone_number = $3
+             AND message_id = ANY($4)
              AND is_from_me = false
              AND status != 'read'`,
-          [workspaceId, phoneNumber, messageIds]
+          [workspaceId, instanceName, phoneNumber, messageIds]
         );
         updatedCount = result.rowCount || 0;
       } else {
-        // Mark all unread messages from this phone as read
+        // Mark all unread messages from this phone as read — filtered by instance_name
         const result = await client.query(
           `UPDATE whatsapp_messages
            SET status = 'read'
            WHERE workspace_id = $1
-             AND phone_number = $2
+             AND instance_name = $2
+             AND phone_number = $3
              AND is_from_me = false
              AND status != 'read'`,
-          [workspaceId, phoneNumber]
+          [workspaceId, instanceName, phoneNumber]
         );
         updatedCount = result.rowCount || 0;
       }

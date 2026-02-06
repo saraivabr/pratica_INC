@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Phone,
@@ -33,6 +33,7 @@ import {
   TrendingUp,
   Heart,
   Lightbulb,
+  Send,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +64,7 @@ interface LeadPanelProps {
   contactName?: string;
   onStageChange?: (newStage: string) => void;
   onAction?: (action: 'visit' | 'simulation' | 'docs') => void;
+  onSendMessage?: (message: string) => Promise<void>;
 }
 
 interface Lead {
@@ -310,12 +312,15 @@ function SuggestReplySection({
   phone,
   title,
   icon: Icon,
+  onSendMessage,
 }: {
   phone: string;
   title: string;
   icon: typeof Sparkles;
+  onSendMessage?: (message: string) => Promise<void>;
 }) {
   const [suggesting, setSuggesting] = useState(false);
+  const [sendingIndex, setSendingIndex] = useState<number | null>(null);
   const [replies, setReplies] = useState<string[]>([]);
 
   const handleSuggest = async () => {
@@ -335,6 +340,24 @@ function SuggestReplySection({
       toast.error('Erro ao gerar sugestões');
     } finally {
       setSuggesting(false);
+    }
+  };
+
+  const handleClickReply = async (reply: string, index: number) => {
+    if (onSendMessage) {
+      setSendingIndex(index);
+      try {
+        await onSendMessage(reply);
+        toast.success('Mensagem enviada!');
+        setReplies([]);
+      } catch {
+        toast.error('Erro ao enviar');
+      } finally {
+        setSendingIndex(null);
+      }
+    } else {
+      navigator.clipboard.writeText(reply);
+      toast.success('Resposta copiada!');
     }
   };
 
@@ -365,13 +388,16 @@ function SuggestReplySection({
           {replies.map((reply, i) => (
             <button
               key={i}
-              onClick={() => {
-                navigator.clipboard.writeText(reply);
-                toast.success('Resposta copiada!');
-              }}
-              className="w-full text-left p-2 text-xs rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 transition-colors"
+              onClick={() => handleClickReply(reply, i)}
+              disabled={sendingIndex !== null}
+              className="w-full text-left p-2 text-xs rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 transition-colors disabled:opacity-50 flex items-start gap-2"
             >
-              {reply}
+              {sendingIndex === i ? (
+                <Loader2 className="h-3 w-3 animate-spin shrink-0 mt-0.5" />
+              ) : onSendMessage ? (
+                <Send className="h-3 w-3 shrink-0 mt-0.5 text-purple-500" />
+              ) : null}
+              <span className="flex-1">{reply}</span>
             </button>
           ))}
         </div>
@@ -384,7 +410,7 @@ function SuggestReplySection({
 // Main Component
 // ============================================
 
-export function LeadPanel({ phone, userId, contactName, onStageChange, onAction }: LeadPanelProps) {
+export function LeadPanel({ phone, userId, contactName, onStageChange, onAction, onSendMessage }: LeadPanelProps) {
   const [showStageSelect, setShowStageSelect] = useState(false);
   const [selectedStage, setSelectedStage] = useState<string>('');
 
@@ -652,7 +678,7 @@ export function LeadPanel({ phone, userId, contactName, onStageChange, onAction 
                   </div>
                 )}
 
-                <SuggestReplySection phone={phone} title="Sugerir Resposta" icon={Sparkles} />
+                <SuggestReplySection phone={phone} title="Sugerir Resposta" icon={Sparkles} onSendMessage={onSendMessage} />
               </div>
             </>
           )}
@@ -661,7 +687,7 @@ export function LeadPanel({ phone, userId, contactName, onStageChange, onAction 
           {!aiData && (
             <>
               <Separator className="bg-gray-200 dark:bg-gray-700" />
-              <SuggestReplySection phone={phone} title="Assistente IA" icon={Sparkles} />
+              <SuggestReplySection phone={phone} title="Assistente IA" icon={Sparkles} onSendMessage={onSendMessage} />
             </>
           )}
 

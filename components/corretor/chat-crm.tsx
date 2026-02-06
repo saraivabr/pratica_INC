@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Search,
@@ -94,6 +94,12 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
     if (!selectedPhone) return;
     await send({ phone: selectedPhone, message });
   };
+
+  // Handler for sending messages to arbitrary phone (used by LeadPanel + agents)
+  const handleSendToPhone = useCallback(async (message: string) => {
+    if (!selectedPhone) return;
+    await send({ phone: selectedPhone, message });
+  }, [selectedPhone, send]);
 
   const handleTyping = () => {
     if (selectedPhone) sendTyping(selectedPhone);
@@ -271,6 +277,9 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
               isSending={isSending}
               onSend={handleSend}
               onTyping={handleTyping}
+              phoneNumber={selectedPhone}
+              instanceName={instanceName}
+              lastMessageIsFromMe={messages.length > 0 ? messages[messages.length - 1].is_from_me : true}
             />
           </>
         ) : (
@@ -305,6 +314,7 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
             phone={selectedPhone}
             userId={userId}
             contactName={selectedConversation?.contact_name}
+            onSendMessage={handleSendToPhone}
           />
         )}
       </div>

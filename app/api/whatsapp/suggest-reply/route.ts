@@ -2,7 +2,11 @@
  * AI-powered reply suggestions.
  *
  * POST /api/whatsapp/suggest-reply
- * Body: { phone_number, context_messages?: number }
+ * Body: { phone_number, context_messages?: number, mode?: 'quick' | 'detailed' }
+ *
+ * Modes:
+ * - 'quick': 3 short replies (1-2 sentences) for smart reply bar
+ * - 'detailed': 2-3 longer replies for lead panel
  *
  * Returns: { success, suggestions: string[] }
  */
@@ -10,7 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/api-auth";
 import { findUserWorkspace } from "@/lib/tenant-context";
-import { suggestReply } from "@/lib/whatsapp-storage/ai-engine";
+import { suggestReply, suggestQuickReply } from "@/lib/whatsapp-storage/ai-engine";
 
 export const runtime = "nodejs";
 
@@ -33,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { phone_number, context_messages = 10 } = body;
+    const { phone_number, context_messages = 10, mode = "detailed" } = body;
 
     if (!phone_number) {
       return NextResponse.json(
@@ -42,11 +46,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const suggestions = await suggestReply(
-      tenant.id,
-      phone_number,
-      context_messages
-    );
+    const suggestions =
+      mode === "quick"
+        ? await suggestQuickReply(tenant.id, phone_number, context_messages)
+        : await suggestReply(tenant.id, phone_number, context_messages);
 
     return NextResponse.json({ success: true, suggestions });
   } catch (error: any) {
