@@ -112,164 +112,166 @@ const get_cliente_historico: VoiceAgentToolDefinition = {
       return { error: 'Necessário informar cliente_id ou telefone' }
     }
 
-    const result: any = {
-      cliente: null,
-      leads: [],
-      reservas: [],
-      atendimentos: []
-    }
+    return withTenant(workspaceId, async (client) => {
+      const result: any = {
+        cliente: null,
+        leads: [],
+        reservas: [],
+        atendimentos: []
+      }
 
-    // Search by cliente_id or telefone
-    if (cliente_id) {
-      // Get leads by corretor assignment or direct ID match
-      const leadsResult = await dbQuery(`
-        SELECT
-          id_lead,
-          nome,
-          email,
-          telefone,
-          data_cad,
-          origem,
-          situacao,
-          score,
-          valor_negocio,
-          corretor
-        FROM cvcrm_leads
-        WHERE workspace_id = $1 AND id_lead = $2
-        ORDER BY data_cad DESC
-        LIMIT 20
-      `, [workspaceId, cliente_id])
-      result.leads = leadsResult.rows
+      // Search by cliente_id or telefone
+      if (cliente_id) {
+        // Get leads by corretor assignment or direct ID match
+        const leadsResult = await client.query(`
+          SELECT
+            id_lead,
+            nome,
+            email,
+            telefone,
+            data_cad,
+            origem,
+            situacao,
+            score,
+            valor_negocio,
+            corretor
+          FROM cvcrm_leads
+          WHERE workspace_id = $1 AND id_lead = $2
+          ORDER BY data_cad DESC
+          LIMIT 20
+        `, [workspaceId, cliente_id])
+        result.leads = leadsResult.rows
 
-      // Get reservas
-      const reservasResult = await dbQuery(`
-        SELECT
-          cvcrm_id,
-          numero_reserva,
-          data_reserva,
-          status,
-          valor_reserva,
-          valor_venda,
-          empreendimento_nome,
-          unidade_nome,
-          corretor_nome
-        FROM cvcrm_reservas
-        WHERE workspace_id = $1 AND cliente_principal_id = $2
-        ORDER BY data_reserva DESC
-        LIMIT 20
-      `, [workspaceId, cliente_id])
-      result.reservas = reservasResult.rows
+        // Get reservas
+        const reservasResult = await client.query(`
+          SELECT
+            cvcrm_id,
+            numero_reserva,
+            data_reserva,
+            status,
+            valor_reserva,
+            valor_venda,
+            empreendimento_nome,
+            unidade_nome,
+            corretor_nome
+          FROM cvcrm_reservas
+          WHERE workspace_id = $1 AND cliente_principal_id = $2
+          ORDER BY data_reserva DESC
+          LIMIT 20
+        `, [workspaceId, cliente_id])
+        result.reservas = reservasResult.rows
 
-      // Get atendimentos
-      const atendimentosResult = await dbQuery(`
-        SELECT
-          cvcrm_id,
-          protocolo,
-          tipo,
-          assunto,
-          status,
-          prioridade,
-          data_abertura,
-          data_fechamento,
-          empreendimento_nome,
-          unidade_nome
-        FROM cvcrm_atendimentos
-        WHERE workspace_id = $1 AND cliente_id = $2
-        ORDER BY data_abertura DESC
-        LIMIT 20
-      `, [workspaceId, cliente_id])
-      result.atendimentos = atendimentosResult.rows
+        // Get atendimentos
+        const atendimentosResult = await client.query(`
+          SELECT
+            cvcrm_id,
+            protocolo,
+            tipo,
+            assunto,
+            status,
+            prioridade,
+            data_abertura,
+            data_fechamento,
+            empreendimento_nome,
+            unidade_nome
+          FROM cvcrm_atendimentos
+          WHERE workspace_id = $1 AND cliente_id = $2
+          ORDER BY data_abertura DESC
+          LIMIT 20
+        `, [workspaceId, cliente_id])
+        result.atendimentos = atendimentosResult.rows
 
-    } else if (telefone) {
-      // Normalize phone for search
-      const phoneClean = telefone.replace(/\D/g, '')
-      const phonePattern = `%${phoneClean.slice(-9)}%`
+      } else if (telefone) {
+        // Normalize phone for search
+        const phoneClean = telefone.replace(/\D/g, '')
+        const phonePattern = `%${phoneClean.slice(-9)}%`
 
-      // Get leads by phone
-      const leadsResult = await dbQuery(`
-        SELECT
-          id_lead,
-          nome,
-          email,
-          telefone,
-          data_cad,
-          origem,
-          situacao,
-          score,
-          valor_negocio,
-          corretor
-        FROM cvcrm_leads
-        WHERE workspace_id = $1 AND telefone LIKE $2
-        ORDER BY data_cad DESC
-        LIMIT 20
-      `, [workspaceId, phonePattern])
-      result.leads = leadsResult.rows
+        // Get leads by phone
+        const leadsResult = await client.query(`
+          SELECT
+            id_lead,
+            nome,
+            email,
+            telefone,
+            data_cad,
+            origem,
+            situacao,
+            score,
+            valor_negocio,
+            corretor
+          FROM cvcrm_leads
+          WHERE workspace_id = $1 AND telefone LIKE $2
+          ORDER BY data_cad DESC
+          LIMIT 20
+        `, [workspaceId, phonePattern])
+        result.leads = leadsResult.rows
 
-      if (result.leads.length > 0) {
-        result.cliente = {
-          nome: result.leads[0].nome,
-          email: result.leads[0].email,
-          telefone: result.leads[0].telefone
-        }
+        if (result.leads.length > 0) {
+          result.cliente = {
+            nome: result.leads[0].nome,
+            email: result.leads[0].email,
+            telefone: result.leads[0].telefone
+          }
 
-        // Get cliente IDs from leads
-        const clienteIds = result.leads.map((l: any) => l.id_lead)
+          // Get cliente IDs from leads
+          const clienteIds = result.leads.map((l: any) => l.id_lead)
 
-        if (clienteIds.length > 0) {
-          // Get reservas for these clients
-          const reservasResult = await dbQuery(`
-            SELECT
-              cvcrm_id,
-              numero_reserva,
-              data_reserva,
-              status,
-              valor_reserva,
-              valor_venda,
-              empreendimento_nome,
-              unidade_nome,
-              corretor_nome,
-              cliente_principal_nome
-            FROM cvcrm_reservas
-            WHERE workspace_id = $1 AND cliente_principal_id = ANY($2)
-            ORDER BY data_reserva DESC
-            LIMIT 20
-          `, [workspaceId, clienteIds])
-          result.reservas = reservasResult.rows
+          if (clienteIds.length > 0) {
+            // Get reservas for these clients
+            const reservasResult = await client.query(`
+              SELECT
+                cvcrm_id,
+                numero_reserva,
+                data_reserva,
+                status,
+                valor_reserva,
+                valor_venda,
+                empreendimento_nome,
+                unidade_nome,
+                corretor_nome,
+                cliente_principal_nome
+              FROM cvcrm_reservas
+              WHERE workspace_id = $1 AND cliente_principal_id = ANY($2)
+              ORDER BY data_reserva DESC
+              LIMIT 20
+            `, [workspaceId, clienteIds])
+            result.reservas = reservasResult.rows
 
-          // Get atendimentos for these clients
-          const atendimentosResult = await dbQuery(`
-            SELECT
-              cvcrm_id,
-              protocolo,
-              tipo,
-              assunto,
-              status,
-              prioridade,
-              data_abertura,
-              data_fechamento,
-              empreendimento_nome,
-              unidade_nome
-            FROM cvcrm_atendimentos
-            WHERE workspace_id = $1 AND cliente_id = ANY($2)
-            ORDER BY data_abertura DESC
-            LIMIT 20
-          `, [workspaceId, clienteIds])
-          result.atendimentos = atendimentosResult.rows
+            // Get atendimentos for these clients
+            const atendimentosResult = await client.query(`
+              SELECT
+                cvcrm_id,
+                protocolo,
+                tipo,
+                assunto,
+                status,
+                prioridade,
+                data_abertura,
+                data_fechamento,
+                empreendimento_nome,
+                unidade_nome
+              FROM cvcrm_atendimentos
+              WHERE workspace_id = $1 AND cliente_id = ANY($2)
+              ORDER BY data_abertura DESC
+              LIMIT 20
+            `, [workspaceId, clienteIds])
+            result.atendimentos = atendimentosResult.rows
+          }
         }
       }
-    }
 
-    return {
-      cliente: result.cliente,
-      resumo: {
-        total_leads: result.leads.length,
-        total_reservas: result.reservas.length,
-        total_atendimentos: result.atendimentos.length
-      },
-      leads: result.leads,
-      reservas: result.reservas,
-      atendimentos: result.atendimentos
-    }
+      return {
+        cliente: result.cliente,
+        resumo: {
+          total_leads: result.leads.length,
+          total_reservas: result.reservas.length,
+          total_atendimentos: result.atendimentos.length
+        },
+        leads: result.leads,
+        reservas: result.reservas,
+        atendimentos: result.atendimentos
+      }
+    })
   }
 }
 

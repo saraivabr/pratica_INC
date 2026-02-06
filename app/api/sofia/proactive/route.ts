@@ -385,7 +385,8 @@ async function logProactiveSent(
           priority: message.priority,
           data: message.data,
         }),
-      ]
+      ],
+      client
     );
   } catch (error) {
     console.error(`[Sofia Proactive] Erro ao registrar envio:`, error);
@@ -578,36 +579,40 @@ async function runProactiveCheck(
 
         summary.tenantsProcessed++;
 
-        // Buscar usuarios
-        let users = await getActiveUsersForTenant(tenant.id);
+        // Wrap per-workspace queries in withTenant for RLS context
+        await withTenant(tenant.id, async (client) => {
+          // Buscar usuarios
+          let users = await getActiveUsersForTenant(tenant.id, client);
 
-        // Filtrar por usuario especifico se fornecido
-        if (userId) {
-          users = users.filter((u) => u.id === userId);
-        }
-
-        console.log(`[Sofia Proactive] Tenant ${tenant.id}: ${users.length} usuarios`);
-
-        for (const user of users) {
-          try {
-            const result = await processUserProactive(
-              user,
-              tenant,
-              instanceName,
-              lancamentos,
-              dryRun
-            );
-
-            summary.usersProcessed++;
-            summary.triggersFound += result.triggersFound;
-            summary.messagesSent += result.messagesSent;
-            summary.errors += result.triggers.filter((t) => t.error).length;
-            summary.results.push(result);
-          } catch (error: any) {
-            console.error(`[Sofia Proactive] Erro usuario ${user.id}:`, error);
-            summary.errors++;
+          // Filtrar por usuario especifico se fornecido
+          if (userId) {
+            users = users.filter((u) => u.id === userId);
           }
-        }
+
+          console.log(`[Sofia Proactive] Tenant ${tenant.id}: ${users.length} usuarios`);
+
+          for (const user of users) {
+            try {
+              const result = await processUserProactive(
+                user,
+                tenant,
+                instanceName,
+                lancamentos,
+                dryRun,
+                client
+              );
+
+              summary.usersProcessed++;
+              summary.triggersFound += result.triggersFound;
+              summary.messagesSent += result.messagesSent;
+              summary.errors += result.triggers.filter((t) => t.error).length;
+              summary.results.push(result);
+            } catch (error: any) {
+              console.error(`[Sofia Proactive] Erro usuario ${user.id}:`, error);
+              summary.errors++;
+            }
+          }
+        });
       } catch (error: any) {
         console.error(`[Sofia Proactive] Erro tenant ${tenant.id}:`, error);
       }
