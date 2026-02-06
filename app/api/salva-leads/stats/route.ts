@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       WHERE workspace_id = $1 ${dateFilter}
     `, [workspaceId]);
 
-    // Estatísticas de execuções (use COALESCE for workspace_id/tenant_id compatibility)
+    // Estatísticas de execuções
     const runsStats = await pool.query(`
       SELECT
         COUNT(*) as total_runs,
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         SUM(leads_sent) as total_sent,
         AVG(leads_sent) as avg_sent_per_run
       FROM salva_leads_runs
-      WHERE COALESCE(workspace_id, tenant_id) = $1 ${dateFilter}
+      WHERE workspace_id = $1 ${dateFilter}
     `, [workspaceId]);
 
     // Estatísticas de tool calls

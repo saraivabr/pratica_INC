@@ -57,7 +57,7 @@ type ConvidadoStatus = "pendente" | "confirmado" | "recusado" | "talvez"
 interface Convidado {
   id: string
   evento_id: string
-  tenant_id: number
+  workspace_id: number
   nome: string
   celular: string
   origem: "cvcrm" | "importado"
@@ -71,7 +71,7 @@ interface Convidado {
 
 interface Evento {
   id: string
-  tenant_id: number
+  workspace_id: number
   nome: string
   descricao: string | null
   data_hora: string

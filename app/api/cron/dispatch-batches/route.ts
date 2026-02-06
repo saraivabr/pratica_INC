@@ -44,8 +44,7 @@ const DELAYS = {
 interface BatchDB {
   id: string;
   evento_id: string;
-  workspace_id: number | null;
-  tenant_id: number;
+  workspace_id: number;
   instance_name: string;
   total_count: number;
   processed_count: number;
@@ -273,9 +272,8 @@ async function processBatch(batch: BatchDB): Promise<{
   failed: number;
   errors: any[];
 }> {
-  const { id: batchId, evento_id, workspace_id, tenant_id, instance_name } = batch;
-  // Usar workspace_id se disponível, senão fallback para tenant_id
-  const effectiveWorkspaceId = workspace_id ?? tenant_id;
+  const { id: batchId, evento_id, workspace_id, instance_name } = batch;
+  const effectiveWorkspaceId = workspace_id;
   const query = tenantQuery(effectiveWorkspaceId);
 
   // Verificar se instância ainda está conectada

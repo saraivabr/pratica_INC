@@ -513,12 +513,10 @@ export async function POST(
       await client.query('BEGIN');
 
       // Criar batch de disparo
-      // workspace_id = ID do workspace do usuário (nova arquitetura)
-      // tenant_id = 1 (único tenant, mantido para compatibilidade)
       const batchResult = await client.query<{ id: string }>(
         `INSERT INTO dispatch_batches (
-          evento_id, workspace_id, tenant_id, instance_name, total_count, status
-        ) VALUES ($1, $2, 1, $3, $4, 'pending')
+          evento_id, workspace_id, instance_name, total_count, status
+        ) VALUES ($1, $2, $3, $4, 'pending')
         RETURNING id`,
         [eventoId, workspaceId, instance_name, convidados.length]
       );

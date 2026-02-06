@@ -332,15 +332,14 @@ async function handleNewMessage(workspaceId: number, data: any) {
     if (messageId) {
       await dbQuery(
         `INSERT INTO whatsapp_messages (
-          tenant_id, workspace_id, instance_name, phone_number, message_id, message_type,
+          workspace_id, instance_name, phone_number, message_id, message_type,
           message_text, is_from_me, timestamp, raw_data
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (instance_name, message_id)
         DO UPDATE SET
           updated_at = NOW(),
           raw_data = EXCLUDED.raw_data`,
         [
-          workspaceId,
           workspaceId,
           data.instance,
           phoneNumber,
@@ -590,7 +589,7 @@ async function handleNewMessage(workspaceId: number, data: any) {
           );
         } else {
           await query.insert('whatsapp_contacts', {
-            tenant_id: workspaceId,
+            workspace_id: workspaceId,
             instance_name: data.instance,
             phone_number: phoneNumber,
             contact_name: phoneNumber,
