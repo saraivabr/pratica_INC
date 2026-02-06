@@ -685,10 +685,6 @@ export default function TabelaPage() {
                     <span className="text-sm text-gray-500">
                       {filteredUnits.length} unidade{filteredUnits.length !== 1 ? "s" : ""} encontrada{filteredUnits.length !== 1 ? "s" : ""}
                     </span>
-                    <button className="flex items-center gap-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium">
-                      <Download className="h-4 w-4" />
-                      Exportar PDF
-                    </button>
                   </div>
                 </div>
               </div>

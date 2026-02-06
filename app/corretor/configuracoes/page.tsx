@@ -162,9 +162,6 @@ export default function CorretorConfiguracoesPage() {
                       {user?.nome?.substring(0, 2).toUpperCase() || "??"}
                     </AvatarFallback>
                   </Avatar>
-                  <button className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg hover:bg-emerald-600 transition-colors">
-                    <Camera className="h-4 w-4" />
-                  </button>
                 </div>
                 <div>
                   <p className="font-semibold text-lg">{user?.nome || "Corretor"}</p>

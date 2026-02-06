@@ -113,7 +113,6 @@ const adminGroups = {
     defaultOpen: true,
     items: [
       { href: "/admin/whatsapp", icon: Smartphone, label: "WhatsApp", description: "Instâncias e conexões" },
-      { href: "/admin/campaigns", icon: Megaphone, label: "Campanhas", description: "Disparos em massa" },
     ],
   },
   inteligencia: {
@@ -154,7 +153,6 @@ const adminGroups = {
     defaultOpen: false,
     items: [
       { href: "/admin/permissoes", icon: Shield, label: "Permissões", description: "Controle de acesso" },
-      { href: "/admin/automations", icon: Zap, label: "Automações", description: "Regras automáticas" },
       { href: "/admin/reports", icon: BarChart3, label: "Relatórios", description: "Exportação e análises" },
       { href: "/admin/status", icon: Activity, label: "Status do Sistema", description: "Status das integrações" },
       { href: "/admin/chat", icon: MessageSquare, label: "Chat", description: "Conversas com leads" },

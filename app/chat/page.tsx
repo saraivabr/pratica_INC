@@ -1,13 +1,16 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { MessageCircle, Loader2, User, Clock, ChevronRight, RefreshCw } from "lucide-react"
 import { WhatsAppConnectionPanel } from "@/components/whatsapp-connection-panel"
+import { AppShell } from "@/components/app-shell"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { format, formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { useAuth } from "@/lib/auth-context"
 
 interface Conversation {
   id: string
@@ -59,6 +62,14 @@ function useConversations() {
 
 export default function ChatPage() {
   const { conversations, loading, error, refetch } = useConversations()
+  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/login")
+    }
+  }, [authLoading, isAuthenticated, router])
 
   const getLastMessage = (conv: Conversation) => {
     if (!conv.messages || conv.messages.length === 0) return "Nenhuma mensagem"
@@ -79,9 +90,17 @@ export default function ChatPage() {
     }
   }
 
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container px-4 py-8 space-y-6">
+    <AppShell title="Chats">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <MessageCircle className="h-5 w-5 text-primary" />
@@ -166,6 +185,6 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   )
 }

@@ -106,6 +106,7 @@ export default function CorretorRecepcaoPage() {
   const [qualificacao, setQualificacao] = useState<QualificacaoData | null>(null)
   const [gamificacao, setGamificacao] = useState<GamificacaoData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [filaTotal, setFilaTotal] = useState(0)
   const [checkinLoading, setCheckinLoading] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [pausaLoading, setPausaLoading] = useState(false)
@@ -153,7 +154,9 @@ export default function CorretorRecepcaoPage() {
       const result = await response.json()
 
       if (result.success && user) {
-        const minha = result.data.find((f: any) => f.user_id === (user as any).id)
+        const filaData = result.data || []
+        setFilaTotal(filaData.length)
+        const minha = filaData.find((f: any) => f.user_id === (user as any).id)
         setMinhaPresenca(minha || null)
       }
     } catch (error) {
@@ -738,7 +741,7 @@ export default function CorretorRecepcaoPage() {
             {/* Fila Dupla */}
             <DualQueueCard
               posicaoPortaria={minhaPresenca.sorteio_posicao || minhaPresenca.posicao_fila}
-              totalPortaria={10} // TODO: buscar do backend
+              totalPortaria={filaTotal}
               statusPortaria={
                 minhaPresenca.em_atendimento ? "atendendo" :
                 minhaPresenca.pausado ? "pausado" :
@@ -748,7 +751,7 @@ export default function CorretorRecepcaoPage() {
               }
               sorteioRealizado={selectedPlantaoData?.sorteio_realizado || false}
               posicaoLeads={qualificacao?.posicao_roleta_leads || null}
-              totalLeads={5} // TODO: buscar do backend
+              totalLeads={filaTotal}
               statusLeads={
                 !qualificacao?.qualificado ? "nao_qualificado" :
                 minhaPresenca.em_atendimento ? "atendendo" :
