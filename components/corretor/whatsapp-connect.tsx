@@ -16,6 +16,7 @@ import {
   Bot,
   Brain,
   Zap,
+  WifiOff,
 } from "lucide-react"
 
 type SessionStatus = "connecting" | "qr" | "pairing" | "ready" | "disconnected" | "error"
@@ -63,18 +64,6 @@ function StepIndicator({ step, currentStep, label }: { step: number; currentStep
       >
         {label}
       </span>
-    </div>
-  )
-}
-
-function BenefitCard({ icon: Icon, title, description }: { icon: any; title: string; description: string }) {
-  return (
-    <div className="group p-4 rounded-2xl bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 hover:border-emerald-200 dark:hover:border-emerald-800 hover:shadow-lg transition-all duration-300">
-      <div className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
-        <Icon className="h-5 w-5 text-emerald-600 group-hover:text-white transition-colors" />
-      </div>
-      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{title}</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
     </div>
   )
 }
@@ -197,14 +186,14 @@ export function WhatsAppConnect({ onConnected }: WhatsAppConnectProps) {
 
   return (
     <div className="w-full max-w-4xl mx-auto py-6 px-4">
-      {/* Progress Steps */}
-      <div className="flex items-center justify-center gap-4 sm:gap-8 mb-8">
-        <StepIndicator step={1} currentStep={currentStep} label="Iniciar" />
-        <div className={cn("w-16 sm:w-24 h-1 rounded-full transition-colors duration-500", currentStep > 1 ? "bg-emerald-500" : "bg-gray-200")} />
-        <StepIndicator step={2} currentStep={currentStep} label="Conectar" />
-        <div className={cn("w-16 sm:w-24 h-1 rounded-full transition-colors duration-500", currentStep > 2 ? "bg-emerald-500" : "bg-gray-200")} />
-        <StepIndicator step={3} currentStep={currentStep} label="Pronto!" />
-      </div>
+      {/* Progress Steps — only visible during connection flow */}
+      {currentStep > 1 && (
+        <div className="flex items-center justify-center gap-4 sm:gap-8 mb-8">
+          <StepIndicator step={2} currentStep={currentStep} label="Conectar" />
+          <div className={cn("w-16 sm:w-24 h-1 rounded-full transition-colors duration-500", currentStep > 2 ? "bg-emerald-500" : "bg-gray-200")} />
+          <StepIndicator step={3} currentStep={currentStep} label="Pronto!" />
+        </div>
+      )}
 
       {/* Card */}
       <div className="relative">
@@ -214,61 +203,56 @@ export function WhatsAppConnect({ onConnected }: WhatsAppConnectProps) {
           <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-500 to-teal-400" />
 
           <div className="p-6 sm:p-8">
-            {/* Step 1: Sua Secretária Digital */}
+            {/* Step 1: Conectar WhatsApp */}
             {currentStep === 1 && (
-              <div className="space-y-6 animate-fadeInUp">
-                <div className="flex justify-center">
+              <div className="space-y-5 animate-fadeInUp">
+                {/* Status + CTA — always visible without scrolling */}
+                <div className="flex flex-col items-center text-center gap-4">
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl blur-xl opacity-50" />
-                    <div className="relative h-20 w-20 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-2xl shadow-emerald-500/30">
-                      <Bot className="h-10 w-10 text-white" />
+                    <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-100 to-orange-100 dark:from-red-900/30 dark:to-orange-900/30 flex items-center justify-center">
+                      <WifiOff className="h-8 w-8 text-red-500" />
                     </div>
                   </div>
-                </div>
 
-                <div className="text-center space-y-2">
-                  <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                    Sua Secretária Digital
-                  </h1>
-                  <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                    Conecte seu WhatsApp e deixe a IA trabalhar por você. Follow-up automático, análise de conversas e muito mais.
-                  </p>
-                </div>
+                  <div className="space-y-1">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                      WhatsApp desconectado
+                    </h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Conecte para acessar conversas, automações e IA
+                    </p>
+                  </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <BenefitCard
-                    icon={Bot}
-                    title="Follow-up Automático"
-                    description="Leads sem resposta recebem mensagens automáticas"
-                  />
-                  <BenefitCard
-                    icon={Brain}
-                    title="Análise com IA"
-                    description="Cada conversa é analisada: sentimento, intenção, próximos passos"
-                  />
-                  <BenefitCard
-                    icon={Zap}
-                    title="Respostas Rápidas"
-                    description="Responda direto do painel sem trocar de app"
-                  />
-                  <BenefitCard
-                    icon={RefreshCcw}
-                    title="Sincronização CRM"
-                    description="Mensagens e leads sincronizados automaticamente"
-                  />
-                </div>
-
-                <div className="pt-4">
-                  <GlowButton onClick={() => handleStart(false)} disabled={loading}>
+                  <GlowButton onClick={() => handleStart(false)} disabled={loading} size="md">
                     {loading ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
                     ) : (
                       <>
                         <Smartphone className="h-5 w-5" />
-                        Conectar WhatsApp
+                        Conectar meu WhatsApp
                       </>
                     )}
                   </GlowButton>
+                </div>
+
+                {/* Benefits — secondary, compact */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-center mb-3">
+                    O que você ganha
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { icon: Bot, label: "Follow-up automático" },
+                      { icon: Brain, label: "Análise com IA" },
+                      { icon: Zap, label: "Chat no painel" },
+                      { icon: RefreshCcw, label: "Sync com CRM" },
+                    ].map(({ icon: Icon, label }) => (
+                      <div key={label} className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                        <Icon className="h-5 w-5 text-emerald-500" />
+                        <span className="text-xs text-gray-600 dark:text-gray-400 text-center leading-tight">{label}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
