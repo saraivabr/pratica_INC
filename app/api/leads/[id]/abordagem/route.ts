@@ -36,14 +36,14 @@ export async function GET(
 
     // Fetch lead data
     const leadRes = await pool.query(
-      `SELECT idlead, nome, email, telefone, origem, midia_principal,
+      `SELECT id_lead, nome, email, telefone, origem, midia_principal,
               corretor, situacao_nome, empreendimento, score,
               valor_negocio, renda_familiar, cidade, estado, tags,
               data_cad, ultima_data_conversao,
               qtde_simulacoes_associadas, qtde_reservas_associadas,
               possibilidade_venda
        FROM cvcrm_leads
-       WHERE workspace_id = $1 AND idlead = $2`,
+       WHERE workspace_id = $1 AND id_lead = $2`,
       [workspaceId, leadId]
     );
 

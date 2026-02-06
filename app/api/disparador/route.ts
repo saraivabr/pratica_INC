@@ -167,12 +167,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Montar lista de leads (CRM ou importados)
-    let leads: Array<{ idlead: number | null; nome: string; telefone: string; empreendimento: string }> = [];
+    let leads: Array<{ id_lead: number | null; nome: string; telefone: string; empreendimento: string }> = [];
 
     if (isImport) {
       // Leads importados manualmente
       leads = leads_importados!.map((l, i) => ({
-        idlead: null,
+        id_lead: null,
         nome: l.nome.trim(),
         telefone: l.telefone.replace(/\D/g, ''),
         empreendimento: l.empreendimento || '',
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
         `NOT EXISTS (
           SELECT 1 FROM disparo_leads dl
           JOIN disparos d ON d.id = dl.disparo_id
-          WHERE dl.lead_cvcrm_id = l.idlead
+          WHERE dl.lead_cvcrm_id = l.id_lead
             AND dl.status = 'enviado'
             AND dl.enviado_at > NOW() - INTERVAL '48 hours'
         )`,
@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
         conditions.push(`
           NOT EXISTS (
             SELECT 1 FROM cvcrm_lead_interacoes i
-            WHERE i.idlead = l.idlead
+            WHERE i.id_lead = l.id_lead
               AND i.workspace_id = l.workspace_id
               AND i.created_at > NOW() - INTERVAL '${filtros.dias_sem_contato} days'
           )
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
       }
 
       const leadsResult = await pool.query(
-        `SELECT l.id, l.idlead, l.nome, l.telefones, l.empreendimentos
+        `SELECT l.id, l.id_lead, l.nome, l.telefones, l.empreendimentos
          FROM cvcrm_leads l
          WHERE ${conditions.join(' AND ')}
          ORDER BY l.created_at DESC
@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
         } catch { /* ignore */ }
 
         return {
-          idlead: lead.idlead as number,
+          id_lead: lead.id_lead as number,
           nome: lead.nome,
           telefone,
           empreendimento: empreendimentoNome,
@@ -345,7 +345,7 @@ Responda APENAS com a mensagem, sem explicações.`;
       );
       insertParams.push(
         disparoId,
-        lead.idlead || null,
+        lead.id_lead || null,
         lead.nome,
         lead.telefone,
         lead.empreendimento,

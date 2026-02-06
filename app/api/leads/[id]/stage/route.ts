@@ -59,8 +59,8 @@ export async function POST(
        SET situacao_id = $1,
            situacao_nome = $2,
            updated_at = NOW()
-       WHERE idlead = $3 AND workspace_id = $4
-       RETURNING idlead, situacao_id, situacao_nome`,
+       WHERE id_lead = $3 AND workspace_id = $4
+       RETURNING id_lead, situacao_id, situacao_nome`,
       [situacaoId, stage, leadId, workspaceId]
     );
 

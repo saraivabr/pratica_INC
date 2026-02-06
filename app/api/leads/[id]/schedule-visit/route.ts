@@ -37,9 +37,9 @@ export async function POST(
 
     // Buscar dados do lead (com verificação de tenant)
     const leadResult = await dbQuery(
-      `SELECT idlead, nome, telefone, corretor_id, corretor
+      `SELECT id_lead, nome, telefone, corretor_id, corretor
        FROM cvcrm_leads
-       WHERE idlead = $1 AND workspace_id = $2`,
+       WHERE id_lead = $1 AND workspace_id = $2`,
       [leadId, workspaceId]
     );
 
@@ -94,7 +94,7 @@ export async function POST(
        SET situacao_id = 4,
            situacao_nome = 'Visita Agendada',
            updated_at = NOW()
-       WHERE idlead = $1 AND workspace_id = $2`,
+       WHERE id_lead = $1 AND workspace_id = $2`,
       [leadId, workspaceId]
     ).catch(err => console.warn('[Visit] Erro ao atualizar estágio:', err.message));
 

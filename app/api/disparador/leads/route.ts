@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       NOT EXISTS (
         SELECT 1 FROM disparo_leads dl
         JOIN disparos d ON d.id = dl.disparo_id
-        WHERE dl.lead_cvcrm_id = l.idlead
+        WHERE dl.lead_cvcrm_id = l.id_lead
           AND dl.status = 'enviado'
           AND dl.enviado_at > NOW() - INTERVAL '48 hours'
       )
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       conditions.push(`
         NOT EXISTS (
           SELECT 1 FROM cvcrm_lead_interacoes i
-          WHERE i.idlead = l.idlead
+          WHERE i.id_lead = l.id_lead
             AND i.workspace_id = l.workspace_id
             AND i.created_at > NOW() - INTERVAL '1 day' * $${paramIndex}
         )
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
     const leadsResult = await pool.query(
       `SELECT
         l.id,
-        l.idlead,
+        l.id_lead,
         l.nome,
         l.telefones,
         l.empreendimentos,
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
 
       return {
         id: lead.id,
-        idlead: lead.idlead,
+        id_lead: lead.id_lead,
         nome: lead.nome,
         telefone,
         empreendimento: empreendimentoNome,

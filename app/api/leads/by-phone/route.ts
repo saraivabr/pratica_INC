@@ -43,7 +43,7 @@ function getPhoneVariants(phone: string): string[] {
 }
 
 interface LeadResult {
-  idlead: number;
+  id_lead: number;
   nome: string;
   email: string | null;
   telefone: string | null;
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
     // Usar LIKE para comparar versões limpas do telefone
     const leadQuery = `
       SELECT
-        idlead, nome, email, telefone, celular, cpf,
+        id_lead, nome, email, telefone, celular, cpf,
         origem, midia_principal, situacao_nome, situacao_id,
         corretor, corretor_id, empreendimento, imobiliaria,
         score, valor_negocio, renda_familiar,
@@ -198,7 +198,7 @@ export async function GET(request: NextRequest) {
         ORDER BY data_cadastro DESC
         LIMIT 10
       `;
-      const interacoesResult = await pool.query<Interacao>(interacoesQuery, [workspaceId, lead.idlead]);
+      const interacoesResult = await pool.query<Interacao>(interacoesQuery, [workspaceId, lead.id_lead]);
       interacoes = interacoesResult.rows;
     }
 
@@ -235,7 +235,7 @@ export async function GET(request: NextRequest) {
       };
 
       normalizedLead = {
-        id: lead.idlead,
+        id: lead.id_lead,
         nome: lead.nome || 'Sem nome',
         email: lead.email,
         telefone: lead.telefone || lead.celular,

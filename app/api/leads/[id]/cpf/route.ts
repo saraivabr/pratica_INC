@@ -80,8 +80,8 @@ export async function PATCH(
       `UPDATE cvcrm_leads
        SET cpf = $1,
            updated_at = NOW()
-       WHERE idlead = $2 AND workspace_id = $3
-       RETURNING idlead, cpf, nome`,
+       WHERE id_lead = $2 AND workspace_id = $3
+       RETURNING id_lead, cpf, nome`,
       [cleanCpf, leadId, workspaceId]
     );
 

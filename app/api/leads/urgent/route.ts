@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     // Buscar leads urgentes diretamente do banco
     let query = `
       SELECT
-        idlead as id,
+        id_lead as id,
         nome,
         telefone,
         email,

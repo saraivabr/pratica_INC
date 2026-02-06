@@ -25,7 +25,7 @@ interface EmpreendimentoInfo {
 }
 
 interface DBLead {
-    idlead: number;
+    id_lead: number;
     nome: string;
     email: string | null;
     telefone: string | null;
@@ -70,8 +70,8 @@ function normalizeLead(lead: DBLead, interacoes: DBInteracao[] = []) {
     const tags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags;
 
     return {
-        id: lead.idlead,
-        idlead: lead.idlead,
+        id: lead.id_lead,
+        id_lead: lead.id_lead,
         nome: lead.nome || 'Sem nome',
         email: lead.email || '',
         telefone: lead.telefone || '',
@@ -134,12 +134,12 @@ export async function GET(
         // Buscar lead
         let query = `
             SELECT
-                idlead, nome, email, telefone, cpf, data_cad, origem, midia_principal,
+                id_lead, nome, email, telefone, cpf, data_cad, origem, midia_principal,
                 corretor, corretor_id, imobiliaria, situacao_nome, situacao_id,
                 empreendimento, score, valor_negocio, renda_familiar,
                 cidade, estado, bairro, cep, endereco, tags, ultima_data_conversao, synced_at, observacao
             FROM cvcrm_leads
-            WHERE workspace_id = $1 AND idlead = $2
+            WHERE workspace_id = $1 AND id_lead = $2
         `;
         const queryParams: any[] = [workspaceId, leadId];
 
@@ -255,8 +255,8 @@ export async function PATCH(
         const query = `
             UPDATE cvcrm_leads
             SET ${setClauses.join(', ')}
-            WHERE workspace_id = $${paramIndex} AND idlead = $${paramIndex + 1}
-            RETURNING idlead, nome, email, telefone, cidade, estado, valor_negocio, renda_familiar
+            WHERE workspace_id = $${paramIndex} AND id_lead = $${paramIndex + 1}
+            RETURNING id_lead, nome, email, telefone, cidade, estado, valor_negocio, renda_familiar
         `;
 
         const result = await pool.query(query, values);

@@ -24,7 +24,7 @@ interface EmpreendimentoInfo {
 }
 
 interface DBLead {
-    idlead: number;
+    id_lead: number;
     nome: string;
     email: string | null;
     telefone: string | null;
@@ -58,7 +58,7 @@ function normalizeLead(lead: DBLead) {
     const tags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags;
 
     return {
-        id: lead.idlead,
+        id: lead.id_lead,
         nome: lead.nome || 'Sem nome',
         email: lead.email || '',
         telefone: lead.telefone || '',
@@ -100,18 +100,18 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Generate a negative idlead for manual leads (to avoid conflict with CV CRM sync)
+        // Generate a negative id_lead for manual leads (to avoid conflict with CV CRM sync)
         const idResult = await pool.query(
-            `SELECT COALESCE(MIN(idlead), 0) - 1 as next_id FROM cvcrm_leads WHERE idlead < 0`
+            `SELECT COALESCE(MIN(id_lead), 0) - 1 as next_id FROM cvcrm_leads WHERE id_lead < 0`
         );
         const nextId = idResult.rows[0].next_id || -1;
 
         const insertQuery = `
             INSERT INTO cvcrm_leads (
-                idlead, nome, email, telefone, origem, situacao_nome,
+                id_lead, nome, email, telefone, origem, situacao_nome,
                 data_cad, workspace_id, created_at, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, NOW(), NOW())
-            RETURNING idlead, nome, email, telefone, origem, situacao_nome, data_cad
+            RETURNING id_lead, nome, email, telefone, origem, situacao_nome, data_cad
         `;
 
         const result = await pool.query(insertQuery, [
@@ -224,13 +224,13 @@ export async function GET(request: NextRequest) {
         // Buscar leads paginados
         const query = `
             SELECT
-                idlead, nome, email, telefone, data_cad, origem, midia_principal,
+                id_lead, nome, email, telefone, data_cad, origem, midia_principal,
                 corretor, corretor_id, imobiliaria, situacao_nome, situacao_id,
                 empreendimento, score, valor_negocio, renda_familiar,
                 cidade, estado, bairro, tags, ultima_data_conversao, synced_at
             FROM cvcrm_leads
             ${whereClause}
-            ORDER BY data_cad DESC NULLS LAST, idlead DESC
+            ORDER BY data_cad DESC NULLS LAST, id_lead DESC
             LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
         `;
         params.push(limit, offset);
