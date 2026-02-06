@@ -10,12 +10,22 @@ import { tenantQuery, findUserWorkspace } from '@/lib/tenant-context';
 import { getAuthenticatedUser } from '@/lib/api-auth';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 import { z } from 'zod';
-import { messageTextSchema, phoneSchema } from '@/lib/validation-schemas';
+import { messageTextSchema } from '@/lib/validation-schemas';
+
+// Phone schema that accepts E.164 (5511999999999), local (11999999999),
+// and formatted ((11) 99999-9999) — strips to digits only
+const whatsappPhoneSchema = z.string()
+  .min(8, 'Número de telefone muito curto')
+  .max(20, 'Número de telefone muito longo')
+  .transform((val) => val.replace(/\D/g, ''))
+  .refine((val) => val.length >= 10 && val.length <= 13, {
+    message: 'Número de telefone inválido',
+  });
 
 // Validation schema for WhatsApp send request
 const SendWhatsAppSchema = z.object({
   instanceName: z.string().min(1, 'Nome da instância é obrigatório'),
-  phoneNumber: phoneSchema,
+  phoneNumber: whatsappPhoneSchema,
   message: messageTextSchema,
 });
 

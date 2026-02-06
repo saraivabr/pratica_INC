@@ -443,11 +443,12 @@ export async function sendPresence(
   number: string,
   presence: 'composing' | 'recording' | 'paused'
 ): Promise<{ status: string }> {
-  return evolutionFetch(`/chat/updatePresence/${instanceName}`, {
+  return evolutionFetch(`/chat/sendPresence/${instanceName}`, {
     method: 'POST',
     body: JSON.stringify({
       number: formatPhoneNumber(number),
       presence,
+      delay: 3000,
     }),
   });
 }
@@ -461,16 +462,15 @@ export async function sendTyping(
   number: string,
   durationMs = 3000
 ): Promise<void> {
-  await sendPresence(instanceName, number, 'composing');
-
-  // Auto-pause after duration
-  setTimeout(async () => {
-    try {
-      await sendPresence(instanceName, number, 'paused');
-    } catch {
-      // Ignore errors on pause
-    }
-  }, durationMs);
+  // Evolution API v2.3.7: sendPresence with delay handles auto-pause
+  await evolutionFetch(`/chat/sendPresence/${instanceName}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      number: formatPhoneNumber(number),
+      presence: 'composing',
+      delay: durationMs,
+    }),
+  });
 }
 
 /**

@@ -31,6 +31,28 @@ export async function GET(request: NextRequest) {
     const instanceName = searchParams.get('instance');
     const phoneNumber = searchParams.get('phone');
 
+    // If phone is provided without instance, return just the AI analysis (for lead-panel)
+    if (!instanceName && phoneNumber) {
+      let aiAnalysis = null;
+      try {
+        const db = getMongoDb();
+        const conv = await db.collection('conversations').findOne({
+          workspace_id: workspaceId,
+          phone_number: phoneNumber,
+        });
+        aiAnalysis = conv?.ai_analysis || null;
+      } catch {
+        // MongoDB unavailable
+      }
+      return NextResponse.json({
+        success: true,
+        data: [],
+        total: 0,
+        unread_count: 0,
+        ai_analysis: aiAnalysis,
+      });
+    }
+
     if (!instanceName) {
       return NextResponse.json(
         { success: false, error: 'Nome da instância é obrigatório' },
