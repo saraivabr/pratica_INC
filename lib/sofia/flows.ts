@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import OpenAI from 'openai';
 import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import {
   sendTextMessage,
   sendQuickButtons,
@@ -330,7 +331,7 @@ async function handleCheapestPriceFlow(
   if (cheapest) {
     const emp = empreendimentosById.get(cheapest.empId);
     const nome = String(emp?.nome || emp?.empreendimento || 'Empreendimento');
-    const empreendimentoDb = await getEmpreendimentoById(cheapest.empId);
+    const empreendimentoDb = await getEmpreendimentoById(cheapest.empId, user.workspace_id);
     const snapshot = buildEmpreendimentoSnapshot(empreendimentoDb || emp);
     const url = buildEmpreendimentoLink(cheapest.empId, 'unidades');
     const textoBase = `Pelo nosso canal de parcerias, o mais em conta agora e o *${nome}* a partir de ${formatCurrency(cheapest.valor)}.`;
@@ -433,18 +434,21 @@ function extractEmpreendimentoQuery(text: string): string | null {
   return tokens.join(' ').trim();
 }
 
-async function findEmpreendimentoByText(text: string) {
+async function findEmpreendimentoByText(text: string, workspaceId?: number) {
   const query = extractEmpreendimentoQuery(text);
   if (!query) return null;
+
+  const wsFilter = workspaceId ? ' and workspace_id = $2' : '';
+  const wsParams = workspaceId ? [`%${query}%`, workspaceId] : [`%${query}%`];
 
   const { rows: directRows } = await dbQuery(
     `select cvcrm_id, nome, descricao, tipo, status, cidade, uf,
             data_entrega_prevista, total_unidades, cvcrm_data
      from cvcrm_empreendimentos
-     where lower(nome) like $1
+     where lower(nome) like $1${wsFilter}
      order by length(nome)
      limit 1`,
-    [`%${query}%`]
+    wsParams
   );
   if (directRows[0]) return directRows[0];
 
@@ -452,11 +456,17 @@ async function findEmpreendimentoByText(text: string) {
   if (!tokens.length) return null;
 
   const conditions: string[] = [];
-  const values: string[] = [];
-  tokens.forEach((token, index) => {
-    conditions.push(`lower(nome) like $${index + 1}`);
+  const values: (string | number)[] = [];
+  let paramIdx = 1;
+  tokens.forEach((token) => {
+    conditions.push(`lower(nome) like $${paramIdx}`);
     values.push(`%${token}%`);
+    paramIdx++;
   });
+  if (workspaceId) {
+    conditions.push(`workspace_id = $${paramIdx}`);
+    values.push(workspaceId);
+  }
 
   const { rows: tokenRows } = await dbQuery(
     `select cvcrm_id, nome, descricao, tipo, status, cidade, uf,
@@ -471,7 +481,7 @@ async function findEmpreendimentoByText(text: string) {
   return tokenRows[0] || null;
 }
 
-async function findEmpreendimentoByRag(text: string) {
+async function findEmpreendimentoByRag(text: string, workspaceId?: number) {
   const results = await searchSimilar(text, {
     limit: 1,
     threshold: 0.6,
@@ -481,25 +491,31 @@ async function findEmpreendimentoByRag(text: string) {
   const top = results[0];
   if (!top?.source_id) return null;
 
+  const wsFilter = workspaceId ? ' and workspace_id = $2' : '';
+  const wsParams = workspaceId ? [Number(top.source_id), workspaceId] : [Number(top.source_id)];
+
   const { rows } = await dbQuery(
     `select cvcrm_id, nome, descricao, tipo, status, cidade, uf,
             data_entrega_prevista, total_unidades, cvcrm_data
      from cvcrm_empreendimentos
-     where cvcrm_id = $1
+     where cvcrm_id = $1${wsFilter}
      limit 1`,
-    [Number(top.source_id)]
+    wsParams
   );
   return rows[0] || null;
 }
 
-async function getEmpreendimentoById(id: string) {
+async function getEmpreendimentoById(id: string, workspaceId?: number) {
+  const wsFilter = workspaceId ? ' and workspace_id = $2' : '';
+  const wsParams = workspaceId ? [Number(id), workspaceId] : [Number(id)];
+
   const { rows } = await dbQuery(
     `select cvcrm_id, nome, descricao, tipo, status, cidade, uf,
             data_entrega_prevista, total_unidades, cvcrm_data, endereco_completo
      from cvcrm_empreendimentos
-     where cvcrm_id = $1
+     where cvcrm_id = $1${wsFilter}
      limit 1`,
-    [Number(id)]
+    wsParams
   );
   return rows[0] || null;
 }
@@ -841,13 +857,15 @@ async function handleGreeting(
 
   let recentPages: string[] = [];
   try {
+    const wsFilter = user.workspace_id ? ' and workspace_id = $2' : '';
+    const wsParams = user.workspace_id ? [user.id, user.workspace_id] : [user.id];
     const { rows: activities } = await dbQuery(
       `select page
        from tracking_events
-       where user_id = $1
+       where user_id = $1${wsFilter}
        order by created_at desc
        limit 6`,
-      [user.id]
+      wsParams
     );
     recentPages = activities.map((row) => String(row.page || "").toLowerCase());
   } catch (error) {
@@ -1003,7 +1021,7 @@ async function handleSearchFlow(
   if (context.current_flow === 'search' && context.entities.empreendimento) {
     const empreendimentoId = String(context.entities.empreendimento);
     if (action.includes('foto') || action.includes('fotos') || action.includes('imagem')) {
-      const empreendimento = await getEmpreendimentoById(empreendimentoId);
+      const empreendimento = await getEmpreendimentoById(empreendimentoId, user.workspace_id);
       if (empreendimento) {
         const messages = [`Perfeito, vou te mandar as fotos do *${empreendimento.nome}* agora.`];
         return {
@@ -1030,7 +1048,7 @@ async function handleSearchFlow(
 
     if (action.includes('tabela') || action.includes('unidades')) {
       const url = buildEmpreendimentoLink(empreendimentoId, 'unidades');
-      const empreendimento = await getEmpreendimentoById(empreendimentoId);
+      const empreendimento = await getEmpreendimentoById(empreendimentoId, user.workspace_id);
       const nome = String(empreendimento?.nome || 'Empreendimento');
       const messages = ['Seguindo com tabela/unidades:'];
       await registerEmpreendimentoInteracao(
@@ -1056,7 +1074,7 @@ async function handleSearchFlow(
 
     if (action.includes('simular')) {
       const url = buildEmpreendimentoLink(empreendimentoId, 'simular');
-      const empreendimento = await getEmpreendimentoById(empreendimentoId);
+      const empreendimento = await getEmpreendimentoById(empreendimentoId, user.workspace_id);
       const nome = String(empreendimento?.nome || 'Empreendimento');
       const messages = ['Posso te ajudar a simular agora:'];
       await registerEmpreendimentoInteracao(
@@ -1082,7 +1100,7 @@ async function handleSearchFlow(
 
     if (action.includes('material')) {
       const url = buildEmpreendimentoLink(empreendimentoId, 'sobre');
-      const empreendimento = await getEmpreendimentoById(empreendimentoId);
+      const empreendimento = await getEmpreendimentoById(empreendimentoId, user.workspace_id);
       const nome = String(empreendimento?.nome || 'Empreendimento');
       const messages = ['Ja separei o material do empreendimento:'];
       await registerEmpreendimentoInteracao(
@@ -2829,14 +2847,16 @@ async function generateAIResponse(
     console.error('Error loading portfolio summary:', error);
   }
 
-  // Buscar atividades recentes
+  // Buscar atividades recentes (com isolamento workspace)
+  const teWsFilter = user.workspace_id ? ' and workspace_id = $2' : '';
+  const teWsParams = user.workspace_id ? [user.id, user.workspace_id] : [user.id];
   const { rows: activities } = await dbQuery(
     `select event_type, page
      from tracking_events
-     where user_id = $1
+     where user_id = $1${teWsFilter}
      order by created_at desc
      limit 5`,
-    [user.id]
+    teWsParams
   );
   const recentActivities = activities
     .map((a) => `${a.event_type} em ${a.page}`)
@@ -2978,20 +2998,27 @@ interface Campaign {
   updated_at: string;
 }
 
-async function getCampanhasAtivas(): Promise<Campaign[]> {
+async function getCampanhasAtivas(workspaceId?: number): Promise<Campaign[]> {
+  const wsFilter = workspaceId ? ' AND workspace_id = $1' : '';
+  const wsParams = workspaceId ? [workspaceId] : [];
+
   const { rows } = await dbQuery(
     `SELECT * FROM campaigns
      WHERE status IN ('active', 'scheduled', 'running')
-     AND (completed_at IS NULL OR completed_at > NOW())
-     ORDER BY created_at DESC`
+     AND (completed_at IS NULL OR completed_at > NOW())${wsFilter}
+     ORDER BY created_at DESC`,
+    wsParams
   );
   return rows as Campaign[];
 }
 
-async function getCampanhaById(id: string): Promise<Campaign | null> {
+async function getCampanhaById(id: string, workspaceId?: number): Promise<Campaign | null> {
+  const wsFilter = workspaceId ? ' AND workspace_id = $2' : '';
+  const wsParams = workspaceId ? [id, workspaceId] : [id];
+
   const { rows } = await dbQuery(
-    `SELECT * FROM campaigns WHERE id = $1 LIMIT 1`,
-    [id]
+    `SELECT * FROM campaigns WHERE id = $1${wsFilter} LIMIT 1`,
+    wsParams
   );
   return (rows[0] as Campaign) || null;
 }
@@ -3047,7 +3074,7 @@ async function handleCampanhaFlow(
 
   // Verificar se está pedindo detalhes de uma campanha específica
   if (context.awaiting_response === 'escolha_campanha') {
-    const campanhas = await getCampanhasAtivas();
+    const campanhas = await getCampanhasAtivas(user.workspace_id);
 
     // Tentar encontrar campanha pelo nome ou índice
     let campanhaEncontrada: Campaign | null = null;
@@ -3256,9 +3283,18 @@ function getAtividadeEmoji(tipo: string | undefined): string {
 /**
  * Busca nome do lead/cliente associado a atividade
  */
-async function buscarNomeLead(leadId: number | undefined): Promise<string | null> {
+async function buscarNomeLead(leadId: number | undefined, workspaceId?: number): Promise<string | null> {
   if (!leadId) return null;
   try {
+    if (workspaceId) {
+      const { rows } = await withTenant(workspaceId, async (client) => {
+        return client.query(
+          `SELECT nome FROM cvcrm_leads WHERE cvcrm_id = $1 AND workspace_id = $2 LIMIT 1`,
+          [leadId, workspaceId]
+        );
+      });
+      return rows[0]?.nome || null;
+    }
     const { rows } = await dbQuery(
       `SELECT nome FROM cvcrm_leads WHERE cvcrm_id = $1 LIMIT 1`,
       [leadId]
@@ -3272,11 +3308,11 @@ async function buscarNomeLead(leadId: number | undefined): Promise<string | null
 /**
  * Formata uma atividade para exibicao
  */
-async function formatarAtividade(atividade: Atividade): Promise<string> {
+async function formatarAtividade(atividade: Atividade, workspaceId?: number): Promise<string> {
   const emoji = getAtividadeEmoji(atividade.tipo);
   const horario = atividade.data_inicio ? formatarHorarioAtividade(atividade.data_inicio) : '--:--';
   const titulo = atividade.titulo || atividade.tipo || 'Compromisso';
-  const cliente = await buscarNomeLead(atividade.lead_id);
+  const cliente = await buscarNomeLead(atividade.lead_id, workspaceId);
 
   let linha = `${emoji} *${horario}* - ${titulo}`;
   if (cliente) {
@@ -3490,7 +3526,7 @@ async function handleAgendaFlow(
 
     const linhasAtividades: string[] = [];
     for (const atividade of atividadesDoDia) {
-      const linha = await formatarAtividade(atividade);
+      const linha = await formatarAtividade(atividade, user.workspace_id);
       linhasAtividades.push(linha);
     }
 
@@ -3579,9 +3615,9 @@ export async function processMessage(
   // Verificar frustração alta adicional
   const frustrationCheck = checkHighFrustration(sanitizedText);
 
-  // Buscar/criar conversa
+  // Buscar/criar conversa (com isolamento workspace)
   const { id: convId, messages, context: rawContext } =
-    await getOrCreateConversation(user.id);
+    await getOrCreateConversation(user.id, user.workspace_id);
 
   let context = rawContext;
 
@@ -3727,7 +3763,7 @@ export async function processMessage(
     }
 
     if (isAffirmative(sanitizedText)) {
-      const empreendimento = await getEmpreendimentoById(String(empreendimentoId));
+      const empreendimento = await getEmpreendimentoById(String(empreendimentoId), user.workspace_id);
       if (empreendimento) {
         const media = getEmpreendimentoMedia(empreendimento);
         if (media.images.length > 0) {
@@ -3753,9 +3789,9 @@ export async function processMessage(
   // Busca direta de empreendimento quando o usuario pede informacoes
   if (!isInActiveFlow(context)) {
     const wantsEmpInfo = /saber|sobre|info|informac|detalh|conhecer|me fala|me fale/i.test(text);
-    let empreendimento = await findEmpreendimentoByText(text);
+    let empreendimento = await findEmpreendimentoByText(text, user.workspace_id);
     if (!empreendimento && wantsEmpInfo) {
-      empreendimento = await findEmpreendimentoByRag(text);
+      empreendimento = await findEmpreendimentoByRag(text, user.workspace_id);
     }
     if (empreendimento) {
       const resumo = formatEmpreendimentoResumo(empreendimento);

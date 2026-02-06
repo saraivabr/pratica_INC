@@ -31,8 +31,13 @@ export async function POST(
     const { id: plantao_id } = await params;
 
     // Verificar permissao (apenas admin/gerente/recepcionista)
-    // TODO: Adicionar verificacao de hierarquia
-    // Por enquanto, qualquer usuario autenticado pode realizar
+    const allowedRoles = ['admin', 'gerente', 'recepcionista'];
+    if (!allowedRoles.includes((user as any).role)) {
+      return NextResponse.json(
+        { success: false, error: 'Sem permissao para realizar sorteio' },
+        { status: 403 }
+      );
+    }
 
     return await withTenant(workspaceId, async (client) => {
       // Verificar se plantao existe e pertence ao workspace

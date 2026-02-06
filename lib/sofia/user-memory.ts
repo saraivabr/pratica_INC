@@ -79,11 +79,13 @@ export interface Interaction {
 /**
  * Busca memória do usuário
  */
-export async function getUserMemory(userId: string): Promise<UserMemory | null> {
-  const { rows } = await dbQuery(
-    `SELECT * FROM user_memory WHERE user_id = $1 LIMIT 1`,
-    [userId]
-  );
+export async function getUserMemory(userId: string, workspaceId?: number): Promise<UserMemory | null> {
+  const query = workspaceId
+    ? `SELECT * FROM user_memory WHERE user_id = $1 AND workspace_id = $2 LIMIT 1`
+    : `SELECT * FROM user_memory WHERE user_id = $1 LIMIT 1`;
+  const params = workspaceId ? [userId, workspaceId] : [userId];
+
+  const { rows } = await dbQuery(query, params);
 
   if (!rows[0]) {
     return null;
@@ -97,9 +99,10 @@ export async function getUserMemory(userId: string): Promise<UserMemory | null> 
  */
 export async function updateUserMemory(
   userId: string,
-  data: Partial<Omit<UserMemory, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>
+  data: Partial<Omit<UserMemory, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>,
+  workspaceId?: number
 ): Promise<UserMemory> {
-  const existing = await getUserMemory(userId);
+  const existing = await getUserMemory(userId, workspaceId);
 
   if (existing) {
     // Merge dos dados existentes com os novos
@@ -119,23 +122,20 @@ export async function updateUserMemory(
       ? { ...existing.metadata, ...data.metadata, ultimaInteracao: new Date().toISOString() }
       : { ...existing.metadata, ultimaInteracao: new Date().toISOString() };
 
-    const { rows } = await dbQuery(
-      `UPDATE user_memory
-       SET preferencias = $1,
-           historico = $2,
-           comportamento = $3,
-           metadata = $4,
-           updated_at = NOW()
-       WHERE user_id = $5
-       RETURNING *`,
-      [
-        JSON.stringify(updatedPreferencias),
-        JSON.stringify(updatedHistorico),
-        JSON.stringify(updatedComportamento),
-        JSON.stringify(updatedMetadata),
-        userId,
-      ]
-    );
+    const updateQuery = workspaceId
+      ? `UPDATE user_memory
+         SET preferencias = $1, historico = $2, comportamento = $3, metadata = $4, updated_at = NOW()
+         WHERE user_id = $5 AND workspace_id = $6
+         RETURNING *`
+      : `UPDATE user_memory
+         SET preferencias = $1, historico = $2, comportamento = $3, metadata = $4, updated_at = NOW()
+         WHERE user_id = $5
+         RETURNING *`;
+    const updateParams = workspaceId
+      ? [JSON.stringify(updatedPreferencias), JSON.stringify(updatedHistorico), JSON.stringify(updatedComportamento), JSON.stringify(updatedMetadata), userId, workspaceId]
+      : [JSON.stringify(updatedPreferencias), JSON.stringify(updatedHistorico), JSON.stringify(updatedComportamento), JSON.stringify(updatedMetadata), userId];
+
+    const { rows } = await dbQuery(updateQuery, updateParams);
 
     return mapRowToUserMemory(rows[0]);
   }
@@ -161,18 +161,18 @@ export async function updateUserMemory(
     ...(data.metadata || {}),
   };
 
-  const { rows } = await dbQuery(
-    `INSERT INTO user_memory (user_id, preferencias, historico, comportamento, metadata)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING *`,
-    [
-      userId,
-      JSON.stringify(newPreferencias),
-      JSON.stringify(newHistorico),
-      JSON.stringify(newComportamento),
-      JSON.stringify(newMetadata),
-    ]
-  );
+  const insertQuery = workspaceId
+    ? `INSERT INTO user_memory (user_id, workspace_id, preferencias, historico, comportamento, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`
+    : `INSERT INTO user_memory (user_id, preferencias, historico, comportamento, metadata)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`;
+  const insertParams = workspaceId
+    ? [userId, workspaceId, JSON.stringify(newPreferencias), JSON.stringify(newHistorico), JSON.stringify(newComportamento), JSON.stringify(newMetadata)]
+    : [userId, JSON.stringify(newPreferencias), JSON.stringify(newHistorico), JSON.stringify(newComportamento), JSON.stringify(newMetadata)];
+
+  const { rows } = await dbQuery(insertQuery, insertParams);
 
   return mapRowToUserMemory(rows[0]);
 }
@@ -182,9 +182,10 @@ export async function updateUserMemory(
  */
 export async function learnFromInteraction(
   userId: string,
-  interaction: Interaction
+  interaction: Interaction,
+  workspaceId?: number
 ): Promise<UserMemory> {
-  const memory = await getUserMemory(userId) || createDefaultMemory(userId);
+  const memory = await getUserMemory(userId, workspaceId) || createDefaultMemory(userId);
 
   const updates: Partial<UserMemory> = {
     metadata: {
@@ -318,7 +319,7 @@ export async function learnFromInteraction(
 
   updates.comportamento = comportamento;
 
-  return updateUserMemory(userId, updates);
+  return updateUserMemory(userId, updates, workspaceId);
 }
 
 // ============================================
@@ -409,8 +410,8 @@ function mapRowToUserMemory(row: any): UserMemory {
 /**
  * Obtém sugestões de empreendimentos baseadas no histórico
  */
-export async function getSuggestedEmpreendimentos(userId: string): Promise<string[]> {
-  const memory = await getUserMemory(userId);
+export async function getSuggestedEmpreendimentos(userId: string, workspaceId?: number): Promise<string[]> {
+  const memory = await getUserMemory(userId, workspaceId);
   if (!memory) return [];
 
   // Retorna os favoritos mais recentes

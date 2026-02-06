@@ -121,42 +121,42 @@ export async function buscarConvidadoPorTelefone(
  */
 export async function atualizarStatusConvidado(
   convidadoId: string,
-  novoStatus: ConvidadoStatus
+  novoStatus: ConvidadoStatus,
+  workspaceId?: number
 ): Promise<void> {
-  await dbQuery(
-    `UPDATE evento_convidados
-     SET status = $1, confirmado_at = NOW()
-     WHERE id = $2`,
-    [novoStatus, convidadoId]
-  );
+  const query = workspaceId
+    ? `UPDATE evento_convidados SET status = $1, confirmado_at = NOW() WHERE id = $2 AND workspace_id = $3`
+    : `UPDATE evento_convidados SET status = $1, confirmado_at = NOW() WHERE id = $2`;
+  const params = workspaceId ? [novoStatus, convidadoId, workspaceId] : [novoStatus, convidadoId];
+  await dbQuery(query, params);
 }
 
 /**
  * Marca convite como enviado
  */
 export async function marcarConviteEnviado(
-  convidadoId: string
+  convidadoId: string,
+  workspaceId?: number
 ): Promise<void> {
-  await dbQuery(
-    `UPDATE evento_convidados
-     SET convite_enviado_at = NOW()
-     WHERE id = $1`,
-    [convidadoId]
-  );
+  const query = workspaceId
+    ? `UPDATE evento_convidados SET convite_enviado_at = NOW() WHERE id = $1 AND workspace_id = $2`
+    : `UPDATE evento_convidados SET convite_enviado_at = NOW() WHERE id = $1`;
+  const params = workspaceId ? [convidadoId, workspaceId] : [convidadoId];
+  await dbQuery(query, params);
 }
 
 /**
  * Marca lembrete como enviado
  */
 export async function marcarLembreteEnviado(
-  convidadoId: string
+  convidadoId: string,
+  workspaceId?: number
 ): Promise<void> {
-  await dbQuery(
-    `UPDATE evento_convidados
-     SET lembrete_enviado_at = NOW()
-     WHERE id = $1`,
-    [convidadoId]
-  );
+  const query = workspaceId
+    ? `UPDATE evento_convidados SET lembrete_enviado_at = NOW() WHERE id = $1 AND workspace_id = $2`
+    : `UPDATE evento_convidados SET lembrete_enviado_at = NOW() WHERE id = $1`;
+  const params = workspaceId ? [convidadoId, workspaceId] : [convidadoId];
+  await dbQuery(query, params);
 }
 
 // ============================================
@@ -167,14 +167,14 @@ export async function marcarLembreteEnviado(
  * Busca todos os convidados de um evento
  */
 export async function listarConvidados(
-  eventoId: string
+  eventoId: string,
+  workspaceId?: number
 ): Promise<EventoConvidado[]> {
-  const { rows } = await dbQuery(
-    `SELECT * FROM evento_convidados
-     WHERE evento_id = $1
-     ORDER BY nome`,
-    [eventoId]
-  );
+  const query = workspaceId
+    ? `SELECT * FROM evento_convidados WHERE evento_id = $1 AND workspace_id = $2 ORDER BY nome`
+    : `SELECT * FROM evento_convidados WHERE evento_id = $1 ORDER BY nome`;
+  const params = workspaceId ? [eventoId, workspaceId] : [eventoId];
+  const { rows } = await dbQuery(query, params);
 
   return rows as EventoConvidado[];
 }
@@ -183,15 +183,14 @@ export async function listarConvidados(
  * Busca convidados pendentes de convite
  */
 export async function listarConvidadosPendentesConvite(
-  eventoId: string
+  eventoId: string,
+  workspaceId?: number
 ): Promise<EventoConvidado[]> {
-  const { rows } = await dbQuery(
-    `SELECT * FROM evento_convidados
-     WHERE evento_id = $1
-       AND convite_enviado_at IS NULL
-     ORDER BY nome`,
-    [eventoId]
-  );
+  const query = workspaceId
+    ? `SELECT * FROM evento_convidados WHERE evento_id = $1 AND workspace_id = $2 AND convite_enviado_at IS NULL ORDER BY nome`
+    : `SELECT * FROM evento_convidados WHERE evento_id = $1 AND convite_enviado_at IS NULL ORDER BY nome`;
+  const params = workspaceId ? [eventoId, workspaceId] : [eventoId];
+  const { rows } = await dbQuery(query, params);
 
   return rows as EventoConvidado[];
 }
@@ -201,17 +200,14 @@ export async function listarConvidadosPendentesConvite(
  * (confirmados ou "talvez" que ainda nao receberam lembrete)
  */
 export async function listarConvidadosParaLembrete(
-  eventoId: string
+  eventoId: string,
+  workspaceId?: number
 ): Promise<EventoConvidado[]> {
-  const { rows } = await dbQuery(
-    `SELECT * FROM evento_convidados
-     WHERE evento_id = $1
-       AND convite_enviado_at IS NOT NULL
-       AND lembrete_enviado_at IS NULL
-       AND status IN ('confirmado', 'talvez')
-     ORDER BY nome`,
-    [eventoId]
-  );
+  const query = workspaceId
+    ? `SELECT * FROM evento_convidados WHERE evento_id = $1 AND workspace_id = $2 AND convite_enviado_at IS NOT NULL AND lembrete_enviado_at IS NULL AND status IN ('confirmado', 'talvez') ORDER BY nome`
+    : `SELECT * FROM evento_convidados WHERE evento_id = $1 AND convite_enviado_at IS NOT NULL AND lembrete_enviado_at IS NULL AND status IN ('confirmado', 'talvez') ORDER BY nome`;
+  const params = workspaceId ? [eventoId, workspaceId] : [eventoId];
+  const { rows } = await dbQuery(query, params);
 
   return rows as EventoConvidado[];
 }
@@ -220,7 +216,8 @@ export async function listarConvidadosParaLembrete(
  * Busca estatisticas de um evento
  */
 export async function getEstatisticasEvento(
-  eventoId: string
+  eventoId: string,
+  workspaceId?: number
 ): Promise<{
   total: number;
   pendentes: number;
@@ -230,19 +227,29 @@ export async function getEstatisticasEvento(
   convitesEnviados: number;
   lembretesEnviados: number;
 }> {
-  const { rows } = await dbQuery(
-    `SELECT
-      COUNT(*) as total,
-      COUNT(*) FILTER (WHERE status = 'pendente') as pendentes,
-      COUNT(*) FILTER (WHERE status = 'confirmado') as confirmados,
-      COUNT(*) FILTER (WHERE status = 'recusado') as recusados,
-      COUNT(*) FILTER (WHERE status = 'talvez') as talvez,
-      COUNT(*) FILTER (WHERE convite_enviado_at IS NOT NULL) as convites_enviados,
-      COUNT(*) FILTER (WHERE lembrete_enviado_at IS NOT NULL) as lembretes_enviados
-    FROM evento_convidados
-    WHERE evento_id = $1`,
-    [eventoId]
-  );
+  const query = workspaceId
+    ? `SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'pendente') as pendentes,
+        COUNT(*) FILTER (WHERE status = 'confirmado') as confirmados,
+        COUNT(*) FILTER (WHERE status = 'recusado') as recusados,
+        COUNT(*) FILTER (WHERE status = 'talvez') as talvez,
+        COUNT(*) FILTER (WHERE convite_enviado_at IS NOT NULL) as convites_enviados,
+        COUNT(*) FILTER (WHERE lembrete_enviado_at IS NOT NULL) as lembretes_enviados
+      FROM evento_convidados
+      WHERE evento_id = $1 AND workspace_id = $2`
+    : `SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'pendente') as pendentes,
+        COUNT(*) FILTER (WHERE status = 'confirmado') as confirmados,
+        COUNT(*) FILTER (WHERE status = 'recusado') as recusados,
+        COUNT(*) FILTER (WHERE status = 'talvez') as talvez,
+        COUNT(*) FILTER (WHERE convite_enviado_at IS NOT NULL) as convites_enviados,
+        COUNT(*) FILTER (WHERE lembrete_enviado_at IS NOT NULL) as lembretes_enviados
+      FROM evento_convidados
+      WHERE evento_id = $1`;
+  const params = workspaceId ? [eventoId, workspaceId] : [eventoId];
+  const { rows } = await dbQuery(query, params);
 
   const stats = rows[0];
 
@@ -287,12 +294,14 @@ export async function listarEventosParaLembrete(
  * Busca evento por ID
  */
 export async function buscarEvento(
-  eventoId: string
+  eventoId: string,
+  workspaceId?: number
 ): Promise<Evento | null> {
-  const { rows } = await dbQuery(
-    `SELECT * FROM eventos WHERE id = $1`,
-    [eventoId]
-  );
+  const query = workspaceId
+    ? `SELECT * FROM eventos WHERE id = $1 AND workspace_id = $2`
+    : `SELECT * FROM eventos WHERE id = $1`;
+  const params = workspaceId ? [eventoId, workspaceId] : [eventoId];
+  const { rows } = await dbQuery(query, params);
 
   return rows[0] as Evento | null;
 }

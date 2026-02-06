@@ -106,36 +106,35 @@ export async function POST(
         [leadId, `Visita agendada para ${date} às ${time}`, (user as any).id]
       ).catch(err => console.warn('[Visit] Erro ao registrar interação:', err.message));
 
-      // TODO: Implementar notificação via WhatsApp com workspace
       // Tentar notificar corretor via WhatsApp
       let notificationSent = false;
-      /* Temporariamente desabilitado - precisa adaptação para workspace
       try {
-        const instances = tenant.evolution_instances || [];
-        const activeInstance = instances.find((i: any) => i.status === 'connected' || i.status === 'open');
+        const wsResult = await client.query(
+          `SELECT evolution_instance_name, evolution_connected FROM workspaces WHERE id = $1`,
+          [workspaceId]
+        );
+        const ws = wsResult.rows[0];
 
-        if (activeInstance && corretor?.telefone) {
+        if (ws?.evolution_connected && ws.evolution_instance_name && corretor?.telefone) {
           const notificationMsg = [
-            `📅 *Nova visita agendada!*`,
+            `*Nova visita agendada!*`,
             ``,
-            `👤 Cliente: ${lead.nome}`,
-            `📞 Telefone: ${lead.telefone}`,
-            `📆 Data: ${date}`,
-            `⏰ Horário: ${time}`,
-            notes ? `📝 Obs: ${notes}` : '',
+            `Cliente: ${lead.nome}`,
+            `Telefone: ${lead.telefone}`,
+            `Data: ${date}`,
+            `Horario: ${time}`,
+            notes ? `Obs: ${notes}` : '',
           ].filter(Boolean).join('\n');
 
-          await sendTextMessage(activeInstance.instance_name, {
+          await sendTextMessage(ws.evolution_instance_name, {
             number: formatPhoneNumber(corretor.telefone),
             text: notificationMsg
           });
           notificationSent = true;
         }
-
       } catch (notifyError) {
         console.warn('[Visit] Erro ao notificar corretor:', notifyError);
       }
-      */
 
       return NextResponse.json({
         success: true,

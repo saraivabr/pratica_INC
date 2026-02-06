@@ -202,7 +202,7 @@ export function clearEntities(
 /**
  * Busca ou cria conversa do dia para o usuário
  */
-export async function getOrCreateConversation(userId: string): Promise<{
+export async function getOrCreateConversation(userId: string, workspaceId?: number): Promise<{
   id: string;
   messages: ConversationMessage[];
   context: ConversationContext;
@@ -210,14 +210,19 @@ export async function getOrCreateConversation(userId: string): Promise<{
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Tentar buscar conversa existente do dia
-  const { rows: existingRows } = await dbQuery(
-    `select * from conversations
-     where user_id = $1 and created_at >= date_trunc('day', now())
-     order by created_at desc
-     limit 1`,
-    [userId]
-  );
+  // Tentar buscar conversa existente do dia (com isolamento workspace)
+  const query = workspaceId
+    ? `select * from conversations
+       where user_id = $1 and workspace_id = $2 and created_at >= date_trunc('day', now())
+       order by created_at desc
+       limit 1`
+    : `select * from conversations
+       where user_id = $1 and created_at >= date_trunc('day', now())
+       order by created_at desc
+       limit 1`;
+  const params = workspaceId ? [userId, workspaceId] : [userId];
+
+  const { rows: existingRows } = await dbQuery(query, params);
   const existing = existingRows[0];
 
   if (existing) {
@@ -230,19 +235,24 @@ export async function getOrCreateConversation(userId: string): Promise<{
     };
   }
 
-  // Criar nova conversa
+  // Criar nova conversa (incluindo workspace_id)
   const newContext = createNewContext(userId);
-  const { rows: newConvRows } = await dbQuery(
-    `insert into conversations (user_id, messages, context)
-     values ($1, $2, $3)
-     returning *`,
-    [userId, JSON.stringify([]), JSON.stringify(newContext)]
-  );
+  const insertQuery = workspaceId
+    ? `insert into conversations (user_id, workspace_id, messages, context)
+       values ($1, $2, $3, $4)
+       returning *`
+    : `insert into conversations (user_id, messages, context)
+       values ($1, $2, $3)
+       returning *`;
+  const insertParams = workspaceId
+    ? [userId, workspaceId, JSON.stringify([]), JSON.stringify(newContext)]
+    : [userId, JSON.stringify([]), JSON.stringify(newContext)];
+
+  const { rows: newConvRows } = await dbQuery(insertQuery, insertParams);
   const newConv = newConvRows[0];
 
   if (!newConv) {
     console.error('Error creating conversation');
-    // Retornar estrutura vazia em caso de erro
     return {
       id: '',
       messages: [],

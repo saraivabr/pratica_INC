@@ -159,7 +159,7 @@ export async function processarMensagemConvidado(
 
     if (statusMudou && intencao.status !== 'pendente') {
       // Atualiza o status no banco
-      await atualizarStatusConvidado(convidado.id, intencao.status);
+      await atualizarStatusConvidado(convidado.id, intencao.status, convidado.workspace_id);
 
       // Gera resposta apropriada
       const resposta = gerarRespostaConfirmacao(primeiroNome, evento, intencao.status);
