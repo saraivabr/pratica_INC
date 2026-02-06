@@ -13,7 +13,8 @@
  * 3. Build conversation aggregates in MongoDB
  */
 
-import "dotenv/config";
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
 import { Pool } from "pg";
 import { MongoClient } from "mongodb";
 import { Client as ESClient } from "@elastic/elasticsearch";
@@ -43,15 +44,32 @@ async function evolutionFetch<T = any>(endpoint: string, options: RequestInit = 
 
 function extractPhoneFromJid(remoteJid: string): string {
   if (!remoteJid) return "";
+  // Standard @s.whatsapp.net format
+  if (remoteJid.endsWith("@s.whatsapp.net")) {
+    return remoteJid.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+  }
+  // Group format
+  if (remoteJid.endsWith("@g.us")) {
+    const atIndex = remoteJid.indexOf("@");
+    const jidPart = atIndex > 0 ? remoteJid.substring(0, atIndex) : remoteJid;
+    const dashIndex = jidPart.indexOf("-");
+    return dashIndex > 0 ? jidPart.substring(0, dashIndex).replace(/\D/g, "") : jidPart.replace(/\D/g, "");
+  }
+  // LID format — cannot extract phone directly
+  if (remoteJid.endsWith("@lid")) {
+    return "";
+  }
+  // Fallback
   const atIndex = remoteJid.indexOf("@");
   const jidPart = atIndex > 0 ? remoteJid.substring(0, atIndex) : remoteJid;
-  const dashIndex = jidPart.indexOf("-");
-  const phoneNumber = dashIndex > 0 ? jidPart.substring(0, dashIndex) : jidPart;
-  return phoneNumber.replace(/\D/g, "");
+  return jidPart.replace(/\D/g, "");
 }
 
 async function fetchAllChats(workspaceId: number, instanceName: string): Promise<any[]> {
-  const chats = await evolutionFetch<any[]>(`/chat/findChats/${instanceName}`, { method: "GET" });
+  const chats = await evolutionFetch<any[]>(`/chat/findChats/${instanceName}`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
   return Array.isArray(chats) ? chats : [];
 }
 
@@ -94,9 +112,6 @@ async function getProfilePicture(instanceName: string, number: string): Promise<
   });
 }
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ||
-  "postgresql://pratica:pratica2026secure@localhost:5432/pratica";
 const MONGODB_URI =
   process.env.MONGODB_URI ||
   "mongodb://pratica:pratica_mongo_2026!@localhost:27017/pratica?authSource=pratica";
@@ -108,8 +123,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function main() {
   console.log("=== Full History Sync ===\n");
 
-  // Connect to all databases
-  const pool = new Pool({ connectionString: DATABASE_URL });
+  // Connect to all databases (TCP with password auth — peer auth fails when running as root)
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL || "postgresql://pratica:pratica2026secure@127.0.0.1:5432/pratica",
+  });
   const mongo = new MongoClient(MONGODB_URI);
   await mongo.connect();
   const db = mongo.db();
@@ -240,12 +257,11 @@ async function main() {
   console.log("\n[Step 2] Fetching connected workspaces...");
 
   const { rows: workspaces } = await pool.query(`
-    SELECT w.id, w.name, u.evolution_instance_name, u.evolution_connected
-    FROM workspaces w
-    JOIN users u ON u.workspace_id = w.id
-    WHERE u.evolution_instance_name IS NOT NULL
-      AND u.evolution_connected = true
-    ORDER BY w.id
+    SELECT id, name, evolution_instance_name, evolution_connected
+    FROM workspaces
+    WHERE evolution_instance_name IS NOT NULL
+      AND evolution_connected = true
+    ORDER BY id
   `);
 
   console.log(`  Found ${workspaces.length} connected instances`);
@@ -269,8 +285,13 @@ async function main() {
       let totalNewMessages = 0;
       for (const chat of individualChats) {
         try {
-          const phoneNumber = extractPhoneFromJid(chat.remoteJid);
-          const contactName = chat.name || chat.pushName || phoneNumber;
+          let phoneNumber = extractPhoneFromJid(chat.remoteJid);
+          // Handle LID format — try remoteJidAlt from last message
+          if (!phoneNumber && chat.lastMessage?.key?.remoteJidAlt) {
+            phoneNumber = chat.lastMessage.key.remoteJidAlt.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+          }
+          if (!phoneNumber) continue;
+          const contactName = chat.name || chat.pushName || chat.lastMessage?.pushName || phoneNumber;
 
           const messages = await fetchAllChatMessages(
             ws.evolution_instance_name,
