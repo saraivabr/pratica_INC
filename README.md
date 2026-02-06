@@ -1,6 +1,6 @@
 # 🏢 Prática - Sistema Imobiliário Multi-Tenant
 
-**Sistema completo para gestão imobiliária** com WhatsApp, intermediação de vendas, gestão de leads e integração CV CRM.
+**Sistema completo para gestão imobiliária** com WhatsApp, gestão de leads, comissões e integração CV CRM.
 
 ---
 
