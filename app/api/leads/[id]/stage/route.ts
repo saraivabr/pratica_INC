@@ -57,11 +57,11 @@ export async function POST(
     const result = await dbQuery(
       `UPDATE cvcrm_leads
        SET situacao_id = $1,
-           situacao = jsonb_set(COALESCE(situacao, '{}')::jsonb, '{nome}', $2::jsonb),
+           situacao_nome = $2,
            updated_at = NOW()
        WHERE idlead = $3 AND workspace_id = $4
-       RETURNING idlead, situacao_id, situacao`,
-      [situacaoId, JSON.stringify(stage), leadId, workspaceId]
+       RETURNING idlead, situacao_id, situacao_nome`,
+      [situacaoId, stage, leadId, workspaceId]
     );
 
     if (result.rows.length === 0) {

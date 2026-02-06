@@ -26,14 +26,14 @@ export async function GET(request: NextRequest) {
         SELECT
           COUNT(*) as total_leads,
           COUNT(*) FILTER (WHERE
-            LOWER(situacao::text) LIKE '%ganho%'
-            OR LOWER(situacao::text) LIKE '%fechado%'
-            OR LOWER(situacao::text) LIKE '%vend%'
+            LOWER(situacao_nome) LIKE '%ganho%'
+            OR LOWER(situacao_nome) LIKE '%fechado%'
+            OR LOWER(situacao_nome) LIKE '%vend%'
           ) as conversions,
           COALESCE(SUM(valor_negocio) FILTER (WHERE
-            LOWER(situacao::text) LIKE '%ganho%'
-            OR LOWER(situacao::text) LIKE '%fechado%'
-            OR LOWER(situacao::text) LIKE '%vend%'
+            LOWER(situacao_nome) LIKE '%ganho%'
+            OR LOWER(situacao_nome) LIKE '%fechado%'
+            OR LOWER(situacao_nome) LIKE '%vend%'
           ), 0) as revenue
         FROM cvcrm_leads
         WHERE workspace_id = $1
@@ -65,14 +65,14 @@ export async function GET(request: NextRequest) {
       SELECT
         COUNT(*) as total_leads,
         COUNT(*) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
-          OR LOWER(situacao::text) LIKE '%vend%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
+          OR LOWER(situacao_nome) LIKE '%vend%'
         ) as conversions,
         COALESCE(SUM(valor_negocio) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
-          OR LOWER(situacao::text) LIKE '%vend%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
+          OR LOWER(situacao_nome) LIKE '%vend%'
         ), 0) as revenue
       FROM cvcrm_leads
       WHERE workspace_id = $1

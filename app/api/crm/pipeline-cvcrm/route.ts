@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
         renda_familiar,
         data_cad as created_at,
         ultima_data_conversao as last_interaction_at,
-        situacao,
+        situacao_nome,
         corretor,
         empreendimento,
         tags,
@@ -96,12 +96,11 @@ export async function GET(req: NextRequest) {
 
     // Processar leads e mapear para stages
     const leads = leadsRes.rows.map((row) => {
-      const situacao = typeof row.situacao === 'string' ? JSON.parse(row.situacao) : row.situacao;
       const corretor = typeof row.corretor === 'string' ? JSON.parse(row.corretor) : row.corretor;
       const empreendimento = typeof row.empreendimento === 'string' ? JSON.parse(row.empreendimento) : row.empreendimento;
       const tags = typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags;
 
-      const situacaoNome = situacao?.nome || null;
+      const situacaoNome = row.situacao_nome || null;
       const stageId = getStageIdFromSituacao(situacaoNome);
 
       // Determinar temperatura baseado no score

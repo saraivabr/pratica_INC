@@ -66,9 +66,9 @@ export async function GET(request: NextRequest) {
     const conversionRes = await dbQuery(`
       SELECT
         COUNT(*) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
-          OR LOWER(situacao::text) LIKE '%vend%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
+          OR LOWER(situacao_nome) LIKE '%vend%'
         ) as won,
         COUNT(*) as total
       FROM cvcrm_leads
@@ -84,9 +84,9 @@ export async function GET(request: NextRequest) {
     const conversionLastMonthRes = await dbQuery(`
       SELECT
         COUNT(*) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
-          OR LOWER(situacao::text) LIKE '%vend%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
+          OR LOWER(situacao_nome) LIKE '%vend%'
         ) as won,
         COUNT(*) as total
       FROM cvcrm_leads
@@ -108,9 +108,9 @@ export async function GET(request: NextRequest) {
       WHERE workspace_id = $1
       AND data_cad >= $2
       AND (
-        LOWER(situacao::text) LIKE '%ganho%'
-        OR LOWER(situacao::text) LIKE '%fechado%'
-        OR LOWER(situacao::text) LIKE '%vend%'
+        LOWER(situacao_nome) LIKE '%ganho%'
+        OR LOWER(situacao_nome) LIKE '%fechado%'
+        OR LOWER(situacao_nome) LIKE '%vend%'
       )
     `, [workspaceId, startOfMonth.toISOString()]);
 
@@ -120,9 +120,9 @@ export async function GET(request: NextRequest) {
       WHERE workspace_id = $1
       AND data_cad >= $2 AND data_cad < $3
       AND (
-        LOWER(situacao::text) LIKE '%ganho%'
-        OR LOWER(situacao::text) LIKE '%fechado%'
-        OR LOWER(situacao::text) LIKE '%vend%'
+        LOWER(situacao_nome) LIKE '%ganho%'
+        OR LOWER(situacao_nome) LIKE '%fechado%'
+        OR LOWER(situacao_nome) LIKE '%vend%'
       )
     `, [workspaceId, startOfLastMonth.toISOString(), startOfMonth.toISOString()]);
 
@@ -138,14 +138,14 @@ export async function GET(request: NextRequest) {
         COALESCE(origem, midia_principal, 'Outros') as origem,
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
-          OR LOWER(situacao::text) LIKE '%vend%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
+          OR LOWER(situacao_nome) LIKE '%vend%'
         ) as converted,
         COALESCE(AVG(valor_negocio) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
-          OR LOWER(situacao::text) LIKE '%vend%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
+          OR LOWER(situacao_nome) LIKE '%vend%'
         ), 0) as avg_ticket
       FROM cvcrm_leads
       WHERE workspace_id = $1
@@ -165,12 +165,12 @@ export async function GET(request: NextRequest) {
     // 8. Leads por situação (funil)
     const stagesRes = await dbQuery(`
       SELECT
-        COALESCE(situacao::json->>'nome', 'Sem situação') as name,
+        COALESCE(situacao_nome, 'Sem situação') as name,
         situacao_id,
         COUNT(*) as count
       FROM cvcrm_leads
       WHERE workspace_id = $1
-      GROUP BY situacao::json->>'nome', situacao_id
+      GROUP BY situacao_nome, situacao_id
       ORDER BY count DESC
     `, [workspaceId]);
 
@@ -192,8 +192,8 @@ export async function GET(request: NextRequest) {
         EXTRACT(DOW FROM data_cad) as day_of_week,
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
         ) as converted
       FROM cvcrm_leads
       WHERE workspace_id = $1 AND data_cad IS NOT NULL

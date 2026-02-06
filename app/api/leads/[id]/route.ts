@@ -36,7 +36,7 @@ interface DBLead {
     corretor: CorretorInfo | string | null;
     corretor_id: number | null;
     imobiliaria: ImobiliariaInfo | string | null;
-    situacao: SituacaoInfo | string | null;
+    situacao_nome: string | null;
     situacao_id: number | null;
     empreendimento: EmpreendimentoInfo | EmpreendimentoInfo[] | string | null;
     score: number | null;
@@ -66,7 +66,6 @@ interface DBInteracao {
 function normalizeLead(lead: DBLead, interacoes: DBInteracao[] = []) {
     const corretor = typeof lead.corretor === 'string' ? JSON.parse(lead.corretor) : lead.corretor;
     const imobiliaria = typeof lead.imobiliaria === 'string' ? JSON.parse(lead.imobiliaria) : lead.imobiliaria;
-    const situacao = typeof lead.situacao === 'string' ? JSON.parse(lead.situacao) : lead.situacao;
     const empreendimento = typeof lead.empreendimento === 'string' ? JSON.parse(lead.empreendimento) : lead.empreendimento;
     const tags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags;
 
@@ -85,7 +84,7 @@ function normalizeLead(lead: DBLead, interacoes: DBInteracao[] = []) {
         corretor_nome: corretor?.nome || null,
         imobiliaria: imobiliaria,
         imobiliaria_nome: imobiliaria?.nome || null,
-        situacao: situacao?.nome || null,
+        situacao: lead.situacao_nome || null,
         situacao_id: lead.situacao_id,
         empreendimento: Array.isArray(empreendimento) ? empreendimento[0] : empreendimento,
         empreendimento_nome: Array.isArray(empreendimento) ? empreendimento[0]?.nome : empreendimento?.nome,
@@ -136,7 +135,7 @@ export async function GET(
         let query = `
             SELECT
                 idlead, nome, email, telefone, cpf, data_cad, origem, midia_principal,
-                corretor, corretor_id, imobiliaria, situacao, situacao_id,
+                corretor, corretor_id, imobiliaria, situacao_nome, situacao_id,
                 empreendimento, score, valor_negocio, renda_familiar,
                 cidade, estado, bairro, cep, endereco, tags, ultima_data_conversao, synced_at, observacao
             FROM cvcrm_leads

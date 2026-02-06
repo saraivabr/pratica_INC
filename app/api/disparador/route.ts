@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
       let paramIndex = 3;
 
       if (filtros.situacao) {
-        conditions.push(`l.situacao = $${paramIndex}`);
+        conditions.push(`l.situacao_nome = $${paramIndex}`);
         params.push(filtros.situacao);
         paramIndex++;
       }

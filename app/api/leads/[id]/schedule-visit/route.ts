@@ -92,7 +92,7 @@ export async function POST(
     await dbQuery(
       `UPDATE cvcrm_leads
        SET situacao_id = 4,
-           situacao = jsonb_set(COALESCE(situacao, '{}')::jsonb, '{nome}', '"visita_agendada"'),
+           situacao_nome = 'Visita Agendada',
            updated_at = NOW()
        WHERE idlead = $1 AND workspace_id = $2`,
       [leadId, workspaceId]

@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
         data_cad,
         ultima_data_conversao,
         corretor,
-        situacao
+        situacao_nome
       FROM cvcrm_leads
       WHERE workspace_id = $1
         AND (
@@ -95,7 +95,6 @@ export async function GET(request: NextRequest) {
 
       const corretor = typeof lead.corretor === 'string' ? JSON.parse(lead.corretor) : lead.corretor
       const empreendimento = typeof lead.empreendimento === 'string' ? JSON.parse(lead.empreendimento) : lead.empreendimento
-      const situacao = typeof lead.situacao === 'string' ? JSON.parse(lead.situacao) : lead.situacao
 
       return {
         leadId: String(lead.id),
@@ -114,7 +113,7 @@ export async function GET(request: NextRequest) {
         slaViolated: urgencyLevel !== 'normal',
         violationType: !hasFirstContact && urgencyLevel !== 'normal' ? 'first_contact' : (urgencyLevel === 'attention' ? 'follow_up' : null),
         assignedCorretor: corretor?.nome || null,
-        situacao: situacao?.nome || null,
+        situacao: lead.situacao_nome || null,
       }
     }).filter((a: any) => a.urgencyLevel !== 'normal')
 

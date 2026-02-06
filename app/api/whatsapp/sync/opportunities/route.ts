@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
         wsc.matched_lead_name,
         l.idlead as lead_idlead,
         l.nome as lead_nome,
-        COALESCE(l.situacao->>'nome', l.situacao->>'descricao') as lead_situacao,
+        l.situacao_nome as lead_situacao,
         CASE
           WHEN jsonb_typeof(l.empreendimento) = 'array' THEN (l.empreendimento->0->>'nome')::text
           ELSE (l.empreendimento->>'nome')::text

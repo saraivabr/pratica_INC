@@ -37,7 +37,7 @@ export async function GET(
     // Fetch lead data
     const leadRes = await pool.query(
       `SELECT idlead, nome, email, telefone, origem, midia_principal,
-              corretor, situacao, empreendimento, score,
+              corretor, situacao_nome, empreendimento, score,
               valor_negocio, renda_familiar, cidade, estado, tags,
               data_cad, ultima_data_conversao,
               qtde_simulacoes_associadas, qtde_reservas_associadas,
@@ -71,7 +71,6 @@ export async function GET(
     };
 
     const corretor = parseJSON(lead.corretor);
-    const situacao = parseJSON(lead.situacao);
     const empreendimento = parseJSON(lead.empreendimento);
     const tags = parseJSON(lead.tags) || [];
 
@@ -79,7 +78,7 @@ export async function GET(
       ? empreendimento[0]?.nome
       : empreendimento?.nome;
 
-    const sitNome = situacao?.nome || "Desconhecida";
+    const sitNome = lead.situacao_nome || "Desconhecida";
 
     // Calculate days since last interaction
     const lastInteraction = interacoesRes.rows[0];

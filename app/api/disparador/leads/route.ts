@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     // Filtro por situação
     if (situacao) {
-      conditions.push(`l.situacao = $${paramIndex}`);
+      conditions.push(`l.situacao_nome = $${paramIndex}`);
       params.push(situacao);
       paramIndex++;
     }
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         l.nome,
         l.telefones,
         l.empreendimentos,
-        l.situacao,
+        l.situacao_nome,
         l.created_at
       FROM cvcrm_leads l
       WHERE ${whereClause}
@@ -139,15 +139,15 @@ export async function GET(request: NextRequest) {
         nome: lead.nome,
         telefone,
         empreendimento: empreendimentoNome,
-        situacao: lead.situacao,
+        situacao: lead.situacao_nome,
       };
     }).filter((l: any) => l.telefone); // Filter out leads where phone extraction failed
 
     // Fetch available filters (distinct situações e empreendimentos)
     const situacoesResult = await pool.query(
-      `SELECT DISTINCT situacao FROM cvcrm_leads
-       WHERE workspace_id = $1 AND corretor_id = $2 AND situacao IS NOT NULL
-       ORDER BY situacao`,
+      `SELECT DISTINCT situacao_nome FROM cvcrm_leads
+       WHERE workspace_id = $1 AND corretor_id = $2 AND situacao_nome IS NOT NULL
+       ORDER BY situacao_nome`,
       [workspaceId, corretorId]
     );
 
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
       total,
       leads,
       filtros: {
-        situacoes: situacoesResult.rows.map((r: any) => r.situacao),
+        situacoes: situacoesResult.rows.map((r: any) => r.situacao_nome),
         empreendimentos: empreendimentosResult.rows
           .map((r: any) => r.nome)
           .filter(Boolean),

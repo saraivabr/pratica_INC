@@ -34,7 +34,7 @@ interface DBLead {
     corretor: CorretorInfo | string | null;
     corretor_id: number | null;
     imobiliaria: ImobiliariaInfo | string | null;
-    situacao: SituacaoInfo | string | null;
+    situacao_nome: string | null;
     situacao_id: number | null;
     empreendimento: EmpreendimentoInfo | EmpreendimentoInfo[] | string | null;
     score: number | null;
@@ -54,7 +54,6 @@ interface DBLead {
 function normalizeLead(lead: DBLead) {
     const corretor = typeof lead.corretor === 'string' ? JSON.parse(lead.corretor) : lead.corretor;
     const imobiliaria = typeof lead.imobiliaria === 'string' ? JSON.parse(lead.imobiliaria) : lead.imobiliaria;
-    const situacao = typeof lead.situacao === 'string' ? JSON.parse(lead.situacao) : lead.situacao;
     const empreendimento = typeof lead.empreendimento === 'string' ? JSON.parse(lead.empreendimento) : lead.empreendimento;
     const tags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags;
 
@@ -69,7 +68,7 @@ function normalizeLead(lead: DBLead) {
         midia: lead.midia_principal,
         corretor: corretor,
         imobiliaria: imobiliaria,
-        situacao: situacao?.nome || null,
+        situacao: lead.situacao_nome || null,
         situacao_id: lead.situacao_id,
         empreendimento: Array.isArray(empreendimento) ? empreendimento[0] : empreendimento,
         score: lead.score,
@@ -107,14 +106,12 @@ export async function POST(request: NextRequest) {
         );
         const nextId = idResult.rows[0].next_id || -1;
 
-        const situacao = JSON.stringify({ id: null, nome: 'Novo' });
-
         const insertQuery = `
             INSERT INTO cvcrm_leads (
-                idlead, nome, email, telefone, origem, situacao,
+                idlead, nome, email, telefone, origem, situacao_nome,
                 data_cad, workspace_id, created_at, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, NOW(), NOW())
-            RETURNING idlead, nome, email, telefone, origem, situacao, data_cad
+            RETURNING idlead, nome, email, telefone, origem, situacao_nome, data_cad
         `;
 
         const result = await pool.query(insertQuery, [
@@ -123,7 +120,7 @@ export async function POST(request: NextRequest) {
             email?.trim() || null,
             telefone?.trim() || null,
             origem?.trim() || 'Manual',
-            situacao,
+            'Novo',
             workspaceId,
         ]);
 
@@ -228,7 +225,7 @@ export async function GET(request: NextRequest) {
         const query = `
             SELECT
                 idlead, nome, email, telefone, data_cad, origem, midia_principal,
-                corretor, corretor_id, imobiliaria, situacao, situacao_id,
+                corretor, corretor_id, imobiliaria, situacao_nome, situacao_id,
                 empreendimento, score, valor_negocio, renda_familiar,
                 cidade, estado, bairro, tags, ultima_data_conversao, synced_at
             FROM cvcrm_leads

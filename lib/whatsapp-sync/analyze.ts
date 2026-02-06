@@ -214,7 +214,7 @@ export async function matchChatToLead(
   idlead: string;
   nome: string;
   telefone: string;
-  situacao: string;
+  situacao_nome: string;
   empreendimento?: string;
   ultima_interacao?: string;
 } | null> {
@@ -233,14 +233,14 @@ export async function matchChatToLead(
     idlead: number;
     nome: string;
     telefone: string;
-    situacao: any;
+    situacao_nome: any;
     empreendimento: any;
   }>(
     `SELECT
        idlead,
        nome,
        telefone,
-       situacao,
+       situacao_nome,
        empreendimento
      FROM cvcrm_leads
      WHERE workspace_id = $1
@@ -258,20 +258,8 @@ export async function matchChatToLead(
 
   const lead = result.rows[0];
 
-  // Extrair nome da situacao do JSONB
-  let situacaoNome = 'Desconhecido';
-  if (lead.situacao) {
-    if (typeof lead.situacao === 'string') {
-      try {
-        const parsed = JSON.parse(lead.situacao);
-        situacaoNome = parsed.nome || 'Desconhecido';
-      } catch {
-        situacaoNome = lead.situacao;
-      }
-    } else if (typeof lead.situacao === 'object') {
-      situacaoNome = lead.situacao.nome || 'Desconhecido';
-    }
-  }
+  // Situacao nome is now a plain text column
+  const situacaoNome = lead.situacao_nome || 'Desconhecido';
 
   // Extrair nome do empreendimento do JSONB array
   let empreendimentoNome: string | undefined;

@@ -102,44 +102,40 @@ export async function syncLeadsCore(workspaceId: number, fullSync = false): Prom
     console.log(`\n✅ Fetched ${leads.length} leads\n`);
 
     // Prepare upsert query
+    // JSONB columns removed: corretor, gestor, imobiliaria, empreendimento,
+    // situacao, midias, tags, motivo_cancelamento, submotivo_cancelamento, empreendimentos
+    // Kept: campos_adicionais (has data), cvcrm_data (raw API response)
+    // Added: situacao_nome (normalized from situacao JSONB)
     const upsertQuery = `
       INSERT INTO cvcrm_leads (
         workspace_id, idlead, codigointerno, nome, email, telefone,
         documento_tipo, documento, sexo, profissao,
         cep, endereco, numero, bairro, complemento, cidade, estado,
         score, renda_familiar, valor_negocio, possibilidade_venda,
-        origem, midia_principal, midias,
-        gestor, gestor_id,
-        imobiliaria, imobiliaria_id,
-        corretor, corretor_id,
-        situacao, situacao_id,
-        empreendimento,
+        origem, midia_principal,
+        gestor_id, imobiliaria_id, corretor_id,
+        situacao_id, situacao_nome,
         data_cad, data_reativacao, data_vencimento, ultima_data_conversao,
         data_cancelamento, data_venda,
-        motivo_cancelamento, submotivo_cancelamento,
         qtde_simulacoes_associadas, qtde_reservas_associadas,
         link_interacoes, link_simulacoes, link_reservas, link_interesses,
         idrd_station, link_rdstation,
-        campos_adicionais, tags, autor_ultima_alteracao, empreendimentos_id,
+        campos_adicionais, autor_ultima_alteracao, empreendimentos_id,
         synced_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10,
         $11, $12, $13, $14, $15, $16, $17,
         $18, $19, $20, $21,
-        $22, $23, $24,
-        $25, $26,
+        $22, $23,
+        $24, $25, $26,
         $27, $28,
-        $29, $30,
-        $31, $32,
-        $33,
-        $34, $35, $36, $37,
-        $38, $39,
-        $40, $41,
-        $42, $43,
-        $44, $45, $46, $47,
-        $48, $49,
-        $50, $51, $52, $53,
+        $29, $30, $31, $32,
+        $33, $34,
+        $35, $36,
+        $37, $38, $39, $40,
+        $41, $42,
+        $43, $44, $45,
         NOW()
       )
       ON CONFLICT (workspace_id, idlead) DO UPDATE SET
@@ -164,24 +160,17 @@ export async function syncLeadsCore(workspaceId: number, fullSync = false): Prom
         possibilidade_venda = EXCLUDED.possibilidade_venda,
         origem = EXCLUDED.origem,
         midia_principal = EXCLUDED.midia_principal,
-        midias = EXCLUDED.midias,
-        gestor = EXCLUDED.gestor,
         gestor_id = EXCLUDED.gestor_id,
-        imobiliaria = EXCLUDED.imobiliaria,
         imobiliaria_id = EXCLUDED.imobiliaria_id,
-        corretor = EXCLUDED.corretor,
         corretor_id = EXCLUDED.corretor_id,
-        situacao = EXCLUDED.situacao,
         situacao_id = EXCLUDED.situacao_id,
-        empreendimento = EXCLUDED.empreendimento,
+        situacao_nome = EXCLUDED.situacao_nome,
         data_cad = EXCLUDED.data_cad,
         data_reativacao = EXCLUDED.data_reativacao,
         data_vencimento = EXCLUDED.data_vencimento,
         ultima_data_conversao = EXCLUDED.ultima_data_conversao,
         data_cancelamento = EXCLUDED.data_cancelamento,
         data_venda = EXCLUDED.data_venda,
-        motivo_cancelamento = EXCLUDED.motivo_cancelamento,
-        submotivo_cancelamento = EXCLUDED.submotivo_cancelamento,
         qtde_simulacoes_associadas = EXCLUDED.qtde_simulacoes_associadas,
         qtde_reservas_associadas = EXCLUDED.qtde_reservas_associadas,
         link_interacoes = EXCLUDED.link_interacoes,
@@ -191,7 +180,6 @@ export async function syncLeadsCore(workspaceId: number, fullSync = false): Prom
         idrd_station = EXCLUDED.idrd_station,
         link_rdstation = EXCLUDED.link_rdstation,
         campos_adicionais = EXCLUDED.campos_adicionais,
-        tags = EXCLUDED.tags,
         autor_ultima_alteracao = EXCLUDED.autor_ultima_alteracao,
         empreendimentos_id = EXCLUDED.empreendimentos_id,
         synced_at = NOW(),
@@ -214,59 +202,51 @@ export async function syncLeadsCore(workspaceId: number, fullSync = false): Prom
           : null;
 
         const result = await pool.query(upsertQuery, [
-          workspaceId,
-          lead.idlead,
-          lead.codigointerno,
-          lead.nome,
-          lead.email,
-          lead.telefone,
-          lead.documento_tipo,
-          lead.documento,
-          lead.sexo,
-          lead.profissao,
-          lead.cep,
-          lead.endereco,
-          lead.numero,
-          lead.bairro,
-          lead.complemento,
-          lead.cidade,
-          lead.estado,
-          lead.score,
-          rendaFamiliar,
-          valorNegocio,
-          lead.possibilidade_venda,
-          lead.origem,
-          lead.midia_principal,
-          JSON.stringify(lead.midias),
-          JSON.stringify(lead.gestor),
-          lead.gestor?.id,
-          JSON.stringify(lead.imobiliaria),
-          lead.imobiliaria?.id,
-          JSON.stringify(lead.corretor),
-          lead.corretor?.id,
-          JSON.stringify(lead.situacao),
-          lead.situacao?.id,
-          JSON.stringify(lead.empreendimento),
-          lead.data_cad,
-          lead.data_reativacao,
-          lead.data_vencimento,
-          lead.ultima_data_conversao,
-          lead.data_cancelamento,
-          lead.data_venda,
-          lead.motivo_cancelamento ? JSON.stringify(lead.motivo_cancelamento) : null,
-          lead.submotivo_cancelamento ? JSON.stringify(lead.submotivo_cancelamento) : null,
-          lead.qtde_simulacoes_associadas,
-          lead.qtde_reservas_associadas,
-          lead.link_interacoes,
-          lead.link_simulacoes,
-          lead.link_reservas,
-          lead.link_interesses,
-          lead.idrd_station,
-          lead.link_rdstation,
-          lead.campos_adicionais ? JSON.stringify(lead.campos_adicionais) : null,
-          lead.tags ? JSON.stringify(lead.tags) : null,
-          lead.autor_ultima_alteracao,
-          lead.empreendimentosId
+          workspaceId,                                                              // $1
+          lead.idlead,                                                              // $2
+          lead.codigointerno,                                                       // $3
+          lead.nome,                                                                // $4
+          lead.email,                                                               // $5
+          lead.telefone,                                                            // $6
+          lead.documento_tipo,                                                      // $7
+          lead.documento,                                                           // $8
+          lead.sexo,                                                                // $9
+          lead.profissao,                                                           // $10
+          lead.cep,                                                                 // $11
+          lead.endereco,                                                            // $12
+          lead.numero,                                                              // $13
+          lead.bairro,                                                              // $14
+          lead.complemento,                                                         // $15
+          lead.cidade,                                                              // $16
+          lead.estado,                                                              // $17
+          lead.score,                                                               // $18
+          rendaFamiliar,                                                            // $19
+          valorNegocio,                                                             // $20
+          lead.possibilidade_venda,                                                 // $21
+          lead.origem,                                                              // $22
+          lead.midia_principal,                                                     // $23
+          lead.gestor?.id,                                                          // $24
+          lead.imobiliaria?.id,                                                     // $25
+          lead.corretor?.id,                                                        // $26
+          lead.situacao?.id,                                                        // $27
+          lead.situacao?.nome,                                                      // $28
+          lead.data_cad,                                                            // $29
+          lead.data_reativacao,                                                     // $30
+          lead.data_vencimento,                                                     // $31
+          lead.ultima_data_conversao,                                               // $32
+          lead.data_cancelamento,                                                   // $33
+          lead.data_venda,                                                          // $34
+          lead.qtde_simulacoes_associadas,                                          // $35
+          lead.qtde_reservas_associadas,                                            // $36
+          lead.link_interacoes,                                                     // $37
+          lead.link_simulacoes,                                                     // $38
+          lead.link_reservas,                                                       // $39
+          lead.link_interesses,                                                     // $40
+          lead.idrd_station,                                                        // $41
+          lead.link_rdstation,                                                      // $42
+          lead.campos_adicionais ? JSON.stringify(lead.campos_adicionais) : null,   // $43
+          lead.autor_ultima_alteracao,                                              // $44
+          lead.empreendimentosId                                                    // $45
         ]);
 
         recordsProcessed++;

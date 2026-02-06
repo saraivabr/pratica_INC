@@ -182,15 +182,15 @@ export async function GET(request: NextRequest) {
     const conversionRes = await dbQuery(`
       SELECT
         COUNT(*) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
-          OR LOWER(situacao::text) LIKE '%vend%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
+          OR LOWER(situacao_nome) LIKE '%vend%'
         ) as won,
         COUNT(*) as total,
         COALESCE(SUM(valor_negocio) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
-          OR LOWER(situacao::text) LIKE '%vend%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
+          OR LOWER(situacao_nome) LIKE '%vend%'
         ), 0) as revenue
       FROM cvcrm_leads
       WHERE workspace_id = $1 AND data_cad >= $2
@@ -213,12 +213,12 @@ export async function GET(request: NextRequest) {
         COALESCE(origem, midia_principal, 'Outros') as origem,
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
         ) as converted,
         COALESCE(AVG(valor_negocio) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
         ), 0) as avg_ticket
       FROM cvcrm_leads
       WHERE workspace_id = $1
@@ -240,8 +240,8 @@ export async function GET(request: NextRequest) {
       SELECT
         EXTRACT(DOW FROM data_cad) as day_of_week,
         COUNT(*) FILTER (WHERE
-          LOWER(situacao::text) LIKE '%ganho%'
-          OR LOWER(situacao::text) LIKE '%fechado%'
+          LOWER(situacao_nome) LIKE '%ganho%'
+          OR LOWER(situacao_nome) LIKE '%fechado%'
         ) as converted
       FROM cvcrm_leads
       WHERE workspace_id = $1 AND data_cad IS NOT NULL

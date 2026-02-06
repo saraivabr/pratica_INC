@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     // Filtrar por situação (excluir perdidos, vendidos, reservas, crédito)
     const leadsReativacao = (leads || []).filter(lead => {
-      const situacao = (lead.situacao?.nome || '').toLowerCase()
+      const situacao = (lead.situacao_nome || '').toLowerCase()
       return !situacao.includes('perdido') &&
              !situacao.includes('venda') &&
              !situacao.includes('vendido') &&
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       porImobiliaria[imobNome].vgv += valorEstimado
 
       // Score e temperatura
-      const situacaoNome = (lead.situacao?.nome || '').toLowerCase()
+      const situacaoNome = (lead.situacao_nome || '').toLowerCase()
       let score = 50
 
       // Recência
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
         nome: lead.nome || 'Sem nome',
         telefone: lead.telefone,
         email: lead.email,
-        situacao: lead.situacao?.nome || 'Não definida',
+        situacao: lead.situacao_nome || 'Não definida',
         empreendimento: empNome,
         diasCadastro,
         valorEstimado,

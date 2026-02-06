@@ -51,7 +51,7 @@ interface LeadResult {
   cpf: string | null;
   origem: string | null;
   midia_principal: string | null;
-  situacao: any;
+  situacao_nome: string | null;
   situacao_id: number | null;
   corretor: any;
   corretor_id: number | null;
@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
     const leadQuery = `
       SELECT
         idlead, nome, email, telefone, celular, cpf,
-        origem, midia_principal, situacao, situacao_id,
+        origem, midia_principal, situacao_nome, situacao_id,
         corretor, corretor_id, empreendimento, imobiliaria,
         score, valor_negocio, renda_familiar,
         cidade, estado, bairro, tags,
@@ -217,15 +217,8 @@ export async function GET(request: NextRequest) {
       }
 
       // Pipeline stage baseado na situação
-      if (lead.situacao) {
-        try {
-          const situacaoObj = typeof lead.situacao === 'string'
-            ? JSON.parse(lead.situacao)
-            : lead.situacao;
-          pipelineStage = situacaoObj?.nome || null;
-        } catch {
-          pipelineStage = null;
-        }
+      if (lead.situacao_nome) {
+        pipelineStage = lead.situacao_nome;
       }
     }
 
@@ -248,7 +241,7 @@ export async function GET(request: NextRequest) {
         telefone: lead.telefone || lead.celular,
         cpf: lead.cpf,
         origem: lead.origem || lead.midia_principal,
-        situacao: parseJsonField(lead.situacao),
+        situacao: lead.situacao_nome,
         situacao_id: lead.situacao_id,
         corretor: parseJsonField(lead.corretor),
         corretor_id: lead.corretor_id,
