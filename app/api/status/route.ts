@@ -221,7 +221,8 @@ export async function GET() {
         { name: 'Reservas', endpoint: '/api/v1/comercial/reservas?limit=10', token: 'CVCRM_TOKEN_RESERVA' },
         { name: 'Unidades (CVIO)', endpoint: '/api/cvio/unidade', token: 'CVCRM_TOKEN_UNIDADE' },
         { name: 'Séries (CVIO)', endpoint: '/api/cvio/serie', token: 'CVCRM_TOKEN_SERIE' },
-        { name: 'Imobiliárias', endpoint: '/api/v1/cadastros/imobiliarias', token: 'CVCRM_TOKEN_IMOBILIARIA' },
+        // Note: Imobiliárias endpoint (/api/v1/cadastros/imobiliarias) returns 405 Method Not Allowed
+        // The CVCRM_TOKEN_IMOBILIARIA token does not have a working GET endpoint for listing all imobiliarias
     ];
 
     const results = await Promise.all(
