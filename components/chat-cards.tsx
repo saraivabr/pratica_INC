@@ -1,54 +1,76 @@
 "use client"
 
-import React, { ReactNode } from "react"
+import React from "react"
+import ReactMarkdown from "react-markdown"
 import { MessageSquare, MapPin, Ruler, Building2, Home, ChevronRight } from "lucide-react"
 
-// ─── Helpers ────────────────────────────────────────────────
+// ─── Markdown Table Parser (from raw text) ──────────────────
 
-function extractText(node: ReactNode): string {
-  if (typeof node === "string") return node
-  if (typeof node === "number") return String(node)
-  if (!node) return ""
-  if (Array.isArray(node)) return node.map(extractText).join("")
-  if (React.isValidElement(node)) {
-    const props = node.props as { children?: ReactNode }
-    return extractText(props.children)
+function parseMarkdownTable(tableText: string): { headers: string[]; rows: string[][] } | null {
+  const lines = tableText.trim().split("\n").filter((l) => l.trim())
+  if (lines.length < 3) return null
+
+  // Find separator line (|---|---|)
+  const sepIdx = lines.findIndex((l) => /^\|[\s\-:|]+\|$/.test(l.trim()))
+  if (sepIdx < 1) return null
+
+  const parseRow = (line: string): string[] => {
+    // Remove leading/trailing pipes, split by pipe
+    const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "")
+    return trimmed.split("|").map((cell) => cell.trim())
   }
-  return ""
-}
 
-function extractTableData(children: ReactNode): { headers: string[]; rows: string[][] } {
-  const headers: string[] = []
+  const headers = parseRow(lines[sepIdx - 1])
+  if (!headers.length || headers.every((h) => !h)) return null
+
   const rows: string[][] = []
+  for (let i = sepIdx + 1; i < lines.length; i++) {
+    if (!lines[i].includes("|")) continue
+    const row = parseRow(lines[i])
+    if (row.length > 0 && row.some((c) => c)) rows.push(row)
+  }
 
-  React.Children.forEach(children, (child) => {
-    if (!React.isValidElement(child)) return
-    const tag = child.type as string
-    const props = child.props as { children?: ReactNode }
-
-    if (tag === "thead") {
-      React.Children.forEach(props.children, (tr) => {
-        if (!React.isValidElement(tr)) return
-        const trProps = tr.props as { children?: ReactNode }
-        React.Children.forEach(trProps.children, (th) => {
-          headers.push(extractText(th).trim())
-        })
-      })
-    } else if (tag === "tbody") {
-      React.Children.forEach(props.children, (tr) => {
-        if (!React.isValidElement(tr)) return
-        const trProps = tr.props as { children?: ReactNode }
-        const row: string[] = []
-        React.Children.forEach(trProps.children, (td) => {
-          row.push(extractText(td).trim())
-        })
-        rows.push(row)
-      })
-    }
-  })
-
-  return { headers, rows }
+  return rows.length > 0 ? { headers, rows } : null
 }
+
+// Split markdown into text and table segments
+function splitContent(content: string): Array<{ type: "text" | "table"; content: string }> {
+  const segments: Array<{ type: "text" | "table"; content: string }> = []
+
+  // Match markdown tables: header row, separator row, data rows
+  const tableRegex = /(?:^|\n)(\|[^\n]+\|\s*\n\|[\s\-:|]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+)/g
+
+  let lastIndex = 0
+  let match
+
+  while ((match = tableRegex.exec(content)) !== null) {
+    const fullMatch = match[1]
+    const matchStart = match.index + (match[0].startsWith("\n") ? 1 : 0)
+
+    // Text before the table
+    if (matchStart > lastIndex) {
+      const text = content.slice(lastIndex, matchStart).trim()
+      if (text) segments.push({ type: "text", content: text })
+    }
+
+    segments.push({ type: "table", content: fullMatch.trim() })
+    lastIndex = match.index + match[0].length
+  }
+
+  // Remaining text
+  if (lastIndex < content.length) {
+    const text = content.slice(lastIndex).trim()
+    if (text) segments.push({ type: "text", content: text })
+  }
+
+  if (segments.length === 0) {
+    segments.push({ type: "text", content })
+  }
+
+  return segments
+}
+
+// ─── Table Type Detection ───────────────────────────────────
 
 type TableType = "lead" | "metric" | "property" | "generic"
 
@@ -63,10 +85,10 @@ function detectTableType(headers: string[]): TableType {
   if (hasNome && (hasTelefone || hasSituacao)) return "lead"
 
   const hasProperty = h.some((x) =>
-    x.includes("empreendimento") || x.includes("unidade") || x.includes("im")
+    x.includes("empreendimento") || x.includes("unidade") || x.includes("imóve") || x.includes("imove")
   )
   const hasPropertyDetail = h.some((x) =>
-    x.includes("dispon") || x.includes("situa") || x.includes("tipo") || x.includes("local") || x.includes("metra")
+    x.includes("dispon") || x.includes("tipo") || x.includes("local") || x.includes("metra")
   )
   if (hasProperty && hasPropertyDetail) return "property"
 
@@ -88,25 +110,26 @@ const GRADIENTS = [
   "from-teal-500 to-emerald-600",
 ]
 
-function getGradient(name: string): string {
+function hashString(s: string): number {
   let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  for (let i = 0; i < s.length; i++) {
+    hash = s.charCodeAt(i) + ((hash << 5) - hash)
   }
-  return GRADIENTS[Math.abs(hash) % GRADIENTS.length]
+  return Math.abs(hash)
 }
 
+function getGradient(name: string): string {
+  return GRADIENTS[hashString(name) % GRADIENTS.length]
+}
+
+const AVATAR_COLORS = [
+  "bg-violet-500", "bg-indigo-500", "bg-blue-500", "bg-cyan-500",
+  "bg-teal-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500",
+  "bg-pink-500", "bg-fuchsia-500",
+]
+
 function getAvatarColor(name: string): string {
-  const colors = [
-    "bg-violet-500", "bg-indigo-500", "bg-blue-500", "bg-cyan-500",
-    "bg-teal-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500",
-    "bg-pink-500", "bg-fuchsia-500",
-  ]
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return colors[Math.abs(hash) % colors.length]
+  return AVATAR_COLORS[hashString(name) % AVATAR_COLORS.length]
 }
 
 function getSituacaoBadge(situacao: string): { bg: string; text: string; dot: string } {
@@ -148,12 +171,9 @@ function PropertyCards({ headers, rows }: { headers: string[]; rows: string[][] 
 
   return (
     <div className="my-3 -mx-1">
-      {/* Scroll hint */}
       {rows.length > 2 && (
         <div className="flex items-center justify-end gap-1 px-2 mb-1.5">
-          <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
-            Deslize para ver mais
-          </span>
+          <span className="text-[10px] text-zinc-400 dark:text-zinc-500">Deslize para ver mais</span>
           <ChevronRight className="h-3 w-3 text-zinc-400 dark:text-zinc-500" />
         </div>
       )}
@@ -172,17 +192,14 @@ function PropertyCards({ headers, rows }: { headers: string[]; rows: string[][] 
               key={i}
               className="chat-card snap-start shrink-0 w-[260px] rounded-2xl border border-zinc-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-800/80 overflow-hidden"
             >
-              {/* Gradient header */}
               <div className={`bg-gradient-to-r ${gradient} px-4 pt-4 pb-3 relative`}>
-                <div className="absolute top-3 right-3 bg-white/20 backdrop-blur-sm rounded-full px-2.5 py-1">
-                  <span className="text-[11px] font-bold text-white">
-                    {available} {parseInt(available) === 1 ? "un." : "un."}
-                  </span>
-                </div>
+                {available && (
+                  <div className="absolute top-3 right-3 bg-white/20 backdrop-blur-sm rounded-full px-2.5 py-1">
+                    <span className="text-[11px] font-bold text-white">{available} un.</span>
+                  </div>
+                )}
                 <Building2 className="h-5 w-5 text-white/60 mb-2" />
-                <h3 className="font-bold text-white text-[15px] leading-tight pr-14">
-                  {name}
-                </h3>
+                <h3 className="font-bold text-white text-[15px] leading-tight pr-14">{name}</h3>
                 {location && (
                   <div className="flex items-center gap-1 mt-1.5">
                     <MapPin className="h-3 w-3 text-white/70" />
@@ -190,8 +207,6 @@ function PropertyCards({ headers, rows }: { headers: string[]; rows: string[][] 
                   </div>
                 )}
               </div>
-
-              {/* Details */}
               <div className="px-4 py-3 space-y-2">
                 {metragem && (
                   <div className="flex items-center gap-2">
@@ -226,7 +241,7 @@ function LeadCards({ headers, rows }: { headers: string[]; rows: string[][] }) {
   const nameIdx = h.findIndex((x) => x.includes("nome"))
   const phoneIdx = h.findIndex((x) => x.includes("telefone") || x.includes("tel"))
   const situacaoIdx = h.findIndex((x) => x.includes("situa") || x.includes("status") || x.includes("temperatura"))
-  const empreendimentoIdx = h.findIndex((x) => x.includes("empreendimento") || x.includes("im"))
+  const empreendimentoIdx = h.findIndex((x) => x.includes("empreendimento") || x.includes("imóve") || x.includes("imove"))
 
   const specialIdxs = new Set([nameIdx, phoneIdx, situacaoIdx, empreendimentoIdx].filter((i) => i >= 0))
   const extraIdxs = headers.map((_, i) => i).filter((i) => !specialIdxs.has(i))
@@ -243,21 +258,13 @@ function LeadCards({ headers, rows }: { headers: string[]; rows: string[][] }) {
         const phoneDigits = phone ? cleanPhone(phone) : ""
 
         return (
-          <div
-            key={i}
-            className="chat-card flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/60"
-          >
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 ${getAvatarColor(name)}`}
-            >
+          <div key={i} className="chat-card flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/60">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 ${getAvatarColor(name)}`}>
               {initial}
             </div>
-
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 truncate">
-                  {name}
-                </span>
+                <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 truncate">{name}</span>
                 {badge && situacao && (
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${badge.bg} ${badge.text}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
@@ -265,16 +272,8 @@ function LeadCards({ headers, rows }: { headers: string[]; rows: string[][] }) {
                   </span>
                 )}
               </div>
-              {phone && (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  {formatPhone(phone)}
-                </p>
-              )}
-              {empreendimento && (
-                <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">
-                  {empreendimento}
-                </p>
-              )}
+              {phone && <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{formatPhone(phone)}</p>}
+              {empreendimento && <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{empreendimento}</p>}
               {extraIdxs.map((idx) =>
                 row[idx] ? (
                   <p key={idx} className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">
@@ -283,7 +282,6 @@ function LeadCards({ headers, rows }: { headers: string[]; rows: string[][] }) {
                 ) : null
               )}
             </div>
-
             {phoneDigits && (
               <a
                 href={`https://wa.me/55${phoneDigits}`}
@@ -321,19 +319,11 @@ function MetricCards({ headers, rows }: { headers: string[]; rows: string[][] })
         const label = row[0] || ""
         const value = row[1] || ""
         const gradient = metricColors[i % metricColors.length]
-
         return (
-          <div
-            key={i}
-            className="chat-card relative overflow-hidden p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/60"
-          >
+          <div key={i} className="chat-card relative overflow-hidden p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/60">
             <div className={`absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r ${gradient}`} />
-            <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
-              {value}
-            </div>
-            <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 font-medium uppercase tracking-wide">
-              {label}
-            </div>
+            <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{value}</div>
+            <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 font-medium uppercase tracking-wide">{label}</div>
           </div>
         )
       })}
@@ -347,17 +337,12 @@ function GenericCards({ headers, rows }: { headers: string[]; rows: string[][] }
   return (
     <div className="space-y-2 my-2">
       {rows.map((row, i) => (
-        <div
-          key={i}
-          className="chat-card p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/60"
-        >
+        <div key={i} className="chat-card p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/60">
           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
             {headers.map((header, j) =>
               row[j] ? (
                 <div key={j} className="min-w-0">
-                  <div className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium">
-                    {header}
-                  </div>
+                  <div className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium">{header}</div>
                   <div className="text-sm text-zinc-900 dark:text-zinc-100 truncate">{row[j]}</div>
                 </div>
               ) : null
@@ -369,18 +354,10 @@ function GenericCards({ headers, rows }: { headers: string[]; rows: string[][] }
   )
 }
 
-// ─── SmartTable (entry point) ───────────────────────────────
+// ─── Render a parsed table as cards ─────────────────────────
 
-export function SmartTable(props: React.TableHTMLAttributes<HTMLTableElement>) {
-  const { children } = props
-  const { headers, rows } = extractTableData(children)
-
-  if (!headers.length || !rows.length) {
-    return <table {...props} />
-  }
-
+function TableCards({ headers, rows }: { headers: string[]; rows: string[][] }) {
   const type = detectTableType(headers)
-
   switch (type) {
     case "lead":
       return <LeadCards headers={headers} rows={rows} />
@@ -391,4 +368,32 @@ export function SmartTable(props: React.TableHTMLAttributes<HTMLTableElement>) {
     default:
       return <GenericCards headers={headers} rows={rows} />
   }
+}
+
+// ─── ChatMarkdown (main export) ─────────────────────────────
+// Replaces <ReactMarkdown> — parses tables from raw text, renders as cards
+
+export function ChatMarkdown({ content }: { content: string }) {
+  const segments = splitContent(content)
+
+  return (
+    <>
+      {segments.map((seg, i) => {
+        if (seg.type === "text") {
+          return (
+            <ReactMarkdown key={i}>{seg.content}</ReactMarkdown>
+          )
+        }
+
+        // Try to parse as a table
+        const table = parseMarkdownTable(seg.content)
+        if (!table) {
+          // Failed to parse — render as normal markdown
+          return <ReactMarkdown key={i}>{seg.content}</ReactMarkdown>
+        }
+
+        return <TableCards key={i} headers={table.headers} rows={table.rows} />
+      })}
+    </>
+  )
 }
