@@ -137,6 +137,14 @@ export default function CorretorDashboard() {
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
+  // Voice recording states
+  const [isRecording, setIsRecording] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
+
   // Leads accordion
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
 
@@ -395,6 +403,71 @@ export default function CorretorDashboard() {
     }
   }
 
+  // Voice recording
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' })
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+        setRecordingTime(0)
+
+        const blob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType })
+        if (blob.size < 1000) return // too small, ignore
+
+        setIsTranscribing(true)
+        try {
+          const formData = new FormData()
+          formData.append('audio', blob, 'audio.webm')
+          const res = await fetch('/api/assistente/transcribe', { method: 'POST', body: formData })
+          if (res.ok) {
+            const { text } = await res.json()
+            if (text) {
+              setChatInput((prev) => (prev ? prev + ' ' + text : text))
+              chatInputRef.current?.focus()
+            }
+          }
+        } catch (err) {
+          console.error('Erro na transcrição:', err)
+        } finally {
+          setIsTranscribing(false)
+        }
+      }
+
+      mediaRecorder.start(250)
+      setIsRecording(true)
+      setRecordingTime(0)
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((t) => {
+          if (t >= 59) { stopRecording(); return 0 }
+          return t + 1
+        })
+      }, 1000)
+    } catch {
+      // permission denied or not available
+    }
+  }, [])
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+    setIsRecording(false)
+  }, [])
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) stopRecording()
+    else startRecording()
+  }, [isRecording, startRecording, stopRecording])
+
   const getGreeting = () => {
     const hour = new Date().getHours()
     if (hour < 12) return "Bom dia"
@@ -506,31 +579,82 @@ export default function CorretorDashboard() {
                 {/* Messages or Welcome */}
                 <div className="flex-1 overflow-y-auto">
                   {mensagens.length === 0 ? (
-                    /* Welcome Screen */
+                    /* Welcome Screen — Narrative */
                     <div className="flex flex-col items-center justify-center h-full px-4 py-8">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-violet-500/20">
-                        <Sparkles className="h-7 w-7 text-white" />
+                      {/* Glow icon */}
+                      <div className="relative mb-5">
+                        <div className="absolute inset-0 bg-violet-500/20 rounded-full blur-xl scale-150" />
+                        <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/25">
+                          <Sparkles className="h-7 w-7 text-white" />
+                        </div>
                       </div>
-                      <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
-                        Prática IA
+
+                      <h2 className="text-lg sm:text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2 text-center">
+                        Seu dia rende mais com IA
                       </h2>
-                      <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-sm mb-6">
-                        Seu assistente com acesso ao CRM. Pergunte sobre leads, empreendimentos e vendas.
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-sm mb-6 leading-relaxed">
+                        Enquanto você visita clientes, eu cuido do resto: respondo leads, encontro imóveis e aviso quando um negócio está esfriando.
                       </p>
 
-                      {/* Smart suggestions */}
-                      <div className="grid grid-cols-2 gap-2 w-full max-w-md">
-                        {smartSuggestions.map((s) => (
+                      {/* 4 Activity cards — 2x2 grid */}
+                      <div className="grid grid-cols-2 gap-2.5 w-full max-w-md mb-5">
+                        {[
+                          {
+                            icon: Sparkles,
+                            title: "Briefing do dia",
+                            subtitle: urgencyStats && urgencyStats.criticalActions > 0
+                              ? `${urgencyStats.criticalActions} urgente${urgencyStats.criticalActions > 1 ? "s" : ""}, ${activities.length} compromisso${activities.length !== 1 ? "s" : ""}`
+                              : "O que precisa da sua atenção agora",
+                            prompt: "Me dê um briefing completo do meu dia: leads urgentes, compromissos, follow-ups atrasados e como está minha meta",
+                          },
+                          {
+                            icon: Building2,
+                            title: "Achar imóvel ideal",
+                            subtitle: "Descreva o cliente e eu busco",
+                            prompt: "Tenho um cliente procurando apartamento de 2 quartos até R$500 mil. O que temos disponível?",
+                          },
+                          {
+                            icon: MessageSquare,
+                            title: "Montar mensagem",
+                            subtitle: "Crio textos prontos pro WhatsApp",
+                            prompt: "Me ajude a montar uma mensagem de follow-up para um lead que visitou o empreendimento semana passada mas não deu retorno",
+                          },
+                          {
+                            icon: TrendingUp,
+                            title: "Analisar meu funil",
+                            subtitle: "Onde estão seus gargalos de vendas",
+                            prompt: "Analise meu funil de vendas e me diga onde estou perdendo mais leads e o que posso fazer",
+                          },
+                        ].map((card) => (
                           <button
-                            key={s.label}
-                            onClick={() => enviarMensagem(s.prompt)}
+                            key={card.title}
+                            onClick={() => enviarMensagem(card.prompt)}
                             disabled={isStreaming}
-                            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/50 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition-all text-left group"
+                            className="flex flex-col gap-1.5 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/50 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-violet-50/80 dark:hover:bg-violet-900/10 transition-all text-left group"
                           >
-                            <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center group-hover:bg-violet-100 dark:group-hover:bg-violet-900/30 transition-colors flex-shrink-0">
-                              <s.icon className="h-4 w-4 text-zinc-500 dark:text-zinc-400 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors" />
+                            <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center group-hover:bg-violet-100 dark:group-hover:bg-violet-900/30 transition-colors">
+                              <card.icon className="h-4 w-4 text-zinc-500 dark:text-zinc-400 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors" />
                             </div>
-                            <span className="text-xs font-medium text-zinc-700 dark:text-zinc-200 line-clamp-2">{s.label}</span>
+                            <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{card.title}</span>
+                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 leading-tight line-clamp-2">{card.subtitle}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Power-user pills */}
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {[
+                          { label: "Leads recentes", prompt: "Quais foram os últimos leads que entraram?" },
+                          { label: "Unidades disponíveis", prompt: "Quais empreendimentos têm unidades disponíveis?" },
+                          { label: "Meus números", prompt: "Me dê um resumo geral dos meus números no CRM." },
+                        ].map((pill) => (
+                          <button
+                            key={pill.label}
+                            onClick={() => enviarMensagem(pill.prompt)}
+                            disabled={isStreaming}
+                            className="px-3 py-1.5 rounded-full text-[11px] font-medium text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:border-violet-300 dark:hover:border-violet-600 hover:text-violet-600 dark:hover:text-violet-400 transition-all"
+                          >
+                            {pill.label}
                           </button>
                         ))}
                       </div>
@@ -596,17 +720,53 @@ export default function CorretorDashboard() {
                       </button>
                     </div>
                   )}
+                  {/* Recording indicator */}
+                  {isRecording && (
+                    <div className="flex items-center justify-center gap-3 mb-2 py-2 px-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                      <div className="flex items-center gap-1 h-7 text-red-500">
+                        <span className="voice-bar" /><span className="voice-bar" /><span className="voice-bar" /><span className="voice-bar" /><span className="voice-bar" />
+                      </div>
+                      <span className="text-xs font-medium text-red-600 dark:text-red-400 recording-pulse">
+                        {Math.floor(recordingTime / 60)}:{String(recordingTime % 60).padStart(2, '0')}
+                      </span>
+                    </div>
+                  )}
+                  {isTranscribing && (
+                    <div className="flex items-center justify-center gap-2 mb-2 py-2 text-sm text-violet-600 dark:text-violet-400">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Transcrevendo...
+                    </div>
+                  )}
                   <div className="relative flex items-end gap-2 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 focus-within:border-violet-400 dark:focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-400/20 transition-all">
                     <textarea
                       ref={chatInputRef}
                       value={chatInput}
                       onChange={handleChatInputChange}
                       onKeyDown={handleChatKeyDown}
-                      placeholder="Pergunte sobre leads, empreendimentos..."
+                      placeholder="Ex: Quais leads preciso ligar hoje?"
                       rows={1}
                       className="flex-1 bg-transparent text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 resize-none outline-none max-h-[120px]"
-                      disabled={isStreaming}
+                      disabled={isStreaming || isTranscribing}
                     />
+                    {/* Mic button */}
+                    <button
+                      onClick={toggleRecording}
+                      disabled={isStreaming || isTranscribing}
+                      className={cn(
+                        "shrink-0 rounded-lg h-8 w-8 flex items-center justify-center transition-all",
+                        isRecording
+                          ? "bg-red-500 text-white shadow-md shadow-red-500/30 hover:bg-red-600"
+                          : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                      )}
+                      title={isRecording ? "Parar gravação" : "Gravar áudio"}
+                    >
+                      {isRecording ? (
+                        <Square className="h-3 w-3 fill-current" />
+                      ) : (
+                        <Mic className="h-4 w-4" />
+                      )}
+                    </button>
+                    {/* Send button */}
                     <Button
                       size="icon"
                       onClick={() => enviarMensagem()}
@@ -626,7 +786,7 @@ export default function CorretorDashboard() {
                     </Button>
                   </div>
                   <p className="text-[10px] text-zinc-400 dark:text-zinc-500 text-center mt-1.5">
-                    Prática IA consulta dados reais do CRM
+                    Consulto dados reais do seu CRM — pode perguntar a qualquer hora
                   </p>
                 </div>
               </div>
