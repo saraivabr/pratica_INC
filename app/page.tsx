@@ -157,7 +157,6 @@ const moduleCategories = [
     borderColor: "border-slate-200",
     iconColor: "text-slate-600",
     modules: [
-      { icon: Handshake, title: "Intermediação", desc: "Gestão completa de vendas e pagamentos" },
       { icon: Calendar, title: "Parcelas e Calendário", desc: "Controle de vencimentos" },
       { icon: ShieldCheck, title: "Auditoria", desc: "Rastreabilidade total" },
       { icon: FileSpreadsheet, title: "Relatórios", desc: "Exportação em PDF e Excel" },

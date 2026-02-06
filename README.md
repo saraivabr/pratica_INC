@@ -36,15 +36,6 @@
 - **Disparador de Eventos:** Envio automatizado de convites
 - **Sofia IA:** Assistente virtual inteligente
 
-### 💼 Sistema de Intermediação de Vendas
-- Cadastro de vendas imobiliárias
-- Cadastro de beneficiários (corretores/equipe)
-- Distribuição automática de comissão (split)
-- Parcelamento de comissões
-- Registro de pagamentos
-- Auditoria completa de alterações
-- Relatórios e dashboards
-
 ### 📊 Gestão de Leads
 - Cadastro e gerenciamento de leads
 - Relacionamento automático com WhatsApp
@@ -341,19 +332,16 @@ appnovo_pratica/
 - `workspaces` - Workspaces por usuário
 - `otp_codes` - Códigos OTP para login por telefone
 
-#### Intermediação de Vendas
-- `im_vendas` - Vendas imobiliárias
-- `im_beneficiarios` - Corretores/equipe
-- `im_distribuicao` - Split de comissão
-- `im_parcelas` - Parcelamento
-- `im_pagamentos` - Pagamentos efetuados
-- `im_auditoria` - Log de auditoria
-
 #### WhatsApp
 - `whatsapp_instances` - Instâncias Evolution API
 - `whatsapp_messages` - Histórico de mensagens
 - `whatsapp_contacts` - Contatos
 - `salva_leads_config` - Configuração do bot
+
+#### Comissões
+- `comissao_vendas` - Comissões de vendas
+- `comissao_parcelas` - Parcelamento de comissões
+- `comissao_pagamentos` - Pagamentos efetuados
 
 #### Leads
 - `leads` - Gestão de leads

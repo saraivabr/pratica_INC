@@ -35,7 +35,7 @@
 | Salva-Leads | 7 | `salva_leads_*` | ⚠️ Incompleto |
 | Eventos | 3 | `eventos`, `evento_*` | ⚠️ Incompleto |
 | Recepção | 12 | `recepcao_*` | ⚠️ Incompleto |
-| Intermediação/Comissões | 11 | `comissao_*`, `im_*` | ⚠️ Incompleto |
+| Comissões | 11 | `comissao_*` | ⚠️ Incompleto |
 | Academy | 5 | `academy_*` | ⚠️ Incompleto |
 | IA/Agentes | 7 | `sofia_*`, `rag_*` | ⚠️ Incompleto |
 | Workspaces/Usuários | 7 | `users`, `workspaces` | ⚠️ Incompleto |

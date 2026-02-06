@@ -243,7 +243,6 @@ Agora que `tenant_id` foi removido do banco, atualizar código:
 # - lib/db.ts
 # - app/api/auth/*.ts
 # - app/api/admin/*.ts
-# - lib/intermediacao/*.ts
 ```
 
 #### 4.4.2 Padrão de mudança

@@ -449,12 +449,9 @@ git commit -m "security: stop leaking error internals, move backup code out of a
 
 **Files:**
 - Modify: `app/admin/equipe/page.tsx` (12 alerts -> toast)
-- Modify: `app/admin/intermediacao/beneficiarios/[id]/page.tsx` (2 alerts)
-- Modify: `app/admin/intermediacao/beneficiarios/novo/page.tsx` (2 alerts)
 - Modify: `app/corretor/clientes/[id]/page.tsx` (2 alerts)
 - Modify: `components/whatsapp-chat.tsx` (2 alerts)
 - Modify: `components/corretor/chat-crm.tsx` (2 alerts)
-- Modify: `components/intermediacao/PrintButton.tsx` (1 alert)
 
 Pattern: `alert("Sucesso!")` -> `toast.success("Sucesso!")` and `alert("Erro...")` -> `toast.error("Erro...")`
 Import `{ toast } from "sonner"` where missing.
@@ -477,7 +474,6 @@ Add `toast.error("Erro ao carregar dados")` or at minimum `console.error(error)`
 ### Task 6.4: Remove console.log from components
 
 **Files:**
-- Modify: `app/admin/intermediacao/page.tsx` (line 266)
 - Modify: `app/corretor/mensagens/page.tsx` (lines 120, 125)
 - Modify: `components/academy/certificate-card.tsx` (line 81)
 
