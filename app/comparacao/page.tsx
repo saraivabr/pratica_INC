@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Breadcrumb } from "@/components/breadcrumb"
 import { usePageTracking } from "@/lib/auth-context"
-import { analytics } from "@/lib/analytics"
 import { useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
@@ -19,12 +18,6 @@ export default function ComparacaoPage() {
   const { properties, removeProperty, clearAll } = useComparisonStore()
 
   usePageTracking("comparacao")
-
-  useEffect(() => {
-    if (properties.length > 0) {
-      analytics.comparisonViewed(properties.length)
-    }
-  }, [properties.length])
 
   if (properties.length === 0) {
     return (
