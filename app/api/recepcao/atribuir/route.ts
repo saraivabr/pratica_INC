@@ -84,8 +84,8 @@ export async function POST(request: NextRequest) {
 
     // Verificar se plantão está ativo
     const plantaoCheck = await client.query(
-      `SELECT id FROM recepcao_plantoes WHERE id = $1 AND workspace_id = $2 AND status = 'ativo'`,
-      [plantao_id, workspaceId]
+      `SELECT id FROM recepcao_plantoes WHERE id = $1 AND status = 'ativo'`,
+      [plantao_id]
     );
 
     if (plantaoCheck.rows.length === 0) {
@@ -110,12 +110,12 @@ export async function POST(request: NextRequest) {
         `SELECT p.id, p.user_id, u.nome AS user_nome
          FROM recepcao_presencas p
          JOIN users u ON u.id = p.user_id
-         WHERE p.id = $1 AND p.plantao_id = $2 AND p.workspace_id = $3
+         WHERE p.id = $1 AND p.plantao_id = $2
            AND p.status = 'presente'
            AND p.em_atendimento = false
            AND p.pausado = false
            AND p.feedback_pendente = false`,
-        [presencaIdEspecifica, plantao_id, workspaceId]
+        [presencaIdEspecifica, plantao_id]
       );
 
       if (presencaCheck.rows.length === 0) {

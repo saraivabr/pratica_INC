@@ -64,10 +64,10 @@ export async function POST(request: NextRequest) {
       max_leads_ativos,
     } = validationResult.data;
 
-    // Verificar se plantão está ativo e pertence ao workspace
+    // Verificar se plantão está ativo
     const plantaoCheck = await client.query(
-      `SELECT id FROM recepcao_plantoes WHERE id = $1 AND workspace_id = $2 AND status = 'ativo'`,
-      [plantao_id, workspaceId]
+      `SELECT id FROM recepcao_plantoes WHERE id = $1 AND status = 'ativo'`,
+      [plantao_id]
     );
 
     if (plantaoCheck.rows.length === 0) {

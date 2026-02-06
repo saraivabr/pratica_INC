@@ -21,9 +21,7 @@ export async function GET(request: NextRequest) {
            COUNT(*) FILTER (WHERE motivo = 'sem_corretor') AS sem_corretor,
            COUNT(*) FILTER (WHERE motivo = 'abandonado') AS abandonados,
            COUNT(*) AS total
-         FROM v_leads_para_distribuir
-         WHERE workspace_id = $1`,
-        [workspaceId]
+         FROM v_leads_para_distribuir`
       );
 
       const row = result.rows[0] || { total: 0, sem_corretor: 0, abandonados: 0 };

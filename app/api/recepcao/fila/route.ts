@@ -54,10 +54,10 @@ export async function GET(request: NextRequest) {
     }
 
     return await withTenant(workspaceId, async (client) => {
-      // Verificar se plantão existe e pertence ao workspace
+      // Verificar se plantão existe
       const plantaoCheck = await client.query(
-        `SELECT id FROM recepcao_plantoes WHERE id = $1 AND workspace_id = $2`,
-        [plantaoId, workspaceId]
+        `SELECT id FROM recepcao_plantoes WHERE id = $1`,
+        [plantaoId]
       );
 
       if (plantaoCheck.rows.length === 0) {
@@ -102,9 +102,9 @@ export async function GET(request: NextRequest) {
         FROM recepcao_presencas p
         JOIN users u ON u.id = p.user_id
         LEFT JOIN roleta_qualificacao q ON q.presenca_id = p.id
-        WHERE p.plantao_id = $1 AND p.workspace_id = $2
+        WHERE p.plantao_id = $1
         ORDER BY p.posicao_fila ASC`,
-        [plantaoId, workspaceId]
+        [plantaoId]
       );
 
       // Estatísticas rápidas

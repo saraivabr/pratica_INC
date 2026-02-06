@@ -38,10 +38,10 @@ export async function GET(request: NextRequest) {
     }
 
     return await withTenant(workspaceId, async (client) => {
-      // Verificar se plantão existe e pertence ao workspace
+      // Verificar se plantão existe e está ativo
       const plantaoCheck = await client.query(
-        `SELECT id FROM recepcao_plantoes WHERE id = $1 AND workspace_id = $2 AND status = 'ativo'`,
-        [plantaoId, workspaceId]
+        `SELECT id FROM recepcao_plantoes WHERE id = $1 AND status = 'ativo'`,
+        [plantaoId]
       );
 
       if (plantaoCheck.rows.length === 0) {

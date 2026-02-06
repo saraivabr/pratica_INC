@@ -31,14 +31,13 @@ export async function POST(request: NextRequest) {
       `SELECT id, plantao_id, posicao_fila, leads_ativos
        FROM recepcao_presencas
        WHERE user_id = $1
-         AND workspace_id = $2
          AND status = 'presente'
          AND pausado = false
          AND feedback_pendente = false
          AND leads_ativos < 5
        LIMIT 1
        FOR UPDATE`,
-      [userId, workspaceId]
+      [userId]
     );
 
     if (presencaResult.rows.length === 0) {
@@ -48,9 +47,9 @@ export async function POST(request: NextRequest) {
       const checkResult = await client.query(
         `SELECT status, pausado, feedback_pendente, leads_ativos
          FROM recepcao_presencas
-         WHERE user_id = $1 AND workspace_id = $2 AND status = 'presente'
+         WHERE user_id = $1 AND status = 'presente'
          LIMIT 1`,
-        [userId, workspaceId]
+        [userId]
       );
 
       if (checkResult.rows.length === 0) {
@@ -106,8 +105,7 @@ export async function POST(request: NextRequest) {
               CASE WHEN l.corretor_id IS NULL THEN 'sem_corretor' ELSE 'abandonado' END as motivo,
               EXTRACT(EPOCH FROM (NOW() - l.created_at))/3600 AS horas_aguardando
        FROM cvcrm_leads l
-       WHERE l.workspace_id = $1
-         AND (
+       WHERE (
            (l.corretor_id IS NULL
             AND l.situacao_nome NOT IN ('Perdido','Descartado','Cancelado','Venda Realizada','Inativo','Fechado'))
            OR
@@ -123,8 +121,7 @@ export async function POST(request: NextRequest) {
        ORDER BY CASE WHEN l.corretor_id IS NULL THEN 0 ELSE 1 END,
                 EXTRACT(EPOCH FROM (NOW() - COALESCE(l.ultima_data_conversao, l.created_at))) DESC
        LIMIT 1
-       FOR UPDATE OF l SKIP LOCKED`,
-      [workspaceId]
+       FOR UPDATE OF l SKIP LOCKED`
     );
 
     if (leadResult.rows.length === 0) {

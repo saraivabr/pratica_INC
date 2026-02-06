@@ -44,10 +44,9 @@ export async function GET(request: NextRequest) {
         JOIN recepcao_locais l ON l.id = p.local_id
         JOIN recepcao_presencas pr ON pr.plantao_id = p.id
         LEFT JOIN roleta_qualificacao q ON q.presenca_id = pr.id
-        WHERE p.workspace_id = $1
-        AND p.data = CURRENT_DATE
+        WHERE p.data = CURRENT_DATE
         AND p.status = 'ativo'
-        AND pr.user_id = $2
+        AND pr.user_id = $1
         AND pr.status = 'presente'
         AND (
           (p.hora_inicio <= CURRENT_TIME AND p.hora_fim >= CURRENT_TIME)
@@ -55,7 +54,7 @@ export async function GET(request: NextRequest) {
         )
         ORDER BY p.hora_inicio
         LIMIT 1
-      `, [workspaceId, userId])
+      `, [userId])
 
       if (result.rows.length === 0) {
         return NextResponse.json({
