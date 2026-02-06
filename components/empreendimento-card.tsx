@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { ImageIcon, Bed, Car, Ruler, Grid3X3, Table, Calculator } from "lucide-react"
+import { ImageIcon, Bed, Car, Ruler, Grid3X3, TableProperties, PiggyBank, Home, FolderOpen } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { type Empreendimento, formatCurrency } from "@/lib/data"
@@ -120,21 +120,23 @@ export function EmpreendimentoCard({ empreendimento }: EmpreendimentoCardProps) 
                 </div>
             </div>
 
-            {/* Quick Actions — big, labeled, impossible to miss */}
-            <div className="mt-auto pt-2 sm:pt-3 grid grid-cols-3 gap-1.5 sm:gap-2 border-t border-border/50">
+            {/* Quick Actions — all available views */}
+            <div className="mt-auto pt-2 sm:pt-3 grid grid-cols-5 gap-1 sm:gap-1.5 border-t border-border/50">
               {[
+                { icon: Home, tab: "visao-geral", label: "Início", color: "text-zinc-600 dark:text-zinc-400", bg: "hover:bg-zinc-100 dark:hover:bg-zinc-800/40" },
                 { icon: Grid3X3, tab: "espelho", label: "Espelho", color: "text-violet-600 dark:text-violet-400", bg: "hover:bg-violet-50 dark:hover:bg-violet-950/30" },
-                { icon: Table, tab: "lista", label: "Preços", color: "text-emerald-600 dark:text-emerald-400", bg: "hover:bg-emerald-50 dark:hover:bg-emerald-950/30" },
-                { icon: Calculator, tab: "simulacao", label: "Simular", color: "text-blue-600 dark:text-blue-400", bg: "hover:bg-blue-50 dark:hover:bg-blue-950/30" },
+                { icon: TableProperties, tab: "lista", label: "Preços", color: "text-emerald-600 dark:text-emerald-400", bg: "hover:bg-emerald-50 dark:hover:bg-emerald-950/30" },
+                { icon: PiggyBank, tab: "simulacao", label: "Simular", color: "text-blue-600 dark:text-blue-400", bg: "hover:bg-blue-50 dark:hover:bg-blue-950/30" },
+                { icon: FolderOpen, tab: "materiais", label: "Materiais", color: "text-amber-600 dark:text-amber-400", bg: "hover:bg-amber-50 dark:hover:bg-amber-950/30" },
               ].map(({ icon: Icon, tab, label, color, bg }) => (
                 <Link
                   key={tab}
                   href={`/empreendimentos/${empreendimento.id}?tab=${tab}`}
                   onClick={(e) => e.stopPropagation()}
-                  className={`flex flex-col items-center justify-center gap-0.5 sm:gap-1 py-2 sm:py-2.5 rounded-lg ${bg} transition-colors group/action`}
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 rounded-lg ${bg} transition-colors`}
                 >
-                  <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${color}`} />
-                  <span className={`text-[10px] sm:text-xs font-semibold ${color}`}>{label}</span>
+                  <Icon className={`h-3.5 w-3.5 sm:h-4.5 sm:w-4.5 ${color}`} />
+                  <span className={`text-[9px] sm:text-[11px] font-semibold leading-tight ${color}`}>{label}</span>
                 </Link>
               ))}
             </div>
