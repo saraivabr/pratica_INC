@@ -35,31 +35,44 @@ import { EmptyState } from "@/components/ui/empty-state"
 // Skeleton Card Component matching new design
 function SkeletonCard({ delay = 0 }: { delay?: number }) {
   return (
-    <div
-      className="animate-pulse rounded-xl overflow-hidden bg-white dark:bg-gray-900 shadow-md h-full flex flex-col"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      {/* Image Placeholder */}
-      <div className="relative aspect-[4/3] bg-gray-200 dark:bg-gray-800">
-        {/* Badge Placeholder */}
-        <div className="absolute top-4 right-4 w-24 h-6 bg-gray-300 dark:bg-gray-700 rounded" />
-        {/* Title Overlay Placeholder */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 pt-12 bg-gradient-to-t from-black/50 to-transparent">
-          <div className="h-6 w-3/4 bg-white/20 rounded mb-2" />
-          <div className="h-4 w-1/2 bg-white/20 rounded" />
+    <>
+      {/* Mobile: horizontal skeleton */}
+      <div
+        className="sm:hidden animate-pulse rounded-xl overflow-hidden bg-white dark:bg-gray-900 shadow-md flex flex-row h-28"
+        style={{ animationDelay: `${delay}ms` }}
+      >
+        <div className="w-28 flex-shrink-0 bg-gray-200 dark:bg-gray-800" />
+        <div className="flex-1 p-3 flex flex-col justify-between">
+          <div>
+            <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded mb-1.5" />
+            <div className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
+          </div>
         </div>
       </div>
 
-      {/* Stats Grid Placeholder */}
-      <div className="grid grid-cols-4 bg-[#1a2e1a] py-3 divide-x divide-white/10 mt-auto">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex flex-col items-center justify-center px-1 space-y-1">
-            <div className="h-2 w-8 bg-white/10 rounded" />
-            <div className="h-3 w-6 bg-white/20 rounded" />
+      {/* Desktop: vertical skeleton */}
+      <div
+        className="hidden sm:flex animate-pulse rounded-xl overflow-hidden bg-white dark:bg-gray-900 shadow-md h-full flex-col"
+        style={{ animationDelay: `${delay}ms` }}
+      >
+        <div className="relative aspect-[4/3] bg-gray-200 dark:bg-gray-800">
+          <div className="absolute top-4 right-4 w-24 h-6 bg-gray-300 dark:bg-gray-700 rounded" />
+        </div>
+        <div className="p-4 space-y-3">
+          <div className="h-5 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-4 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-10 bg-gray-100 dark:bg-gray-800 rounded" />
+            ))}
           </div>
-        ))}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -575,48 +588,68 @@ export default function EmpreendimentosPage() {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-8">
-        {/* Hero Section */}
-        <div className="mb-8 sm:mb-10 text-center animate-fadeInDown">
-          {/* Icon with glow */}
-          <div className="flex justify-center mb-4 sm:mb-5">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl blur-xl opacity-50" />
-              <div className="relative h-16 sm:h-20 w-16 sm:w-20 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-2xl shadow-emerald-500/30">
-                <Building2 className="h-8 sm:h-10 w-8 sm:w-10 text-white" />
-                <Sparkles className="absolute -top-1 -right-1 h-5 w-5 text-yellow-300 animate-pulse" />
+        {/* Hero Section — compact on mobile */}
+        <div className="mb-4 sm:mb-10 animate-fadeInDown">
+          {/* Desktop: centered with icon */}
+          <div className="hidden sm:block text-center">
+            <div className="flex justify-center mb-5">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl blur-xl opacity-50" />
+                <div className="relative h-20 w-20 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-2xl shadow-emerald-500/30">
+                  <Building2 className="h-10 w-10 text-white" />
+                  <Sparkles className="absolute -top-1 -right-1 h-5 w-5 text-yellow-300 animate-pulse" />
+                </div>
               </div>
             </div>
+            <h1 className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-emerald-800 to-gray-900 dark:from-white dark:via-emerald-300 dark:to-white bg-clip-text text-transparent mb-3">
+              Empreendimentos
+            </h1>
+            <p className="text-base lg:text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-emerald-500" />
+                  <span>Carregando empreendimentos...</span>
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-full text-sm font-medium">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {filteredEmpreendimentos.length}
+                  </span>
+                  <span>empreendimento{filteredEmpreendimentos.length !== 1 ? "s" : ""} encontrado{filteredEmpreendimentos.length !== 1 ? "s" : ""}</span>
+                </span>
+              )}
+            </p>
           </div>
 
-          {/* Title with gradient */}
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-emerald-800 to-gray-900 dark:from-white dark:via-emerald-300 dark:to-white bg-clip-text text-transparent mb-3">
-            Empreendimentos
-          </h1>
-
-          {/* Subtitle */}
-          <p className="text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            {loading ? (
-              <span className="inline-flex items-center gap-2">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full blur opacity-50 animate-pulse" />
-                  <Loader2 className="relative h-4 w-4 sm:h-5 sm:w-5 animate-spin text-emerald-500" />
-                </div>
-                <span>Carregando empreendimentos incriveis...</span>
-              </span>
-            ) : (
-              <span className="flex items-center justify-center gap-2">
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-full text-sm font-medium">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {filteredEmpreendimentos.length}
-                </span>
-                <span>empreendimento{filteredEmpreendimentos.length !== 1 ? "s" : ""} encontrado{filteredEmpreendimentos.length !== 1 ? "s" : ""}</span>
-              </span>
-            )}
-          </p>
+          {/* Mobile: inline compact header */}
+          <div className="flex sm:hidden items-center gap-3">
+            <div className="relative flex-shrink-0">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <Building2 className="h-5 w-5 text-white" />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Empreendimentos</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {loading ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />
+                    Carregando...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="font-semibold text-emerald-600">{filteredEmpreendimentos.length}</span>
+                    empreendimento{filteredEmpreendimentos.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Enhanced Filters */}
-        <div className="mb-8 animate-fadeInUp" style={{ animationDelay: "100ms" }}>
+        <div className="mb-4 sm:mb-8 animate-fadeInUp" style={{ animationDelay: "100ms" }}>
           <EnhancedSearchFilters
             search={search}
             setSearch={setSearch}
@@ -639,7 +672,7 @@ export default function EmpreendimentosPage() {
         {/* Content */}
         {loading ? (
           /* Skeleton Loading with shimmer */
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
             {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} delay={i * 100} />
             ))}
@@ -647,14 +680,14 @@ export default function EmpreendimentosPage() {
         ) : filteredEmpreendimentos.length > 0 ? (
           <>
             {/* Empreendimentos Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 md:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
               {paginatedEmpreendimentos.map((empreendimento, index) => (
                 <div
                   key={empreendimento.id}
                   className="animate-fadeInUp"
                   style={{ animationDelay: `${(index % 12) * 50}ms` }}
                 >
-                  <EmpreendimentoCard empreendimento={empreendimento} />
+                  <EmpreendimentoCard empreendimento={empreendimento} variant="grid" mobileVariant="list" />
                 </div>
               ))}
             </div>

@@ -10,6 +10,7 @@ import { type Empreendimento, formatCurrency } from "@/lib/data"
 interface EmpreendimentoCardProps {
   empreendimento: Empreendimento
   variant?: "grid" | "compact" | "list"
+  mobileVariant?: "grid" | "compact" | "list"
 }
 
 function getStatusBadge(empreendimento: Empreendimento) {
@@ -312,7 +313,109 @@ function ListCard({ empreendimento }: { empreendimento: Empreendimento }) {
   )
 }
 
-export function EmpreendimentoCard({ empreendimento, variant = "grid" }: EmpreendimentoCardProps) {
+function MobileListCard({ empreendimento }: { empreendimento: Empreendimento }) {
+  const { unidadesDisponiveis, areaText, quartosText } = useCardData(empreendimento)
+  const statusBadge = getStatusBadge(empreendimento)
+  const hasImage = Boolean(empreendimento.imagemPrincipal)
+
+  return (
+    <Link href={`/empreendimentos/${empreendimento.id}`}>
+      <Card className="group flex flex-row overflow-hidden border-border/50 shadow-sm hover:shadow-lg transition-all duration-200 bg-card">
+
+        {/* Thumbnail */}
+        <div className="relative w-28 flex-shrink-0 overflow-hidden">
+          {hasImage ? (
+            <Image
+              src={empreendimento.imagemPrincipal as string}
+              alt={empreendimento.nome}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-muted flex items-center justify-center text-muted-foreground">
+              <ImageIcon className="h-6 w-6" />
+            </div>
+          )}
+          {/* Status badge */}
+          <div className="absolute top-1.5 left-1.5 z-10">
+            <Badge className={`${statusBadge.className} text-[8px] uppercase font-bold px-1.5 py-0.5 shadow-sm`}>
+              {statusBadge.label}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between p-3 gap-1.5">
+          {/* Top: name + location */}
+          <div>
+            <h3 className="font-bold text-sm leading-tight group-hover:text-primary transition-colors line-clamp-1">
+              {empreendimento.nome}
+            </h3>
+            <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+              {empreendimento.bairro}, {empreendimento.cidade}
+            </p>
+          </div>
+
+          {/* Middle: price + specs */}
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] text-muted-foreground font-medium uppercase">A partir de</div>
+              <div className="text-sm font-bold text-foreground leading-tight">
+                {empreendimento.precoMinimo && empreendimento.precoMinimo > 0
+                  ? formatCurrency(empreendimento.precoMinimo)
+                  : "Sob consulta"}
+              </div>
+            </div>
+            <div className="text-[11px] text-muted-foreground font-medium text-right">
+              {areaText}m² · {quartosText}q · <span className="text-emerald-600 font-semibold">{unidadesDisponiveis > 0 ? unidadesDisponiveis : "—"} disp.</span>
+            </div>
+          </div>
+
+          {/* Bottom: quick actions */}
+          <div className="flex gap-1 pt-1 border-t border-border/50">
+            {[
+              { icon: Grid3X3, tab: "espelho", label: "Espelho", color: "text-violet-600 dark:text-violet-400", bg: "hover:bg-violet-50 dark:hover:bg-violet-950/30" },
+              { icon: TableProperties, tab: "lista", label: "Preços", color: "text-emerald-600 dark:text-emerald-400", bg: "hover:bg-emerald-50 dark:hover:bg-emerald-950/30" },
+              { icon: PiggyBank, tab: "simulacao", label: "Simular", color: "text-blue-600 dark:text-blue-400", bg: "hover:bg-blue-50 dark:hover:bg-blue-950/30" },
+              { icon: FolderOpen, tab: "materiais", label: "Materiais", color: "text-amber-600 dark:text-amber-400", bg: "hover:bg-amber-50 dark:hover:bg-amber-950/30" },
+            ].map(({ icon: Icon, tab, label, color, bg }) => (
+              <Link
+                key={tab}
+                href={`/empreendimentos/${empreendimento.id}?tab=${tab}`}
+                onClick={(e) => e.stopPropagation()}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md ${bg} transition-colors`}
+              >
+                <Icon className={`h-3 w-3 ${color}`} />
+                <span className={`text-[10px] font-semibold ${color}`}>{label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </Card>
+    </Link>
+  )
+}
+
+export function EmpreendimentoCard({ empreendimento, variant = "grid", mobileVariant }: EmpreendimentoCardProps) {
+  if (mobileVariant) {
+    return (
+      <>
+        {/* Mobile: show mobileVariant */}
+        <div className="sm:hidden">
+          {mobileVariant === "list" ? <MobileListCard empreendimento={empreendimento} /> :
+           mobileVariant === "compact" ? <CompactCard empreendimento={empreendimento} /> :
+           <GridCard empreendimento={empreendimento} />}
+        </div>
+        {/* Desktop: show normal variant */}
+        <div className="hidden sm:block">
+          {variant === "compact" ? <CompactCard empreendimento={empreendimento} /> :
+           variant === "list" ? <ListCard empreendimento={empreendimento} /> :
+           <GridCard empreendimento={empreendimento} />}
+        </div>
+      </>
+    )
+  }
+
   if (variant === "compact") return <CompactCard empreendimento={empreendimento} />
   if (variant === "list") return <ListCard empreendimento={empreendimento} />
   return <GridCard empreendimento={empreendimento} />
