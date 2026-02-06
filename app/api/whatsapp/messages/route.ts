@@ -10,6 +10,8 @@ import { tenantQuery, findUserWorkspace } from '@/lib/tenant-context';
 import { getAuthenticatedUser } from '@/lib/api-auth';
 import { markAsRead as markAsReadEvolution } from '@/lib/evolution-api';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
+import { getMongoDb } from '@/lib/mongodb';
+import { resetUnread } from '@/lib/whatsapp-storage/realtime';
 
 /**
  * Contar mensagens não lidas de uma conversa
@@ -66,11 +68,25 @@ export async function GET(request: NextRequest) {
       // Contar não lidas desta conversa
       const unreadCount = countUnreadMessages(messages, phoneNumber);
 
+      // Fetch AI analysis for this conversation from MongoDB
+      let aiAnalysis = null;
+      try {
+        const db = getMongoDb();
+        const conv = await db.collection('conversations').findOne({
+          workspace_id: workspaceId,
+          phone_number: phoneNumber,
+        });
+        aiAnalysis = conv?.ai_analysis || null;
+      } catch {
+        // MongoDB unavailable
+      }
+
       return NextResponse.json({
         success: true,
         data: messages,
         total: messages.length,
         unread_count: unreadCount,
+        ai_analysis: aiAnalysis,
       });
     }
 
@@ -104,26 +120,78 @@ export async function GET(request: NextRequest) {
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       );
 
-    // Buscar informações dos contatos
+    // Enrich with MongoDB contacts (batch fetch — single query)
+    let mongoContactMap = new Map<string, any>();
+    try {
+      const db = getMongoDb();
+      const allPhoneNumbers = conversations.map((m: any) => m.phone_number);
+      const mongoContacts = await db
+        .collection('contacts')
+        .find({ workspace_id: workspaceId, phone_number: { $in: allPhoneNumbers } })
+        .toArray();
+      mongoContactMap = new Map(mongoContacts.map((c) => [c.phone_number, c]));
+    } catch {
+      // MongoDB unavailable — fallback to PostgreSQL contacts only
+    }
+
+    // Also try to get MongoDB conversation data (for AI analysis, labels, etc.)
+    let mongoConvMap = new Map<string, any>();
+    try {
+      const db = getMongoDb();
+      const allPhoneNumbers = conversations.map((m: any) => m.phone_number);
+      const mongoConvs = await db
+        .collection('conversations')
+        .find({ workspace_id: workspaceId, phone_number: { $in: allPhoneNumbers } })
+        .toArray();
+      mongoConvMap = new Map(mongoConvs.map((c) => [c.phone_number, c]));
+    } catch {
+      // MongoDB unavailable
+    }
+
+    // Buscar informações dos contatos (PostgreSQL + MongoDB enrichment)
     const conversationsWithContact = await Promise.all(
       conversations.map(async (msg: any) => {
         const contacts = await query.select('whatsapp_contacts', {
           phone_number: msg.phone_number,
         });
 
-        const contact = contacts[0];
+        const pgContact = contacts[0];
+        const mc = mongoContactMap.get(msg.phone_number);
+        const mongoConv = mongoConvMap.get(msg.phone_number);
+
+        // Priority: push_name (WhatsApp) > contact_name (agenda) > lead name > phone
+        const contactName =
+          mc?.push_name ||
+          mc?.contact_name ||
+          pgContact?.contact_name ||
+          msg.contact_name ||
+          mongoConv?.contact_name ||
+          msg.phone_number;
+
+        const profilePicUrl =
+          mc?.profile_picture_url ||
+          pgContact?.profile_picture_url ||
+          mongoConv?.profile_picture_url ||
+          null;
 
         return {
           phone_number: msg.phone_number,
-          contact_name: contact?.contact_name || msg.contact_name || msg.phone_number,
-          profile_picture_url: contact?.profile_picture_url || null,
+          contact_name: contactName,
+          profile_picture_url: profilePicUrl,
           last_message: msg.message_text,
           last_message_type: msg.message_type,
           last_message_time: msg.timestamp,
           is_from_me: msg.is_from_me,
           unread_count: unreadCountMap.get(msg.phone_number) || 0,
-          lead_id: contact?.lead_id || msg.lead_id,
-          is_lead: !!(contact?.lead_id || msg.lead_id),
+          lead_id: pgContact?.lead_id || msg.lead_id || mongoConv?.matched_lead_id,
+          is_lead: !!(pgContact?.lead_id || msg.lead_id || mongoConv?.matched_lead_id),
+          // AI enrichment from MongoDB
+          labels: mongoConv?.labels || [],
+          archived: mongoConv?.archived || false,
+          pinned: mongoConv?.pinned || false,
+          ai_summary: mongoConv?.ai_analysis?.summary || null,
+          ai_sentiment: mongoConv?.ai_analysis?.sentiment || null,
+          ai_temperature: mongoConv?.ai_analysis?.temperature || null,
         };
       })
     );

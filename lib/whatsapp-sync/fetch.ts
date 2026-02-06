@@ -303,6 +303,52 @@ export async function fetchAllContacts(
   }
 }
 
+/**
+ * Busca TODAS as mensagens de uma conversa com paginação.
+ * Loop até esgotar (batch < limit) ou max 10.000 msgs.
+ */
+export async function fetchAllChatMessages(
+  instanceName: string,
+  remoteJid: string,
+  batchSize: number = 500,
+  maxMessages: number = 10000
+): Promise<any[]> {
+  const allMessages: any[] = [];
+  let offset = 0;
+
+  while (allMessages.length < maxMessages) {
+    try {
+      const batch = await evolutionFetch<any>(
+        `/chat/findMessages/${instanceName}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            where: { key: { remoteJid } },
+            limit: batchSize,
+            offset,
+          }),
+        }
+      );
+
+      const messages = Array.isArray(batch) ? batch : batch?.messages || [];
+      if (messages.length === 0) break;
+
+      allMessages.push(...messages);
+
+      if (messages.length < batchSize) break; // No more pages
+      offset += batchSize;
+
+      // Rate limit protection
+      await sleep(200);
+    } catch (error: any) {
+      console.error(`[WhatsApp Sync] Error fetching messages at offset ${offset}: ${error.message}`);
+      break;
+    }
+  }
+
+  return allMessages;
+}
+
 // =============================================================================
 // SYNC FUNCTIONS
 // =============================================================================

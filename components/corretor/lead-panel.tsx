@@ -27,6 +27,12 @@ import {
   AlertCircle,
   DollarSign,
   Loader2,
+  Brain,
+  Sparkles,
+  Target,
+  TrendingUp,
+  Heart,
+  Lightbulb,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -303,6 +309,8 @@ function LeadPanelEmpty() {
 export function LeadPanel({ phone, userId, contactName, onStageChange, onAction }: LeadPanelProps) {
   const [showStageSelect, setShowStageSelect] = useState(false);
   const [selectedStage, setSelectedStage] = useState<string>('');
+  const [suggestingReply, setSuggestingReply] = useState(false);
+  const [suggestedReplies, setSuggestedReplies] = useState<string[]>([]);
 
   // Fetch lead data using React Query directly
   const { data, isLoading, error, refetch } = useQuery<LeadDataResponse>({
@@ -319,6 +327,41 @@ export function LeadPanel({ phone, userId, contactName, onStageChange, onAction 
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: false,
   });
+
+  // Fetch AI analysis for this conversation
+  const { data: aiData } = useQuery<any>({
+    queryKey: ['ai-analysis', phone],
+    queryFn: async () => {
+      const res = await fetch(`/api/whatsapp/messages?instance=&phone=${encodeURIComponent(phone)}`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.ai_analysis || null;
+    },
+    enabled: !!phone && phone.length >= 8,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+  });
+
+  // Handle suggest reply
+  const handleSuggestReply = async () => {
+    setSuggestingReply(true);
+    setSuggestedReplies([]);
+    try {
+      const res = await fetch('/api/whatsapp/suggest-reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: phone, context_messages: 10 }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setSuggestedReplies(json.suggestions || []);
+      }
+    } catch {
+      toast.error('Erro ao gerar sugestões');
+    } finally {
+      setSuggestingReply(false);
+    }
+  };
 
   // No phone selected - show empty state
   if (!phone) {
@@ -465,6 +508,176 @@ export function LeadPanel({ phone, userId, contactName, onStageChange, onAction 
               </div>
             )}
           </div>
+
+          {/* ========== AI Analysis Section ========== */}
+          {aiData && (
+            <>
+              <Separator className="bg-gray-200 dark:bg-gray-700" />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-purple-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Analise IA
+                  </h4>
+                </div>
+
+                {/* Summary */}
+                {aiData.summary && (
+                  <p className="text-sm text-gray-700 dark:text-gray-300 bg-purple-50 dark:bg-purple-900/20 p-2.5 rounded-lg border border-purple-100 dark:border-purple-800">
+                    {aiData.summary}
+                  </p>
+                )}
+
+                {/* Sentiment & Temperature badges */}
+                <div className="flex flex-wrap gap-1.5">
+                  {aiData.sentiment && (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        'text-[10px] gap-1',
+                        aiData.sentiment === 'positivo' && 'bg-green-50 text-green-700 border-green-200',
+                        aiData.sentiment === 'negativo' && 'bg-red-50 text-red-700 border-red-200',
+                        aiData.sentiment === 'neutro' && 'bg-gray-50 text-gray-700 border-gray-200',
+                        aiData.sentiment === 'irritado' && 'bg-orange-50 text-orange-700 border-orange-200',
+                      )}
+                    >
+                      <Heart className="h-3 w-3" />
+                      {aiData.sentiment}
+                    </Badge>
+                  )}
+                  {aiData.temperature && (
+                    <Badge variant="outline" className="text-[10px] gap-1 bg-amber-50 text-amber-700 border-amber-200">
+                      <TrendingUp className="h-3 w-3" />
+                      {aiData.temperature}
+                    </Badge>
+                  )}
+                  {aiData.intent && (
+                    <Badge variant="outline" className="text-[10px] gap-1 bg-blue-50 text-blue-700 border-blue-200">
+                      <Target className="h-3 w-3" />
+                      {aiData.intent}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Extracted data */}
+                {aiData.extracted && (
+                  <div className="space-y-1.5 text-xs">
+                    {aiData.extracted.budget && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Orcamento</span>
+                        <span className="font-medium">{aiData.extracted.budget}</span>
+                      </div>
+                    )}
+                    {aiData.extracted.bedrooms && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Quartos</span>
+                        <span className="font-medium">{aiData.extracted.bedrooms}</span>
+                      </div>
+                    )}
+                    {aiData.extracted.preferred_region && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Regiao</span>
+                        <span className="font-medium">{aiData.extracted.preferred_region}</span>
+                      </div>
+                    )}
+                    {aiData.extracted.timeline && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Prazo</span>
+                        <span className="font-medium">{aiData.extracted.timeline}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Next action suggestion */}
+                {aiData.next_action && (
+                  <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800">
+                    <Lightbulb className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800 dark:text-amber-300">{aiData.next_action}</p>
+                  </div>
+                )}
+
+                {/* Suggest Reply button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-8 text-xs gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50"
+                  onClick={handleSuggestReply}
+                  disabled={suggestingReply}
+                >
+                  {suggestingReply ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  Sugerir Resposta
+                </Button>
+
+                {/* Suggested replies */}
+                {suggestedReplies.length > 0 && (
+                  <div className="space-y-2">
+                    {suggestedReplies.map((reply, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          navigator.clipboard.writeText(reply);
+                          toast.success('Resposta copiada!');
+                        }}
+                        className="w-full text-left p-2 text-xs rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 transition-colors"
+                      >
+                        {reply}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Suggest Reply button (even without AI data) */}
+          {!aiData && (
+            <>
+              <Separator className="bg-gray-200 dark:bg-gray-700" />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-purple-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Assistente IA
+                  </h4>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-8 text-xs gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50"
+                  onClick={handleSuggestReply}
+                  disabled={suggestingReply}
+                >
+                  {suggestingReply ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  Sugerir Resposta
+                </Button>
+                {suggestedReplies.length > 0 && (
+                  <div className="space-y-2">
+                    {suggestedReplies.map((reply, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          navigator.clipboard.writeText(reply);
+                          toast.success('Resposta copiada!');
+                        }}
+                        className="w-full text-left p-2 text-xs rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 transition-colors"
+                      >
+                        {reply}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           <Separator className="bg-gray-200 dark:bg-gray-700" />
 

@@ -106,11 +106,14 @@ function formatDate(timestamp: string): string {
 }
 
 function getMessagePreview(message: string, type?: string): string {
-  if (type?.includes('image')) return 'Imagem';
-  if (type?.includes('document')) return 'Documento';
-  if (type?.includes('audio') || type?.includes('ptt')) return 'Audio';
-  if (type?.includes('video')) return 'Video';
-  if (type?.includes('sticker')) return 'Figurinha';
+  if (type?.includes('image')) return '📷 Imagem';
+  if (type?.includes('document')) return '📄 Documento';
+  if (type?.includes('audio') || type?.includes('ptt')) return '🎤 Audio';
+  if (type?.includes('video')) return '🎬 Video';
+  if (type?.includes('sticker')) return '✨ Figurinha';
+  if (type?.includes('location')) return '📍 Localizacao';
+  if (type?.includes('contact')) return '👤 Contato';
+  if (type?.includes('poll')) return '📊 Enquete';
   return message?.slice(0, 50) + (message?.length > 50 ? '...' : '') || '';
 }
 
@@ -300,6 +303,14 @@ function ConnectionIndicator({ connected }: { connected: boolean }) {
 // MAIN COMPONENT
 // ============================================================================
 
+interface SearchResult {
+  phone_number: string;
+  contact_name: string;
+  last_message?: string;
+  last_message_time?: string;
+  is_from_me?: boolean;
+}
+
 export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
   // State
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -314,10 +325,13 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
   const [totalUnread, setTotalUnread] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Hooks
   const notifications = useWhatsAppNotifications(instanceName, {
@@ -394,6 +408,40 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
       return () => clearInterval(interval);
     }
   }, [selectedPhone, loadMessages]);
+
+  // Server-side search (debounced 300ms)
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!searchQuery || searchQuery.length < 3) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/whatsapp/search/suggest?q=${encodeURIComponent(searchQuery)}`);
+        const data = await res.json();
+        if (data.success) {
+          setSearchResults(data.data || []);
+        }
+      } catch {
+        // Ignore search errors
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -545,23 +593,65 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
 
         {/* Conversations List */}
         <ScrollArea className="flex-1">
-          {filteredConversations.length === 0 ? (
+          {filteredConversations.length === 0 && searchResults.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
               <p className="font-medium">Nenhuma conversa</p>
               <p className="text-sm mt-1">As mensagens aparecerao aqui</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {filteredConversations.map((conv) => (
-                <ConversationItem
-                  key={conv.phone_number}
-                  conversation={conv}
-                  isSelected={selectedPhone === conv.phone_number}
-                  onClick={() => handleSelectConversation(conv.phone_number)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                {filteredConversations.map((conv) => (
+                  <ConversationItem
+                    key={conv.phone_number}
+                    conversation={conv}
+                    isSelected={selectedPhone === conv.phone_number}
+                    onClick={() => handleSelectConversation(conv.phone_number)}
+                  />
+                ))}
+              </div>
+
+              {/* Server-side search results */}
+              {searchQuery.length >= 3 && (
+                <div>
+                  <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-t border-b border-gray-200 dark:border-gray-700">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                      {searchLoading ? 'Buscando...' : `Resultados da busca (${searchResults.length})`}
+                    </p>
+                  </div>
+                  {searchLoading && (
+                    <div className="p-4 text-center">
+                      <Loader2 className="w-5 h-5 animate-spin mx-auto text-emerald-500" />
+                    </div>
+                  )}
+                  <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {searchResults
+                      .filter(r => !filteredConversations.some(c => c.phone_number === r.phone_number))
+                      .map((result) => (
+                        <button
+                          key={result.phone_number}
+                          onClick={() => handleSelectConversation(result.phone_number)}
+                          className={cn(
+                            'w-full p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left',
+                            selectedPhone === result.phone_number && 'bg-emerald-50 dark:bg-emerald-900/20'
+                          )}
+                        >
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="bg-purple-100 dark:bg-purple-900 text-purple-600 text-xs">
+                              {result.contact_name?.slice(0, 2).toUpperCase() || <Search className="w-4 h-4" />}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-sm truncate">{result.contact_name}</h3>
+                            <p className="text-xs text-gray-500 truncate">{result.last_message}</p>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </ScrollArea>
       </div>

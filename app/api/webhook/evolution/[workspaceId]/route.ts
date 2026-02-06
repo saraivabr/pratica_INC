@@ -25,6 +25,7 @@ import {
 } from '@/lib/sofia';
 import { withProvider } from '@/lib/whatsapp-sender';
 import { dbQuery } from '@/lib/db';
+import { enqueueMessage } from '@/lib/message-queue';
 import {
   getAgentConfig,
   isWithinBusinessHours,
@@ -370,6 +371,40 @@ async function handleNewMessage(workspaceId: number, data: any) {
         timestamp: timestamp.toISOString(),
         raw_data: message,
       });
+    }
+
+    // Async dual-write to MongoDB + Elasticsearch (non-blocking)
+    if (messageId && phoneNumber) {
+      const hasMedia = !!(
+        message.message?.imageMessage ||
+        message.message?.videoMessage ||
+        message.message?.audioMessage ||
+        message.message?.documentMessage ||
+        message.message?.stickerMessage
+      );
+
+      enqueueMessage(workspaceId, 'index_message', {
+        workspace_id: workspaceId,
+        instance_name: data.instance,
+        phone_number: phoneNumber,
+        remote_jid: message.key?.remoteJid || `${phoneNumber}@s.whatsapp.net`,
+        message_id: messageId,
+        message_type: messageType,
+        message_text: messageText,
+        is_from_me: isFromMe,
+        is_group: false,
+        has_media: hasMedia,
+        timestamp: timestamp.toISOString(),
+        contact_name: message.pushName || null,
+        status: isFromMe ? 'sent' : 'received',
+        raw_data: message,
+      }).catch(err => console.error('[Pipeline] Enqueue error:', err.message));
+
+      // Enqueue AI analysis (runs in background, not on every message)
+      enqueueMessage(workspaceId, 'analyze_conversation', {
+        phone_number: phoneNumber,
+        workspace_id: workspaceId,
+      }).catch(err => console.error('[Pipeline] Enqueue analyze error:', err.message));
     }
 
     // Apenas processar leads para mensagens recebidas
