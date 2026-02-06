@@ -233,40 +233,35 @@ export default function AssistentePage() {
             </div>
           ) : (
             /* Messages */
-            <div className="space-y-6 py-4 px-2">
+            <div className="space-y-4 py-4 px-2">
               {mensagens.map((msg, i) => (
-                <div key={i} className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "justify-start")}>
-                  {msg.role === "assistant" && (
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mt-1">
-                      <Sparkles className="h-4 w-4 text-white" />
+                <div key={i}>
+                  {msg.role === "user" ? (
+                    <div className="flex justify-end">
+                      <div className="max-w-[80%] rounded-2xl px-4 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900">
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      </div>
                     </div>
-                  )}
-                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-3",
-                      msg.role === "user"
-                        ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-                    )}
-                  >
-                    {msg.role === "assistant" ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-table:my-2 prose-table:text-sm">
+                  ) : (
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <Sparkles className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0 text-zinc-900 dark:text-zinc-100">
                         {msg.content ? (
-                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                          <div className="chat-markdown">
+                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                          </div>
                         ) : (
-                          <div className="flex items-center gap-2 text-zinc-400">
-                            <div className="flex gap-1">
-                              <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                              <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                              <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "300ms" }} />
-                            </div>
+                          <div className="flex items-center gap-1.5 py-2">
+                            <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                            <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                            <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "300ms" }} />
                           </div>
                         )}
                       </div>
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
