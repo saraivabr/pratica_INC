@@ -22,6 +22,8 @@ import {
   Trophy,
   Send,
   Plus,
+  Mic,
+  Square,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { useAuth, usePageTracking } from "@/lib/auth-context"
