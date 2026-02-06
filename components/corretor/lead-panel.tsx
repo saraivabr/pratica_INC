@@ -303,14 +303,90 @@ function LeadPanelEmpty() {
 }
 
 // ============================================
+// Suggest Reply Section (shared between AI and non-AI views)
+// ============================================
+
+function SuggestReplySection({
+  phone,
+  title,
+  icon: Icon,
+}: {
+  phone: string;
+  title: string;
+  icon: typeof Sparkles;
+}) {
+  const [suggesting, setSuggesting] = useState(false);
+  const [replies, setReplies] = useState<string[]>([]);
+
+  const handleSuggest = async () => {
+    setSuggesting(true);
+    setReplies([]);
+    try {
+      const res = await fetch('/api/whatsapp/suggest-reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: phone, context_messages: 10 }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setReplies(json.suggestions || []);
+      }
+    } catch {
+      toast.error('Erro ao gerar sugestões');
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 text-purple-600" />
+        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+          {title}
+        </h4>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full h-8 text-xs gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50"
+        onClick={handleSuggest}
+        disabled={suggesting}
+      >
+        {suggesting ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Sparkles className="h-3.5 w-3.5" />
+        )}
+        Sugerir Resposta
+      </Button>
+      {replies.length > 0 && (
+        <div className="space-y-2">
+          {replies.map((reply, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                navigator.clipboard.writeText(reply);
+                toast.success('Resposta copiada!');
+              }}
+              className="w-full text-left p-2 text-xs rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 transition-colors"
+            >
+              {reply}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
 // Main Component
 // ============================================
 
 export function LeadPanel({ phone, userId, contactName, onStageChange, onAction }: LeadPanelProps) {
   const [showStageSelect, setShowStageSelect] = useState(false);
   const [selectedStage, setSelectedStage] = useState<string>('');
-  const [suggestingReply, setSuggestingReply] = useState(false);
-  const [suggestedReplies, setSuggestedReplies] = useState<string[]>([]);
 
   // Fetch lead data using React Query directly
   const { data, isLoading, error, refetch } = useQuery<LeadDataResponse>({
@@ -341,27 +417,6 @@ export function LeadPanel({ phone, userId, contactName, onStageChange, onAction 
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
   });
-
-  // Handle suggest reply
-  const handleSuggestReply = async () => {
-    setSuggestingReply(true);
-    setSuggestedReplies([]);
-    try {
-      const res = await fetch('/api/whatsapp/suggest-reply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: phone, context_messages: 10 }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setSuggestedReplies(json.suggestions || []);
-      }
-    } catch {
-      toast.error('Erro ao gerar sugestões');
-    } finally {
-      setSuggestingReply(false);
-    }
-  };
 
   // No phone selected - show empty state
   if (!phone) {
@@ -597,85 +652,16 @@ export function LeadPanel({ phone, userId, contactName, onStageChange, onAction 
                   </div>
                 )}
 
-                {/* Suggest Reply button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-8 text-xs gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50"
-                  onClick={handleSuggestReply}
-                  disabled={suggestingReply}
-                >
-                  {suggestingReply ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3.5 w-3.5" />
-                  )}
-                  Sugerir Resposta
-                </Button>
-
-                {/* Suggested replies */}
-                {suggestedReplies.length > 0 && (
-                  <div className="space-y-2">
-                    {suggestedReplies.map((reply, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          navigator.clipboard.writeText(reply);
-                          toast.success('Resposta copiada!');
-                        }}
-                        className="w-full text-left p-2 text-xs rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 transition-colors"
-                      >
-                        {reply}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <SuggestReplySection phone={phone} title="Sugerir Resposta" icon={Sparkles} />
               </div>
             </>
           )}
 
-          {/* Suggest Reply button (even without AI data) */}
+          {/* Suggest Reply (even without AI data) */}
           {!aiData && (
             <>
               <Separator className="bg-gray-200 dark:bg-gray-700" />
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-purple-600" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Assistente IA
-                  </h4>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-8 text-xs gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50"
-                  onClick={handleSuggestReply}
-                  disabled={suggestingReply}
-                >
-                  {suggestingReply ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3.5 w-3.5" />
-                  )}
-                  Sugerir Resposta
-                </Button>
-                {suggestedReplies.length > 0 && (
-                  <div className="space-y-2">
-                    {suggestedReplies.map((reply, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          navigator.clipboard.writeText(reply);
-                          toast.success('Resposta copiada!');
-                        }}
-                        className="w-full text-left p-2 text-xs rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 transition-colors"
-                      >
-                        {reply}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <SuggestReplySection phone={phone} title="Assistente IA" icon={Sparkles} />
             </>
           )}
 
