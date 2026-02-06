@@ -248,12 +248,33 @@ function SettingItem({
   );
 }
 
+interface Lead {
+  id: number;
+  nome: string;
+  situacao: string | null;
+  data_cadastro: string | null;
+}
+
+interface LeadsStats {
+  totalLeads: number;
+  conversions: number;
+  avgResponseTime: string;
+  daysActive: number;
+}
+
 export default function PerfilPage() {
   const router = useRouter()
   const { user, isAuthenticated, isLoading, logout, login, sessionId } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const [stats, setStats] = useState<LeadsStats>({
+    totalLeads: 0,
+    conversions: 0,
+    avgResponseTime: "-",
+    daysActive: 0
+  })
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
 
   usePageTracking("perfil")
 
@@ -268,6 +289,58 @@ export default function PerfilPage() {
       setEditName(user.nome)
     }
   }, [user?.nome])
+
+  // Fetch real leads data for stats
+  useEffect(() => {
+    const fetchLeadsStats = async () => {
+      if (!isAuthenticated || !user) return;
+
+      setIsLoadingStats(true);
+      try {
+        const response = await fetch('/api/leads?limit=200');
+        if (response.ok) {
+          const result = await response.json();
+          const leads: Lead[] = result.data || [];
+
+          // Calculate stats
+          const totalLeads = leads.length;
+
+          // Count conversions (situacao contains "vend", "convers", or "fechad")
+          const conversions = leads.filter(lead => {
+            const situacao = (lead.situacao || '').toLowerCase();
+            return situacao.includes('vend') ||
+                   situacao.includes('convers') ||
+                   situacao.includes('fechad');
+          }).length;
+
+          // Calculate days active (from first lead date to now)
+          const leadDates = leads
+            .map(l => l.data_cadastro ? new Date(l.data_cadastro) : null)
+            .filter((d): d is Date => d !== null);
+
+          let daysActive = 0;
+          if (leadDates.length > 0) {
+            const oldestDate = new Date(Math.min(...leadDates.map(d => d.getTime())));
+            const now = new Date();
+            daysActive = Math.floor((now.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
+          }
+
+          setStats({
+            totalLeads,
+            conversions,
+            avgResponseTime: "-", // Not calculated from available data
+            daysActive: Math.max(0, daysActive)
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching leads stats:', error);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
+    fetchLeadsStats();
+  }, [isAuthenticated, user])
 
   const handleLogout = async () => {
     await logout()
@@ -457,27 +530,45 @@ export default function PerfilPage() {
                 </div>
               </GlassCard>
 
-              {/* Quick Stats */}
+              {/* Achievements */}
               <GlassCard glowColor="blue" delay={200}>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Award className="h-5 w-5 text-blue-500" />
                   Conquistas
                 </h3>
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20">
-                    <Star className="h-6 w-6 text-amber-500" />
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Nivel Ouro</p>
-                      <p className="text-xs text-gray-500">Top 10% dos corretores</p>
+                  {stats.totalLeads >= 50 && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20">
+                      <Star className="h-6 w-6 text-amber-500" />
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">Top Corretor</p>
+                        <p className="text-xs text-gray-500">Mais de 50 leads cadastrados</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20">
-                    <Zap className="h-6 w-6 text-emerald-500" />
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Super Ativo</p>
-                      <p className="text-xs text-gray-500">30 dias consecutivos</p>
+                  )}
+                  {stats.conversions >= 10 && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20">
+                      <Zap className="h-6 w-6 text-emerald-500" />
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">Fechador</p>
+                        <p className="text-xs text-gray-500">{stats.conversions} conversões realizadas</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  {stats.totalLeads >= 100 && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
+                      <Award className="h-6 w-6 text-purple-500" />
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">Expert</p>
+                        <p className="text-xs text-gray-500">100+ leads na base</p>
+                      </div>
+                    </div>
+                  )}
+                  {stats.totalLeads === 0 && !isLoadingStats && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                      Suas conquistas aparecerão aqui conforme você adiciona leads
+                    </p>
+                  )}
                 </div>
               </GlassCard>
             </div>
@@ -489,30 +580,28 @@ export default function PerfilPage() {
                 <StatCard
                   icon={Target}
                   label="Leads"
-                  value="128"
-                  trend="+12%"
+                  value={isLoadingStats ? "-" : stats.totalLeads}
                   color="emerald"
                   delay={150}
                 />
                 <StatCard
                   icon={TrendingUp}
                   label="Conversoes"
-                  value="34"
-                  trend="+8%"
+                  value={isLoadingStats ? "-" : stats.conversions}
                   color="blue"
                   delay={200}
                 />
                 <StatCard
                   icon={Clock}
                   label="Tempo Medio"
-                  value="4.2h"
+                  value={stats.avgResponseTime}
                   color="purple"
                   delay={250}
                 />
                 <StatCard
                   icon={Calendar}
                   label="Dias Ativos"
-                  value="45"
+                  value={isLoadingStats ? "-" : stats.daysActive}
                   color="orange"
                   delay={300}
                 />
@@ -606,39 +695,15 @@ export default function PerfilPage() {
                   <Activity className="h-5 w-5 text-orange-500" />
                   Atividade Recente
                 </h3>
-                <div className="space-y-1">
-                  <ActivityItem
-                    icon={Target}
-                    title="Novo lead cadastrado"
-                    description="Maria Silva - Apartamento 3 quartos"
-                    time="Agora"
-                    color="emerald"
-                    delay={500}
-                  />
-                  <ActivityItem
-                    icon={MessageSquare}
-                    title="Mensagem enviada"
-                    description="Follow-up com Joao Santos"
-                    time="2h"
-                    color="blue"
-                    delay={550}
-                  />
-                  <ActivityItem
-                    icon={TrendingUp}
-                    title="Conversao registrada"
-                    description="Venda concluida - Casa Praia"
-                    time="1d"
-                    color="purple"
-                    delay={600}
-                  />
-                  <ActivityItem
-                    icon={Calendar}
-                    title="Visita agendada"
-                    description="Apartamento Centro - 15:00"
-                    time="2d"
-                    color="orange"
-                    delay={650}
-                  />
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/20 dark:to-amber-900/20 mb-4">
+                      <Activity className="h-8 w-8 text-orange-400" />
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Suas atividades recentes aparecerão aqui
+                    </p>
+                  </div>
                 </div>
               </GlassCard>
 
