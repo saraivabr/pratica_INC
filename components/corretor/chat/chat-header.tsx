@@ -28,7 +28,7 @@ export function ChatHeader({
     <div className="p-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
       <button
         onClick={onToggleConversations}
-        className="lg:hidden text-gray-600 hover:bg-gray-100 p-2 rounded-lg"
+        className="md:hidden text-gray-600 hover:bg-gray-100 p-2 rounded-lg"
       >
         <Menu className="w-5 h-5" />
       </button>

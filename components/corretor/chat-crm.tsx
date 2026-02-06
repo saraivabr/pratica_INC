@@ -85,7 +85,7 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
   // Handlers
   const handleSelectConversation = (phone: string) => {
     setSelectedPhone(phone);
-    if (window.innerWidth < 1024) {
+    if (window.innerWidth < 768) {
       setShowConversations(false);
     }
   };
@@ -119,8 +119,8 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
       <div
         className={cn(
           'w-80 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col',
-          'fixed lg:relative inset-y-0 left-0 z-30 transition-transform duration-300',
-          showConversations ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          'fixed md:relative inset-y-0 left-0 z-30 transition-transform duration-300',
+          showConversations ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         )}
       >
         {/* Header */}
@@ -144,7 +144,7 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
               </button>
               <button
                 onClick={() => setShowConversations(false)}
-                className="lg:hidden text-white hover:bg-emerald-700 p-2 rounded-lg"
+                className="md:hidden text-white hover:bg-emerald-700 p-2 rounded-lg"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -237,7 +237,7 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
       {/* Mobile backdrop */}
       {showConversations && (
         <div
-          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
           onClick={() => setShowConversations(false)}
         />
       )}
@@ -281,7 +281,7 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
               <p className="text-sm mt-1">Escolha uma conversa ao lado para comecar</p>
               <button
                 onClick={() => setShowConversations(true)}
-                className="lg:hidden mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                className="md:hidden mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
               >
                 Ver conversas
               </button>
