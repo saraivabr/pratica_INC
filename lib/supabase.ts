@@ -40,6 +40,9 @@ export interface User {
   // Hierarquia
   hierarquia_id?: number;
   hierarquia?: UserHierarquia;
+  // WhatsApp / Evolution
+  evolution_instance_name?: string | null;
+  evolution_connected?: boolean;
 }
 
 export interface Session {
@@ -158,6 +161,8 @@ function mapUserRow(row: any): User {
     workspace_id: row.workspace_id,
     hierarquia_id: row.hierarquia_id,
     hierarquia,
+    evolution_instance_name: row.evolution_instance_name || null,
+    evolution_connected: row.evolution_connected || false,
   };
 }
 

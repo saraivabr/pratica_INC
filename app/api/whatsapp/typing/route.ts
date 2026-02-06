@@ -29,13 +29,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Nota: Esta API não requer tenant pois apenas envia comando para Evolution API
-
     const validation = await validateRequest(request, WhatsAppTypingSchema);
     if (!validation.success) {
       return NextResponse.json({ success: false, error: validation.error, details: validation.details }, { status: 400 });
     }
     const { instanceName, phoneNumber, action, duration } = validation.data;
+
+    // Validate instance ownership — user can only send typing to their own instance
+    const userInstance = user.evolution_instance_name;
+    if (!userInstance || userInstance !== instanceName) {
+      return NextResponse.json(
+        { success: false, error: 'Instância não pertence a este usuário' },
+        { status: 403 }
+      );
+    }
 
     if (action === 'start') {
       // Iniciar typing com auto-pause

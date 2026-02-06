@@ -51,6 +51,15 @@ export async function POST(request: NextRequest) {
 
     const { instanceName, phoneNumber, message } = validationResult.data;
 
+    // Validate instance ownership — user can only send from their own instance
+    const userInstance = user.evolution_instance_name;
+    if (!userInstance || userInstance !== instanceName) {
+      return NextResponse.json(
+        { success: false, error: 'Instância não pertence a este usuário' },
+        { status: 403 }
+      );
+    }
+
     // Rate limiting: 20 messages per minute per user
     const rateLimitKey = `whatsapp:send:${user.id}`;
     const rateLimit = await rateLimiter.check(rateLimitKey, RateLimitConfigs.WHATSAPP_SEND);

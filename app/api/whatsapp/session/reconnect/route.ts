@@ -25,6 +25,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate instance ownership
+    const userInstance = (ctx.user as any)?.evolution_instance_name;
+    if (!userInstance || userInstance !== instanceName) {
+      return NextResponse.json(
+        { success: false, error: 'Instância não pertence a este usuário' },
+        { status: 403 }
+      );
+    }
+
     console.log(`[Reconnect] Requesting QR Code for instance: ${instanceName}`);
 
     // Call Evolution API to get QR Code
