@@ -10,8 +10,10 @@ import pool from './db';
 
 export interface Tenant {
   id: number;
+  owner_id: string;
   slug: string;
   name: string;
+  type: 'imobiliaria' | 'construtora' | 'personal' | 'demo';
   cvcrm_config: {
     base_url: string;
     email: string;
@@ -23,18 +25,11 @@ export interface Tenant {
       [key: string]: string | undefined;
     };
   };
-  status: 'active' | 'suspended' | 'cancelled';
+  is_active: boolean;
   plan: string;
-  max_leads?: number;
-  max_users?: number;
-  max_whatsapp_instances?: number;
-  metadata?: Record<string, any>;
   settings?: Record<string, any>;
-  evolution_instances?: Array<{
-    instance_name: string;
-    qr_code?: string;
-    status: string;
-  }>;
+  evolution_instance_name?: string;
+  evolution_connected?: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -44,7 +39,7 @@ export interface Tenant {
  */
 export async function getWorkspace(workspaceId: number): Promise<Tenant | null> {
   const result = await pool.query(
-    'SELECT * FROM tenants WHERE id = $1',
+    'SELECT * FROM workspaces WHERE id = $1',
     [workspaceId]
   );
 
@@ -56,7 +51,7 @@ export async function getWorkspace(workspaceId: number): Promise<Tenant | null> 
  */
 export async function getWorkspaceBySlug(slug: string): Promise<Tenant | null> {
   const result = await pool.query(
-    'SELECT * FROM tenants WHERE slug = $1',
+    'SELECT * FROM workspaces WHERE slug = $1',
     [slug]
   );
 
@@ -64,12 +59,12 @@ export async function getWorkspaceBySlug(slug: string): Promise<Tenant | null> {
 }
 
 /**
- * List all active tenants
+ * List all active workspaces
  */
-export async function listTenants(status = 'active'): Promise<Tenant[]> {
+export async function listTenants(isActive = true): Promise<Tenant[]> {
   const result = await pool.query(
-    'SELECT * FROM tenants WHERE status = $1 ORDER BY name ASC',
-    [status]
+    'SELECT * FROM workspaces WHERE is_active = $1 ORDER BY name ASC',
+    [isActive]
   );
 
   return result.rows;
@@ -79,22 +74,22 @@ export async function listTenants(status = 'active'): Promise<Tenant[]> {
  * Create a new tenant
  */
 export async function createTenant(data: {
+  owner_id: string;
   slug: string;
   name: string;
   cvcrm_config: Tenant['cvcrm_config'];
   plan?: string;
-  metadata?: Record<string, any>;
 }): Promise<Tenant> {
   const result = await pool.query(
-    `INSERT INTO tenants (slug, name, cvcrm_config, plan, metadata)
+    `INSERT INTO workspaces (owner_id, slug, name, cvcrm_config, plan)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
     [
+      data.owner_id,
       data.slug,
       data.name,
       JSON.stringify(data.cvcrm_config),
-      data.plan || 'free',
-      JSON.stringify(data.metadata || {})
+      data.plan || 'free'
     ]
   );
 
@@ -106,7 +101,7 @@ export async function createTenant(data: {
  */
 export async function updateWorkspace(
   workspaceId: number,
-  data: Partial<Omit<Tenant, 'id' | 'created_at' | 'updated_at'>>
+  data: Partial<Omit<Tenant, 'id' | 'created_at' | 'updated_at'>> & Record<string, any>
 ): Promise<Tenant> {
   const updates: string[] = [];
   const values: any[] = [];
@@ -122,9 +117,9 @@ export async function updateWorkspace(
     values.push(JSON.stringify(data.cvcrm_config));
   }
 
-  if (data.status !== undefined) {
-    updates.push(`status = $${paramCount++}`);
-    values.push(data.status);
+  if (data.is_active !== undefined) {
+    updates.push(`is_active = $${paramCount++}`);
+    values.push(data.is_active);
   }
 
   if (data.plan !== undefined) {
@@ -132,29 +127,32 @@ export async function updateWorkspace(
     values.push(data.plan);
   }
 
-  if (data.metadata !== undefined) {
-    updates.push(`metadata = $${paramCount++}`);
-    values.push(JSON.stringify(data.metadata));
-  }
-
   if (data.settings !== undefined) {
     updates.push(`settings = $${paramCount++}`);
     values.push(JSON.stringify(data.settings));
   }
 
-  if (data.evolution_instances !== undefined) {
-    updates.push(`evolution_instances = $${paramCount++}`);
-    values.push(JSON.stringify(data.evolution_instances));
+  if (data.evolution_instance_name !== undefined) {
+    updates.push(`evolution_instance_name = $${paramCount++}`);
+    values.push(data.evolution_instance_name);
+  }
+
+  if (data.evolution_connected !== undefined) {
+    updates.push(`evolution_connected = $${paramCount++}`);
+    values.push(data.evolution_connected);
   }
 
   if (updates.length === 0) {
-    throw new Error('No fields to update');
+    // No recognized fields - return current workspace
+    const current = await getWorkspace(workspaceId);
+    if (!current) throw new Error(`Workspace ${workspaceId} not found`);
+    return current;
   }
 
   values.push(workspaceId);
 
   const result = await pool.query(
-    `UPDATE tenants SET ${updates.join(', ')}, updated_at = NOW()
+    `UPDATE workspaces SET ${updates.join(', ')}, updated_at = NOW()
      WHERE id = $${paramCount}
      RETURNING *`,
     values

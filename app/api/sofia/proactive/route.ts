@@ -544,7 +544,7 @@ async function runProactiveCheck(
       const tenant = await getWorkspace(workspaceId);
       tenants = tenant ? [tenant] : [];
     } else {
-      tenants = await listTenants("active");
+      tenants = await listTenants(true);
     }
 
     console.log(`[Sofia Proactive] Processando ${tenants.length} tenants`);

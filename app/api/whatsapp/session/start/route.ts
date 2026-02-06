@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       try {
         // 1. Criar tenant primeiro
         tenant = await createTenant({
+          owner_id: userId,
           slug: `user-${userId}-${Date.now()}`,
           name: userName,
           cvcrm_config: {

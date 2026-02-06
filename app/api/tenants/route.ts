@@ -28,9 +28,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status') || 'active';
+    const isActive = searchParams.get('status') !== 'inactive';
 
-    const tenants = await listTenants(status as any);
+    const tenants = await listTenants(isActive);
 
     return NextResponse.json({
       success: true,
@@ -70,11 +70,11 @@ export async function POST(request: NextRequest) {
     }
 
     const tenant = await createTenant({
+      owner_id: user.id,
       slug: body.slug,
       name: body.name,
       cvcrm_config: body.cvcrm_config,
       plan: body.plan || 'free',
-      metadata: body.metadata || {}
     });
 
     return NextResponse.json({
