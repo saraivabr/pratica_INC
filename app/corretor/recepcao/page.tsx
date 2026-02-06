@@ -5,21 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation"
 import {
   AlertCircle,
   CheckCircle,
-  Clock,
   Loader2,
   LogOut,
   MapPin,
-  Navigation,
-  PauseCircle,
   PlayCircle,
   Coffee,
   UserCheck,
   ScanLine,
   ClipboardList,
   HelpCircle,
-  Star,
-  ArrowRight,
-  X,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
@@ -32,13 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 import {
@@ -48,6 +35,7 @@ import {
   DualQueueCard,
   OfertaQuickForm,
   CelebrationModal,
+  OnboardingTour,
 } from "@/components/recepcao"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -117,8 +105,7 @@ export default function CorretorRecepcaoPage() {
   const [leadsDisponiveis, setLeadsDisponiveis] = useState<{ total: number; sem_corretor: number; abandonados: number } | null>(null)
 
   // Onboarding tour
-  const [tourOpen, setTourOpen] = useState(false)
-  const [tourStep, setTourStep] = useState(0)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   // Modais
   const [ofertaFormOpen, setOfertaFormOpen] = useState(false)
@@ -271,6 +258,15 @@ export default function CorretorRecepcaoPage() {
     }
   }, [minhaPresenca, fetchQualificacao, fetchGamificacao, fetchLeadsDisponiveis])
 
+  // Auto-open onboarding on first access
+  useEffect(() => {
+    if (isAuthenticated && !authLoading && !loading) {
+      if (!localStorage.getItem("corretor_parceria_onboarding_v1")) {
+        setShowOnboarding(true)
+      }
+    }
+  }, [isAuthenticated, authLoading, loading])
+
   // Auto check-in via QR Code
   useEffect(() => {
     if (qrToken && isAuthenticated && !loading) {
@@ -298,11 +294,6 @@ export default function CorretorRecepcaoPage() {
       if (result.success) {
         toast.success("Show! Voce esta na fila.")
         await fetchMinhaPresenca()
-        // Show tour on first check-in
-        if (!localStorage.getItem("recepcao_tour_v1")) {
-          setTourStep(0)
-          setTourOpen(true)
-        }
       } else {
         toast.error(result.error || "Erro ao fazer check-in")
       }
@@ -567,7 +558,7 @@ export default function CorretorRecepcaoPage() {
         {/* Header com saudacao */}
         <div className="text-center relative">
           <button
-            onClick={() => { setTourStep(0); setTourOpen(true) }}
+            onClick={() => setShowOnboarding(true)}
             className="absolute right-0 top-0 p-1 rounded-full text-muted-foreground hover:text-primary transition-colors"
             title="Como funciona?"
           >
@@ -894,92 +885,13 @@ export default function CorretorRecepcaoPage() {
       />
 
       {/* Onboarding Tour */}
-      <Dialog open={tourOpen} onOpenChange={setTourOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-center">
-              {tourStep === 0 && "Como funciona a Roleta"}
-              {tourStep === 1 && "Puxe leads e anote tudo"}
-              {tourStep === 2 && "De feedback e ganhe estrelas"}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="py-4 text-center space-y-3">
-            {tourStep === 0 && (
-              <>
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-                  <MapPin className="h-8 w-8 text-primary" />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Faca check-in via GPS, QR Code ou manual para entrar na fila do plantao.
-                  Voce sera notificado quando for sua vez!
-                </p>
-              </>
-            )}
-            {tourStep === 1 && (
-              <>
-                <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto">
-                  <ClipboardList className="h-8 w-8 text-blue-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Puxe o proximo lead disponivel, entre em contato via WhatsApp ou telefone,
-                  e anote cada interacao. Agende follow-ups para nao perder ninguem!
-                </p>
-              </>
-            )}
-            {tourStep === 2 && (
-              <>
-                <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto">
-                  <Star className="h-8 w-8 text-amber-600" />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Apos cada atendimento, de feedback. Quanto mais rapido, mais estrelas voce ganha!
-                  Acumule estrelas e troque por premios.
-                </p>
-              </>
-            )}
-
-            {/* Step dots */}
-            <div className="flex justify-center gap-2 pt-2">
-              {[0, 1, 2].map((s) => (
-                <div
-                  key={s}
-                  className={cn(
-                    "h-2 w-2 rounded-full transition-colors",
-                    s === tourStep ? "bg-primary" : "bg-muted"
-                  )}
-                />
-              ))}
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            {tourStep > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setTourStep(tourStep - 1)}>
-                Voltar
-              </Button>
-            )}
-            {tourStep < 2 ? (
-              <Button size="sm" onClick={() => setTourStep(tourStep + 1)} className="gap-1">
-                Proximo
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={() => {
-                  localStorage.setItem("recepcao_tour_v1", "true")
-                  setTourOpen(false)
-                }}
-                className="gap-1"
-              >
-                Bora!
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <OnboardingTour
+        open={showOnboarding}
+        onComplete={() => {
+          localStorage.setItem("corretor_parceria_onboarding_v1", "true")
+          setShowOnboarding(false)
+        }}
+      />
     </AppShell>
   )
 }

@@ -19,3 +19,5 @@ export { OfertaQuickForm } from "./OfertaQuickForm"
 export { DualQueueCard } from "./DualQueueCard"
 
 export { CelebrationModal } from "./CelebrationModal"
+
+export { OnboardingTour } from "./OnboardingTour"
