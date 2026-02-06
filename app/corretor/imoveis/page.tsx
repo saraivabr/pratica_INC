@@ -18,8 +18,6 @@ import {
   DollarSign,
   Bed,
   CheckCircle,
-  Heart,
-  Star,
   Filter
 } from "lucide-react"
 import { AnimatedBackground } from "@/components/animated-background"
@@ -28,7 +26,6 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Slider } from "@/components/ui/slider"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatCurrency } from "@/lib/data"
 import { cn } from "@/lib/utils"
 
@@ -45,7 +42,6 @@ export default function CorretorImoveisPage() {
   const [quartos, setQuartos] = useState("todos")
   const [statusUnidade, setStatusUnidade] = useState("todos")
   const [ordenacao, setOrdenacao] = useState("relevancia")
-  const [activeTab, setActiveTab] = useState("catalogo")
   const [isFilterOpen, setIsFilterOpen] = useState(false)
 
   usePageTracking("corretor-imoveis")
@@ -185,23 +181,8 @@ export default function CorretorImoveisPage() {
           </div>
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full max-w-md mx-auto grid-cols-3 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-1 rounded-xl">
-              <TabsTrigger value="catalogo" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-500 data-[state=active]:text-white rounded-lg">
-                <Building2 className="h-4 w-4" />
-                Catálogo
-              </TabsTrigger>
-              <TabsTrigger value="favoritos" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-500 data-[state=active]:text-white rounded-lg">
-                <Heart className="h-4 w-4" />
-                Favoritos
-              </TabsTrigger>
-              <TabsTrigger value="clientes" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-500 data-[state=active]:text-white rounded-lg">
-                <Star className="h-4 w-4" />
-                Clientes
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="catalogo" className="mt-6 space-y-6">
+          <div className="w-full">
+            <div className="mt-6 space-y-6">
               {/* Search and Filters */}
               <div className="space-y-4">
                 <div className="relative">
@@ -470,32 +451,8 @@ export default function CorretorImoveisPage() {
                   </button>
                 </div>
               )}
-            </TabsContent>
-
-            <TabsContent value="favoritos" className="mt-6">
-              <div className="text-center py-16">
-                <Heart className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-gray-700 dark:text-gray-300 mb-2">
-                  Nenhum favorito ainda
-                </h3>
-                <p className="text-gray-500 dark:text-gray-400">
-                  Marque imóveis como favoritos para acessá-los rapidamente
-                </p>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="clientes" className="mt-6">
-              <div className="text-center py-16">
-                <Star className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-gray-700 dark:text-gray-300 mb-2">
-                  Imóveis dos Clientes
-                </h3>
-                <p className="text-gray-500 dark:text-gray-400">
-                  Veja os imóveis de interesse dos seus clientes
-                </p>
-              </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+          </div>
         </div>
       </div>
     </AppShell>

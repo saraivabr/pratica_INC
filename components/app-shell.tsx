@@ -40,7 +40,6 @@ import {
   PartyPopper,
   Gauge,
   PanelLeft,
-  FileText,
   Activity,
   Layers,
   Contact,
@@ -87,7 +86,6 @@ const corretorSecondaryItems = [
   { href: "/corretor/disparador", icon: Send, label: "Disparador", description: "Envios em massa" },
   { href: "/corretor/chat", icon: MessageSquare, label: "Conversas", description: "Chat com leads" },
   { href: "/corretor/agenda", icon: Calendar, label: "Agenda", description: "Visitas e compromissos" },
-  { href: "/corretor/propostas", icon: FileText, label: "Propostas", description: "Propostas enviadas" },
   { href: "/corretor/configuracoes", icon: Settings, label: "Configurações", description: "Perfil e preferências" },
 ]
 
@@ -205,7 +203,6 @@ const adminQuickActions = [
 const corretorQuickActions = [
   { href: "/calculadora", icon: Calculator, label: "Nova Simulação", description: "Simular financiamento" },
   { href: "/corretor/clientes", icon: UserPlus, label: "Novo Lead", description: "Cadastrar novo cliente" },
-  { href: "/corretor/propostas", icon: FileText, label: "Nova Proposta", description: "Criar proposta comercial" },
 ]
 
 // ────────────────────────────────────────────────────────

@@ -225,41 +225,6 @@ export const PipelineMoveSchema = z.object({
 
 export type PipelineMoveRequest = z.infer<typeof PipelineMoveSchema>;
 
-/** POST /api/crm/campaigns */
-export const CampaignCreateSchema = z.object({
-  name: z.string().min(1, 'Nome é obrigatório').max(200),
-  message_template: z.string().min(1).max(2000),
-  segmentation_config: z.record(z.unknown()).optional(),
-  scheduled_at: z.string().datetime().optional().nullable(),
-});
-
-export type CampaignCreateRequest = z.infer<typeof CampaignCreateSchema>;
-
-/** POST /api/crm/automations */
-export const AutomationCreateSchema = z.object({
-  name: z.string().min(1).max(200),
-  trigger_type: z.string().min(1),
-  trigger_config: z.record(z.unknown()).optional(),
-  action_type: z.string().min(1),
-  action_config: z.record(z.unknown()).optional(),
-  is_active: z.boolean().optional(),
-});
-
-export type AutomationCreateRequest = z.infer<typeof AutomationCreateSchema>;
-
-/** PUT /api/crm/automations/:id */
-export const AutomationUpdateSchema = z.object({
-  id: z.union([z.number().int().positive(), z.string().min(1)]),
-  name: z.string().min(1).max(200).optional(),
-  trigger_type: z.string().optional(),
-  trigger_config: z.record(z.unknown()).optional(),
-  action_type: z.string().optional(),
-  action_config: z.record(z.unknown()).optional(),
-  is_active: z.boolean().optional(),
-});
-
-export type AutomationUpdateRequest = z.infer<typeof AutomationUpdateSchema>;
-
 // ==========================================
 // Lead Schemas
 // ==========================================
