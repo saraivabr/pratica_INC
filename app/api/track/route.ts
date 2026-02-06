@@ -14,10 +14,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false }, { status: 400 });
     }
 
+    // Look up workspace_id from user
+    const { rows } = await dbQuery(
+      `SELECT workspace_id FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+    const workspaceId = rows[0]?.workspace_id;
+    if (!workspaceId) {
+      // Skip tracking if user has no workspace — don't error
+      return NextResponse.json({ success: true });
+    }
+
     await dbQuery(
-      `insert into tracking_events (user_id, event_type, page, data)
-       values ($1, $2, $3, $4)`,
-      [userId, eventType, page, data || {}]
+      `INSERT INTO tracking_events (user_id, event_type, page, data, workspace_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, eventType, page, data || {}, workspaceId]
     );
 
     return NextResponse.json({ success: true });

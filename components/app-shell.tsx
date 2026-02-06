@@ -120,7 +120,7 @@ const adminGroups = {
       { href: "/admin/equipe", icon: Users, label: "Equipe", description: "Corretores e ranking" },
       { href: "/admin/eventos", icon: PartyPopper, label: "Eventos", description: "Criar e gerenciar eventos" },
       { href: "/admin/recepcao", icon: ClipboardCheck, label: "Plantão", description: "Controle de plantão e fila" },
-      { href: "/admin/comissao", icon: Calculator, label: "Comissão", description: "Cálculo de comissões" },
+      { href: "/admin/comissao/lista", icon: Calculator, label: "Comissão", description: "Cálculo de comissões" },
       { href: "/admin/agenda", icon: Calendar, label: "Agenda", description: "Visitas da equipe" },
     ],
   },

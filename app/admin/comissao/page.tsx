@@ -47,6 +47,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import Link from "next/link"
 import { AppShell } from "@/components/app-shell"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -1360,6 +1361,12 @@ export default function ComissaoCalculadoraPage() {
         {/* Top bar */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            <Link href="/admin/comissao/lista">
+              <Button variant="ghost" size="sm">
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Vendas</span>
+              </Button>
+            </Link>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
