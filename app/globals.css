@@ -516,3 +516,15 @@
 .dark .chat-markdown hr {
   border-top-color: oklch(0.25 0.005 0);
 }
+
+/* Chat Cards — hover effect */
+.chat-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.chat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
+}
+.dark .chat-card:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.25);
+}

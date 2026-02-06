@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import ReactMarkdown from "react-markdown"
+import { SmartTable } from "@/components/chat-cards"
 
 interface Conversa {
   id: number
@@ -372,7 +373,7 @@ export default function AssistentePage() {
                       <div className="flex-1 min-w-0 text-zinc-900 dark:text-zinc-100">
                         {msg.content ? (
                           <div className="chat-markdown">
-                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            <ReactMarkdown components={{ table: SmartTable }}>{msg.content}</ReactMarkdown>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5 py-2">
