@@ -72,15 +72,15 @@ import {
 // This list is the compact secondary nav below the cards
 // ────────────────────────────────────────────────────────
 const corretorListItems = [
-  { href: "/corretor/imoveis", icon: Building2, label: "Empreendimentos", description: "Catálogo de imóveis" },
-  { href: "/corretor/espelho", icon: Grid3X3, label: "Espelho", description: "Disponibilidade de unidades" },
-  { href: "/corretor/tabela", icon: Table, label: "Tabela", description: "Tabela de preços" },
+  { href: "/corretor/imoveis", icon: Building2, label: "Catálogo", description: "Imóveis e lançamentos" },
+  { href: "/corretor/espelho", icon: Grid3X3, label: "Mapa de Vendas", description: "Disponibilidade de unidades" },
+  { href: "/corretor/tabela", icon: Table, label: "Preços", description: "Tabela de preços" },
   { href: "/corretor/propostas", icon: FileText, label: "Propostas", description: "Propostas comerciais" },
-  { href: "/corretor/assistente", icon: Sparkles, label: "Assistente IA", highlight: true, description: "Tire dúvidas com a IA" },
-  { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads", description: "Follow-up automático" },
-  { href: "/corretor/disparador", icon: Send, label: "Disparador", description: "Envios em massa" },
-  { href: "/corretor/agenda", icon: Calendar, label: "Agenda", description: "Visitas e compromissos" },
-  { href: "/corretor/configuracoes", icon: Settings, label: "Configurações", description: "Perfil e preferências" },
+  { href: "/corretor/assistente", icon: Sparkles, label: "Sofia", highlight: true, description: "Sua assistente inteligente" },
+  { href: "/corretor/salva-leads", icon: Bot, label: "Meu Assistente", description: "Follow-up automático de leads" },
+  { href: "/corretor/disparador", icon: Send, label: "Disparos", description: "Mensagens em massa" },
+  { href: "/corretor/agenda", icon: Calendar, label: "Minha Agenda", description: "Visitas e compromissos" },
+  { href: "/corretor/configuracoes", icon: Settings, label: "Ajustes", description: "Perfil e preferências" },
 ]
 
 // ────────────────────────────────────────────────────────
@@ -109,8 +109,8 @@ const adminGroups = {
     icon: Sparkles,
     defaultOpen: true,
     items: [
-      { href: "/corretor/assistente", icon: Sparkles, label: "Assistente IA", highlight: true, description: "Pergunte à IA" },
-      { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads", description: "Recuperação automática" },
+      { href: "/corretor/assistente", icon: Sparkles, label: "Sofia", highlight: true, description: "Sua assistente inteligente" },
+      { href: "/corretor/salva-leads", icon: Bot, label: "Meu Assistente", description: "Follow-up automático de leads" },
       { href: "/admin/score", icon: ShieldCheck, label: "Consulta Score", description: "Análise de crédito" },
     ],
   },
@@ -121,7 +121,7 @@ const adminGroups = {
     items: [
       { href: "/admin/equipe", icon: Users, label: "Equipe", description: "Corretores e ranking" },
       { href: "/admin/eventos", icon: PartyPopper, label: "Eventos", description: "Criar e gerenciar eventos" },
-      { href: "/admin/recepcao", icon: ClipboardCheck, label: "Roleta", description: "Controle de plantão e fila" },
+      { href: "/admin/recepcao", icon: ClipboardCheck, label: "Plantão", description: "Controle de plantão e fila" },
       { href: "/admin/comissao", icon: Calculator, label: "Comissão", description: "Cálculo de comissões" },
       { href: "/admin/agenda", icon: Calendar, label: "Agenda", description: "Visitas da equipe" },
     ],
@@ -154,11 +154,11 @@ const adminItems = Object.values(adminGroups).flatMap(g => g.items)
 
 // Mobile bottom nav for corretor (5 main items - core priority)
 const corretorMobileNavItems = [
-  { href: "/corretor", icon: Gauge, label: "Painel" },
-  { href: "/corretor/imoveis", icon: Building2, label: "Imóveis" },
-  { href: "/corretor/espelho", icon: Grid3X3, label: "Espelho" },
-  { href: "/corretor/clientes", icon: Contact, label: "Leads" },
-  { href: "/corretor/assistente", icon: Sparkles, label: "IA", highlight: true },
+  { href: "/corretor", icon: Gauge, label: "Início" },
+  { href: "/corretor/imoveis", icon: Building2, label: "Catálogo" },
+  { href: "/corretor/espelho", icon: Grid3X3, label: "Vendas" },
+  { href: "/corretor/clientes", icon: Contact, label: "Clientes" },
+  { href: "/corretor/assistente", icon: Sparkles, label: "Sofia", highlight: true },
 ]
 
 // Mobile bottom nav for admin (5 main items)
@@ -193,7 +193,7 @@ const adminQuickActions = [
 
 const corretorQuickActions = [
   { href: "/calculadora", icon: Calculator, label: "Nova Simulação", description: "Simular financiamento" },
-  { href: "/corretor/clientes", icon: UserPlus, label: "Novo Lead", description: "Cadastrar novo cliente" },
+  { href: "/corretor/clientes", icon: UserPlus, label: "Novo Cliente", description: "Cadastrar novo cliente" },
 ]
 
 // ────────────────────────────────────────────────────────

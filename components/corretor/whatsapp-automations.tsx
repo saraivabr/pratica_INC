@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import {
@@ -15,8 +16,20 @@ import {
   Users,
   MailCheck,
   Zap,
+  Unplug,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { useConversations } from "@/hooks/use-chat"
 
 interface WhatsAppAutomationsProps {
@@ -25,6 +38,7 @@ interface WhatsAppAutomationsProps {
   pairedPhone?: string | null
   profileName?: string | null
   onReconnect?: () => void
+  onDisconnect?: () => void
   onSwitchToChat?: () => void
 }
 
@@ -72,8 +86,24 @@ export function WhatsAppAutomations({
   pairedPhone,
   profileName,
   onReconnect,
+  onDisconnect,
   onSwitchToChat,
 }: WhatsAppAutomationsProps) {
+  const [disconnecting, setDisconnecting] = useState(false)
+
+  const handleDisconnect = async () => {
+    setDisconnecting(true)
+    try {
+      const res = await fetch("/api/whatsapp/session/logout", { method: "POST" })
+      if (res.ok) {
+        onDisconnect?.()
+      }
+    } catch {
+      // Keep current state on error
+    } finally {
+      setDisconnecting(false)
+    }
+  }
   // Salva-Leads stats
   const { data: slStats, isLoading: slLoading } = useQuery<{
     conversations: { active: number; completed: number; with_potential: number }
@@ -113,12 +143,43 @@ export function WhatsAppAutomations({
             </p>
           </div>
         </div>
-        {onReconnect && (
-          <Button variant="outline" size="sm" onClick={onReconnect} className="gap-1.5">
-            <RefreshCcw className="h-3.5 w-3.5" />
-            Reconectar
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {onReconnect && (
+            <Button variant="outline" size="sm" onClick={onReconnect} className="gap-1.5">
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Reconectar
+            </Button>
+          )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20 dark:hover:border-red-700">
+                <Unplug className="h-3.5 w-3.5" />
+                Desconectar
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Desconectar WhatsApp?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Suas conversas e automações serão pausadas. Você precisará reconectar escaneando o QR Code novamente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {disconnecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                  ) : null}
+                  Sim, desconectar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       {/* Salva-Leads Metrics */}

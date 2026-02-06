@@ -81,6 +81,14 @@ export default function CorretorWhatsAppPage() {
     if (user?.id) setUserId(user.id)
   }, [user?.id])
 
+  // Disconnect handler
+  const handleDisconnect = () => {
+    setWhatsappStatus("disconnected")
+    setInstanceName(null)
+    setPairedPhone(null)
+    setProfileName(null)
+  }
+
   // Re-check handler (for onConnected / onReconnect)
   const recheckStatus = async () => {
     try {
@@ -150,6 +158,7 @@ export default function CorretorWhatsAppPage() {
               pairedPhone={pairedPhone}
               profileName={profileName}
               onReconnect={recheckStatus}
+              onDisconnect={handleDisconnect}
               onSwitchToChat={() => setActiveTab("conversas")}
             />
           )}

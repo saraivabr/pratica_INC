@@ -76,7 +76,7 @@ export function RoletaCard({ status, collapsed, isActive }: RoletaCardProps) {
           </Link>
         </TooltipTrigger>
         <TooltipContent side="right" sideOffset={8} className="text-xs font-medium">
-          {state === 'my-turn' ? 'SUA VEZ na Roleta!' : state === 'in-queue' ? `Roleta - Posição #${position}` : 'Roleta - Fora da fila'}
+          {state === 'my-turn' ? 'SUA VEZ no Plantão!' : state === 'in-queue' ? `Plantão - Posição #${position}` : 'Plantão - Fora da fila'}
         </TooltipContent>
       </Tooltip>
     )
@@ -119,7 +119,7 @@ export function RoletaCard({ status, collapsed, isActive }: RoletaCardProps) {
             state === 'in-queue' && 'text-emerald-800 dark:text-emerald-200',
             state === 'out' && 'text-zinc-500 dark:text-zinc-400',
           )}>
-            {state === 'my-turn' ? 'SUA VEZ!' : state === 'in-queue' ? 'Roleta' : 'Roleta'}
+            {state === 'my-turn' ? 'SUA VEZ!' : state === 'in-queue' ? 'Plantão' : 'Plantão'}
           </p>
           <p className={cn(
             'text-[11px] leading-tight mt-0.5',
@@ -131,7 +131,7 @@ export function RoletaCard({ status, collapsed, isActive }: RoletaCardProps) {
               ? 'Clique para atender'
               : state === 'in-queue'
                 ? `Posição #${position} na fila`
-                : 'Entrar na fila'
+                : 'Entrar no plantão'
             }
           </p>
         </div>
@@ -309,7 +309,7 @@ export function LeadsCard({ total, newToday, collapsed, isActive }: LeadsCardPro
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[12px] font-medium text-zinc-700 dark:text-zinc-300">
-          Leads
+          Clientes
         </p>
         <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
           {total} ativo{total !== 1 ? 's' : ''}
@@ -394,7 +394,7 @@ export function PainelCard({ overallProgress, currentRevenue, collapsed, isActiv
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="text-[12px] font-medium text-zinc-700 dark:text-zinc-300">
-              Painel
+              Meu Dia
             </p>
             <span className={cn('text-[11px] font-bold', progressColor)}>
               {overallProgress}%
