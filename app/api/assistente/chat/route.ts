@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { dbQuery } from '@/lib/db';
 import { requireWorkspaceContext, hasError } from '@/lib/api-helpers';
 import { applyRateLimit } from '@/lib/rate-limit-helper';
+import { withTenant } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -113,336 +114,338 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 
 async function executeTool(name: string, args: any, workspaceId: number): Promise<string> {
   try {
-    switch (name) {
-      case 'consultar_leads': {
-        if (args.apenas_contagem) {
-          const { rows } = await dbQuery(
-            `SELECT situacao_nome, COUNT(*) as total FROM cvcrm_leads
-             WHERE workspace_id = $1 AND situacao_nome IS NOT NULL
-             GROUP BY situacao_nome ORDER BY total DESC`,
-            [workspaceId]
-          );
-          return JSON.stringify({ tipo: 'contagem_leads', dados: rows });
-        }
+    return await withTenant(workspaceId, async (client) => {
+      switch (name) {
+        case 'consultar_leads': {
+          if (args.apenas_contagem) {
+            const { rows } = await client.query(
+              `SELECT situacao_nome, COUNT(*) as total FROM cvcrm_leads
+               WHERE workspace_id = $1 AND situacao_nome IS NOT NULL
+               GROUP BY situacao_nome ORDER BY total DESC`,
+              [workspaceId]
+            );
+            return JSON.stringify({ tipo: 'contagem_leads', dados: rows });
+          }
 
-        const conditions = ['workspace_id = $1'];
-        const params: any[] = [workspaceId];
-        let idx = 2;
+          const conditions = ['workspace_id = $1'];
+          const params: any[] = [workspaceId];
+          let idx = 2;
 
-        if (args.situacao) {
-          conditions.push(`situacao_nome ILIKE $${idx}`);
-          params.push(`%${args.situacao}%`);
-          idx++;
-        }
-        if (args.nome) {
-          conditions.push(`nome ILIKE $${idx}`);
-          params.push(`%${args.nome}%`);
-          idx++;
-        }
-        if (args.empreendimento) {
-          conditions.push(`(empreendimentos::text ILIKE $${idx} OR empreendimentos_id::text ILIKE $${idx})`);
-          params.push(`%${args.empreendimento}%`);
-          idx++;
-        }
-        if (args.corretor_nome) {
-          conditions.push(`corretor_nome ILIKE $${idx}`);
-          params.push(`%${args.corretor_nome}%`);
-          idx++;
-        }
+          if (args.situacao) {
+            conditions.push(`situacao_nome ILIKE $${idx}`);
+            params.push(`%${args.situacao}%`);
+            idx++;
+          }
+          if (args.nome) {
+            conditions.push(`nome ILIKE $${idx}`);
+            params.push(`%${args.nome}%`);
+            idx++;
+          }
+          if (args.empreendimento) {
+            conditions.push(`(empreendimentos::text ILIKE $${idx} OR empreendimentos_id::text ILIKE $${idx})`);
+            params.push(`%${args.empreendimento}%`);
+            idx++;
+          }
+          if (args.corretor_nome) {
+            conditions.push(`corretor_nome ILIKE $${idx}`);
+            params.push(`%${args.corretor_nome}%`);
+            idx++;
+          }
 
-        const limit = Math.min(args.limite || 20, 50);
-        const { rows } = await dbQuery(
-          `SELECT nome, email, telefone, celular, situacao_nome, corretor_nome,
-                  empreendimentos, score, origem, cidade, estado,
-                  data_cadastro_cvcrm, valor_negocio, possibilidade_venda
-           FROM cvcrm_leads
-           WHERE ${conditions.join(' AND ')}
-           ORDER BY data_cadastro_cvcrm DESC NULLS LAST
-           LIMIT ${limit}`,
-          params
-        );
-
-        const total = await dbQuery(
-          `SELECT COUNT(*) as total FROM cvcrm_leads WHERE ${conditions.join(' AND ')}`,
-          params
-        );
-
-        return JSON.stringify({
-          tipo: 'leads',
-          total: total.rows[0]?.total,
-          mostrando: rows.length,
-          dados: rows.map((r: any) => ({
-            nome: r.nome,
-            telefone: r.telefone || r.celular,
-            email: r.email,
-            situacao: r.situacao_nome,
-            corretor: r.corretor_nome,
-            empreendimentos: r.empreendimentos,
-            score: r.score,
-            origem: r.origem,
-            cidade: r.cidade,
-            estado: r.estado,
-            valor_negocio: r.valor_negocio,
-            data_cadastro: r.data_cadastro_cvcrm,
-          })),
-        });
-      }
-
-      case 'consultar_empreendimentos': {
-        const conditions: string[] = [];
-        const params: any[] = [];
-        let idx = 1;
-
-        if (args.nome) {
-          conditions.push(`e.nome ILIKE $${idx}`);
-          params.push(`%${args.nome}%`);
-          idx++;
-        }
-        if (args.cidade) {
-          conditions.push(`e.cidade ILIKE $${idx}`);
-          params.push(`%${args.cidade}%`);
-          idx++;
-        }
-        if (args.status) {
-          conditions.push(`e.status ILIKE $${idx}`);
-          params.push(`%${args.status}%`);
-          idx++;
-        }
-
-        const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-        // Get empreendimentos with unit summary
-        const { rows } = await dbQuery(
-          `SELECT e.nome, e.descricao, e.tipo, e.status, e.cidade, e.uf, e.total_unidades,
-                  e.endereco_completo, e.data_lancamento, e.data_entrega_prevista,
-                  COALESCE(us.disponiveis, 0) as unidades_disponiveis,
-                  COALESCE(us.total, 0) as unidades_cadastradas,
-                  us.tipos_unidade,
-                  us.area_min, us.area_max
-           FROM cvcrm_empreendimentos e
-           LEFT JOIN (
-             SELECT empreendimento_nome,
-               COUNT(*) as total,
-               COUNT(CASE WHEN situacao = 'Disponível' THEN 1 END) as disponiveis,
-               STRING_AGG(DISTINCT CASE WHEN cvcrm_data->>'tipo' NOT LIKE 'VAGA%' AND cvcrm_data->>'tipo' NOT LIKE 'Vaga%' THEN cvcrm_data->>'tipo' END, ', ') as tipos_unidade,
-               MIN(CASE WHEN area_privativa > 10 AND cvcrm_data->>'tipo' NOT LIKE 'VAGA%' THEN area_privativa END) as area_min,
-               MAX(CASE WHEN cvcrm_data->>'tipo' NOT LIKE 'VAGA%' THEN area_privativa END) as area_max,
-               MIN(CASE WHEN valor_venda > 0 AND cvcrm_data->>'tipo' NOT LIKE 'VAGA%' THEN valor_venda END) as valor_min,
-               MAX(CASE WHEN valor_venda > 0 AND cvcrm_data->>'tipo' NOT LIKE 'VAGA%' THEN valor_venda END) as valor_max,
-               MIN(CASE WHEN dormitorios > 0 THEN dormitorios END) as dorm_min,
-               MAX(dormitorios) as dorm_max
-             FROM cvcrm_unidades
-             GROUP BY empreendimento_nome
-           ) us ON UPPER(us.empreendimento_nome) LIKE UPPER(e.nome) || '%'
-           ${where}
-           ${args.apenas_disponiveis ? 'AND COALESCE(us.disponiveis, 0) > 0' : ''}
-           ORDER BY e.nome LIMIT 30`,
-          params
-        );
-
-        return JSON.stringify({
-          tipo: 'empreendimentos',
-          total: rows.length,
-          dados: rows.map((r: any) => ({
-            nome: r.nome,
-            descricao: r.descricao || null,
-            status: r.status,
-            cidade: r.cidade,
-            uf: r.uf,
-            endereco: r.endereco_completo || null,
-            total_unidades: r.total_unidades || r.unidades_cadastradas,
-            unidades_disponiveis: r.unidades_disponiveis,
-            tipos_unidade: r.tipos_unidade || null,
-            metragem: r.area_min && r.area_max ? `${r.area_min}m² a ${r.area_max}m²` : null,
-            faixa_preco: r.valor_min && r.valor_max ? `R$ ${Number(r.valor_min).toLocaleString('pt-BR')} a R$ ${Number(r.valor_max).toLocaleString('pt-BR')}` : null,
-            dormitorios: r.dorm_min && r.dorm_max ? (r.dorm_min === r.dorm_max ? `${r.dorm_min}` : `${r.dorm_min} a ${r.dorm_max}`) : null,
-            lancamento: r.data_lancamento || null,
-            entrega_prevista: r.data_entrega_prevista || null,
-          })),
-        });
-      }
-
-      case 'consultar_unidades': {
-        const conditions: string[] = [];
-        const params: any[] = [];
-        let idx = 1;
-
-        if (args.empreendimento) {
-          conditions.push(`empreendimento_nome ILIKE $${idx}`);
-          params.push(`%${args.empreendimento}%`);
-          idx++;
-        }
-        if (args.situacao) {
-          conditions.push(`situacao ILIKE $${idx}`);
-          params.push(`%${args.situacao}%`);
-          idx++;
-        }
-        if (args.tipo) {
-          conditions.push(`(cvcrm_data->>'tipo' ILIKE $${idx} OR tipo ILIKE $${idx})`);
-          params.push(`%${args.tipo}%`);
-          idx++;
-        }
-        if (args.area_min) {
-          conditions.push(`area_privativa >= $${idx}`);
-          params.push(args.area_min);
-          idx++;
-        }
-        if (args.area_max) {
-          conditions.push(`area_privativa <= $${idx}`);
-          params.push(args.area_max);
-          idx++;
-        }
-        if (args.dormitorios) {
-          conditions.push(`dormitorios = $${idx}`);
-          params.push(args.dormitorios);
-          idx++;
-        }
-        if (args.valor_max) {
-          conditions.push(`valor_venda > 0 AND valor_venda <= $${idx}`);
-          params.push(args.valor_max);
-          idx++;
-        }
-
-        // Exclude parking spots from results unless explicitly searching for them
-        if (!args.tipo || !args.tipo.toLowerCase().includes('vaga')) {
-          conditions.push(`cvcrm_data->>'tipo' NOT LIKE 'VAGA%'`);
-          conditions.push(`cvcrm_data->>'tipo' NOT LIKE 'Vaga%'`);
-        }
-
-        const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-        // Summary mode: group by type and situação
-        if (args.resumo) {
-          const { rows } = await dbQuery(
-            `SELECT empreendimento_nome,
-                    cvcrm_data->>'tipo' as tipo_unidade,
-                    situacao,
-                    COUNT(*) as quantidade,
-                    MIN(area_privativa) as area_min,
-                    MAX(area_privativa) as area_max,
-                    MIN(NULLIF(valor_venda, 0)) as valor_min,
-                    MAX(NULLIF(valor_venda, 0)) as valor_max
-             FROM cvcrm_unidades ${where}
-             GROUP BY empreendimento_nome, cvcrm_data->>'tipo', situacao
-             ORDER BY empreendimento_nome, quantidade DESC`,
+          const limit = Math.min(args.limite || 20, 50);
+          const { rows } = await client.query(
+            `SELECT nome, email, telefone, celular, situacao_nome, corretor_nome,
+                    empreendimentos, score, origem, cidade, estado,
+                    data_cadastro_cvcrm, valor_negocio, possibilidade_venda
+             FROM cvcrm_leads
+             WHERE ${conditions.join(' AND ')}
+             ORDER BY data_cadastro_cvcrm DESC NULLS LAST
+             LIMIT ${limit}`,
             params
           );
-          return JSON.stringify({ tipo: 'resumo_unidades', dados: rows });
+
+          const total = await client.query(
+            `SELECT COUNT(*) as total FROM cvcrm_leads WHERE ${conditions.join(' AND ')}`,
+            params
+          );
+
+          return JSON.stringify({
+            tipo: 'leads',
+            total: total.rows[0]?.total,
+            mostrando: rows.length,
+            dados: rows.map((r: any) => ({
+              nome: r.nome,
+              telefone: r.telefone || r.celular,
+              email: r.email,
+              situacao: r.situacao_nome,
+              corretor: r.corretor_nome,
+              empreendimentos: r.empreendimentos,
+              score: r.score,
+              origem: r.origem,
+              cidade: r.cidade,
+              estado: r.estado,
+              valor_negocio: r.valor_negocio,
+              data_cadastro: r.data_cadastro_cvcrm,
+            })),
+          });
         }
 
-        // Detail mode
-        const limit = Math.min(args.limite || 20, 50);
-        const { rows } = await dbQuery(
-          `SELECT nome, cvcrm_data->>'tipo' as tipo_unidade, empreendimento_nome, bloco, andar,
-                  area_privativa, dormitorios, vagas, situacao,
-                  NULLIF(valor_venda, 0) as valor_venda,
-                  cvcrm_data->>'tipologia' as tipologia
-           FROM cvcrm_unidades ${where}
-           ORDER BY empreendimento_nome, andar, nome LIMIT ${limit}`,
-          params
-        );
+        case 'consultar_empreendimentos': {
+          const conditions: string[] = [];
+          const params: any[] = [];
+          let idx = 1;
 
-        const total = await dbQuery(
-          `SELECT COUNT(*) as total FROM cvcrm_unidades ${where}`,
-          params
-        );
+          if (args.nome) {
+            conditions.push(`e.nome ILIKE $${idx}`);
+            params.push(`%${args.nome}%`);
+            idx++;
+          }
+          if (args.cidade) {
+            conditions.push(`e.cidade ILIKE $${idx}`);
+            params.push(`%${args.cidade}%`);
+            idx++;
+          }
+          if (args.status) {
+            conditions.push(`e.status ILIKE $${idx}`);
+            params.push(`%${args.status}%`);
+            idx++;
+          }
 
-        return JSON.stringify({
-          tipo: 'unidades',
-          total: total.rows[0]?.total,
-          mostrando: rows.length,
-          dados: rows.map((r: any) => ({
-            unidade: r.nome,
-            tipo: r.tipo_unidade || r.tipologia,
-            empreendimento: r.empreendimento_nome,
-            bloco: r.bloco,
-            andar: r.andar,
-            area_privativa_m2: r.area_privativa,
-            dormitorios: r.dormitorios,
-            vagas: r.vagas,
-            situacao: r.situacao,
-            valor: r.valor_venda || 'Consultar tabela',
-          })),
-        });
+          const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+          // Get empreendimentos with unit summary
+          const { rows } = await client.query(
+            `SELECT e.nome, e.descricao, e.tipo, e.status, e.cidade, e.uf, e.total_unidades,
+                    e.endereco_completo, e.data_lancamento, e.data_entrega_prevista,
+                    COALESCE(us.disponiveis, 0) as unidades_disponiveis,
+                    COALESCE(us.total, 0) as unidades_cadastradas,
+                    us.tipos_unidade,
+                    us.area_min, us.area_max
+             FROM cvcrm_empreendimentos e
+             LEFT JOIN (
+               SELECT empreendimento_nome,
+                 COUNT(*) as total,
+                 COUNT(CASE WHEN situacao = 'Disponível' THEN 1 END) as disponiveis,
+                 STRING_AGG(DISTINCT CASE WHEN cvcrm_data->>'tipo' NOT LIKE 'VAGA%' AND cvcrm_data->>'tipo' NOT LIKE 'Vaga%' THEN cvcrm_data->>'tipo' END, ', ') as tipos_unidade,
+                 MIN(CASE WHEN area_privativa > 10 AND cvcrm_data->>'tipo' NOT LIKE 'VAGA%' THEN area_privativa END) as area_min,
+                 MAX(CASE WHEN cvcrm_data->>'tipo' NOT LIKE 'VAGA%' THEN area_privativa END) as area_max,
+                 MIN(CASE WHEN valor_venda > 0 AND cvcrm_data->>'tipo' NOT LIKE 'VAGA%' THEN valor_venda END) as valor_min,
+                 MAX(CASE WHEN valor_venda > 0 AND cvcrm_data->>'tipo' NOT LIKE 'VAGA%' THEN valor_venda END) as valor_max,
+                 MIN(CASE WHEN dormitorios > 0 THEN dormitorios END) as dorm_min,
+                 MAX(dormitorios) as dorm_max
+               FROM cvcrm_unidades
+               GROUP BY empreendimento_nome
+             ) us ON UPPER(us.empreendimento_nome) LIKE UPPER(e.nome) || '%'
+             ${where}
+             ${args.apenas_disponiveis ? 'AND COALESCE(us.disponiveis, 0) > 0' : ''}
+             ORDER BY e.nome LIMIT 30`,
+            params
+          );
+
+          return JSON.stringify({
+            tipo: 'empreendimentos',
+            total: rows.length,
+            dados: rows.map((r: any) => ({
+              nome: r.nome,
+              descricao: r.descricao || null,
+              status: r.status,
+              cidade: r.cidade,
+              uf: r.uf,
+              endereco: r.endereco_completo || null,
+              total_unidades: r.total_unidades || r.unidades_cadastradas,
+              unidades_disponiveis: r.unidades_disponiveis,
+              tipos_unidade: r.tipos_unidade || null,
+              metragem: r.area_min && r.area_max ? `${r.area_min}m² a ${r.area_max}m²` : null,
+              faixa_preco: r.valor_min && r.valor_max ? `R$ ${Number(r.valor_min).toLocaleString('pt-BR')} a R$ ${Number(r.valor_max).toLocaleString('pt-BR')}` : null,
+              dormitorios: r.dorm_min && r.dorm_max ? (r.dorm_min === r.dorm_max ? `${r.dorm_min}` : `${r.dorm_min} a ${r.dorm_max}`) : null,
+              lancamento: r.data_lancamento || null,
+              entrega_prevista: r.data_entrega_prevista || null,
+            })),
+          });
+        }
+
+        case 'consultar_unidades': {
+          const conditions: string[] = [];
+          const params: any[] = [];
+          let idx = 1;
+
+          if (args.empreendimento) {
+            conditions.push(`empreendimento_nome ILIKE $${idx}`);
+            params.push(`%${args.empreendimento}%`);
+            idx++;
+          }
+          if (args.situacao) {
+            conditions.push(`situacao ILIKE $${idx}`);
+            params.push(`%${args.situacao}%`);
+            idx++;
+          }
+          if (args.tipo) {
+            conditions.push(`(cvcrm_data->>'tipo' ILIKE $${idx} OR tipo ILIKE $${idx})`);
+            params.push(`%${args.tipo}%`);
+            idx++;
+          }
+          if (args.area_min) {
+            conditions.push(`area_privativa >= $${idx}`);
+            params.push(args.area_min);
+            idx++;
+          }
+          if (args.area_max) {
+            conditions.push(`area_privativa <= $${idx}`);
+            params.push(args.area_max);
+            idx++;
+          }
+          if (args.dormitorios) {
+            conditions.push(`dormitorios = $${idx}`);
+            params.push(args.dormitorios);
+            idx++;
+          }
+          if (args.valor_max) {
+            conditions.push(`valor_venda > 0 AND valor_venda <= $${idx}`);
+            params.push(args.valor_max);
+            idx++;
+          }
+
+          // Exclude parking spots from results unless explicitly searching for them
+          if (!args.tipo || !args.tipo.toLowerCase().includes('vaga')) {
+            conditions.push(`cvcrm_data->>'tipo' NOT LIKE 'VAGA%'`);
+            conditions.push(`cvcrm_data->>'tipo' NOT LIKE 'Vaga%'`);
+          }
+
+          const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+          // Summary mode: group by type and situação
+          if (args.resumo) {
+            const { rows } = await client.query(
+              `SELECT empreendimento_nome,
+                      cvcrm_data->>'tipo' as tipo_unidade,
+                      situacao,
+                      COUNT(*) as quantidade,
+                      MIN(area_privativa) as area_min,
+                      MAX(area_privativa) as area_max,
+                      MIN(NULLIF(valor_venda, 0)) as valor_min,
+                      MAX(NULLIF(valor_venda, 0)) as valor_max
+               FROM cvcrm_unidades ${where}
+               GROUP BY empreendimento_nome, cvcrm_data->>'tipo', situacao
+               ORDER BY empreendimento_nome, quantidade DESC`,
+              params
+            );
+            return JSON.stringify({ tipo: 'resumo_unidades', dados: rows });
+          }
+
+          // Detail mode
+          const limit = Math.min(args.limite || 20, 50);
+          const { rows } = await client.query(
+            `SELECT nome, cvcrm_data->>'tipo' as tipo_unidade, empreendimento_nome, bloco, andar,
+                    area_privativa, dormitorios, vagas, situacao,
+                    NULLIF(valor_venda, 0) as valor_venda,
+                    cvcrm_data->>'tipologia' as tipologia
+             FROM cvcrm_unidades ${where}
+             ORDER BY empreendimento_nome, andar, nome LIMIT ${limit}`,
+            params
+          );
+
+          const total = await client.query(
+            `SELECT COUNT(*) as total FROM cvcrm_unidades ${where}`,
+            params
+          );
+
+          return JSON.stringify({
+            tipo: 'unidades',
+            total: total.rows[0]?.total,
+            mostrando: rows.length,
+            dados: rows.map((r: any) => ({
+              unidade: r.nome,
+              tipo: r.tipo_unidade || r.tipologia,
+              empreendimento: r.empreendimento_nome,
+              bloco: r.bloco,
+              andar: r.andar,
+              area_privativa_m2: r.area_privativa,
+              dormitorios: r.dormitorios,
+              vagas: r.vagas,
+              situacao: r.situacao,
+              valor: r.valor_venda || 'Consultar tabela',
+            })),
+          });
+        }
+
+        case 'consultar_reservas': {
+          const conditions: string[] = [];
+          const params: any[] = [];
+          let idx = 1;
+
+          if (args.status) {
+            conditions.push(`status ILIKE $${idx}`);
+            params.push(`%${args.status}%`);
+            idx++;
+          }
+          if (args.empreendimento) {
+            conditions.push(`empreendimento_nome ILIKE $${idx}`);
+            params.push(`%${args.empreendimento}%`);
+            idx++;
+          }
+          if (args.corretor_nome) {
+            conditions.push(`corretor_nome ILIKE $${idx}`);
+            params.push(`%${args.corretor_nome}%`);
+            idx++;
+          }
+          if (args.cliente) {
+            conditions.push(`cliente_principal_nome ILIKE $${idx}`);
+            params.push(`%${args.cliente}%`);
+            idx++;
+          }
+
+          const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+          const limit = Math.min(args.limite || 20, 50);
+          const { rows } = await client.query(
+            `SELECT numero_reserva, status, valor_reserva, valor_venda, data_reserva, data_venda,
+                    empreendimento_nome, unidade_nome, cliente_principal_nome, corretor_nome, imobiliaria_nome
+             FROM cvcrm_reservas ${where}
+             ORDER BY data_reserva DESC NULLS LAST LIMIT ${limit}`,
+            params
+          );
+
+          return JSON.stringify({ tipo: 'reservas', total: rows.length, dados: rows });
+        }
+
+        case 'estatisticas_gerais': {
+          const [leads, empreendimentos, reservas, leadsSituacao, unidadesDisp] = await Promise.all([
+            client.query(`SELECT COUNT(*) as total FROM cvcrm_leads WHERE workspace_id = $1`, [workspaceId]),
+            client.query(`SELECT COUNT(*) as total, COUNT(CASE WHEN status = 'ativo' THEN 1 END) as ativos FROM cvcrm_empreendimentos`),
+            client.query(`SELECT COUNT(*) as total, COUNT(CASE WHEN status ILIKE '%ativ%' OR data_venda IS NOT NULL THEN 1 END) as vendas FROM cvcrm_reservas`),
+            client.query(
+              `SELECT situacao_nome, COUNT(*) as total FROM cvcrm_leads
+               WHERE workspace_id = $1 AND situacao_nome IS NOT NULL
+               GROUP BY situacao_nome ORDER BY total DESC`,
+              [workspaceId]
+            ),
+            client.query(
+              `SELECT empreendimento_nome,
+                      COUNT(CASE WHEN situacao = 'Disponível' THEN 1 END) as disponiveis,
+                      COUNT(CASE WHEN situacao = 'Vendida' THEN 1 END) as vendidas,
+                      COUNT(*) as total
+               FROM cvcrm_unidades
+               WHERE cvcrm_data->>'tipo' NOT LIKE 'VAGA%' AND cvcrm_data->>'tipo' NOT LIKE 'Vaga%'
+               GROUP BY empreendimento_nome
+               ORDER BY disponiveis DESC`
+            ),
+          ]);
+
+          return JSON.stringify({
+            tipo: 'estatisticas',
+            total_leads: leads.rows[0]?.total,
+            total_empreendimentos: empreendimentos.rows[0]?.total,
+            empreendimentos_ativos: empreendimentos.rows[0]?.ativos,
+            total_reservas: reservas.rows[0]?.total,
+            vendas_realizadas: reservas.rows[0]?.vendas,
+            leads_por_situacao: leadsSituacao.rows,
+            unidades_por_empreendimento: unidadesDisp.rows,
+          });
+        }
+
+        default:
+          return JSON.stringify({ error: 'Ferramenta não encontrada' });
       }
-
-      case 'consultar_reservas': {
-        const conditions: string[] = [];
-        const params: any[] = [];
-        let idx = 1;
-
-        if (args.status) {
-          conditions.push(`status ILIKE $${idx}`);
-          params.push(`%${args.status}%`);
-          idx++;
-        }
-        if (args.empreendimento) {
-          conditions.push(`empreendimento_nome ILIKE $${idx}`);
-          params.push(`%${args.empreendimento}%`);
-          idx++;
-        }
-        if (args.corretor_nome) {
-          conditions.push(`corretor_nome ILIKE $${idx}`);
-          params.push(`%${args.corretor_nome}%`);
-          idx++;
-        }
-        if (args.cliente) {
-          conditions.push(`cliente_principal_nome ILIKE $${idx}`);
-          params.push(`%${args.cliente}%`);
-          idx++;
-        }
-
-        const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-        const limit = Math.min(args.limite || 20, 50);
-        const { rows } = await dbQuery(
-          `SELECT numero_reserva, status, valor_reserva, valor_venda, data_reserva, data_venda,
-                  empreendimento_nome, unidade_nome, cliente_principal_nome, corretor_nome, imobiliaria_nome
-           FROM cvcrm_reservas ${where}
-           ORDER BY data_reserva DESC NULLS LAST LIMIT ${limit}`,
-          params
-        );
-
-        return JSON.stringify({ tipo: 'reservas', total: rows.length, dados: rows });
-      }
-
-      case 'estatisticas_gerais': {
-        const [leads, empreendimentos, reservas, leadsSituacao, unidadesDisp] = await Promise.all([
-          dbQuery(`SELECT COUNT(*) as total FROM cvcrm_leads WHERE workspace_id = $1`, [workspaceId]),
-          dbQuery(`SELECT COUNT(*) as total, COUNT(CASE WHEN status = 'ativo' THEN 1 END) as ativos FROM cvcrm_empreendimentos`),
-          dbQuery(`SELECT COUNT(*) as total, COUNT(CASE WHEN status ILIKE '%ativ%' OR data_venda IS NOT NULL THEN 1 END) as vendas FROM cvcrm_reservas`),
-          dbQuery(
-            `SELECT situacao_nome, COUNT(*) as total FROM cvcrm_leads
-             WHERE workspace_id = $1 AND situacao_nome IS NOT NULL
-             GROUP BY situacao_nome ORDER BY total DESC`,
-            [workspaceId]
-          ),
-          dbQuery(
-            `SELECT empreendimento_nome,
-                    COUNT(CASE WHEN situacao = 'Disponível' THEN 1 END) as disponiveis,
-                    COUNT(CASE WHEN situacao = 'Vendida' THEN 1 END) as vendidas,
-                    COUNT(*) as total
-             FROM cvcrm_unidades
-             WHERE cvcrm_data->>'tipo' NOT LIKE 'VAGA%' AND cvcrm_data->>'tipo' NOT LIKE 'Vaga%'
-             GROUP BY empreendimento_nome
-             ORDER BY disponiveis DESC`
-          ),
-        ]);
-
-        return JSON.stringify({
-          tipo: 'estatisticas',
-          total_leads: leads.rows[0]?.total,
-          total_empreendimentos: empreendimentos.rows[0]?.total,
-          empreendimentos_ativos: empreendimentos.rows[0]?.ativos,
-          total_reservas: reservas.rows[0]?.total,
-          vendas_realizadas: reservas.rows[0]?.vendas,
-          leads_por_situacao: leadsSituacao.rows,
-          unidades_por_empreendimento: unidadesDisp.rows,
-        });
-      }
-
-      default:
-        return JSON.stringify({ error: 'Ferramenta não encontrada' });
-    }
+    });
   } catch (err: any) {
     console.error(`[Assistente] Tool ${name} error:`, err);
     return JSON.stringify({ error: `Erro ao consultar: ${err.message}` });
@@ -538,23 +541,25 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const conversaId = searchParams.get('conversaId');
 
-  if (conversaId) {
-    // Load messages for a specific conversation
-    const { rows: msgs } = await dbQuery(
-      `SELECT id, role, content, created_at FROM assistente_mensagens
-       WHERE conversa_id = $1 ORDER BY created_at ASC`,
-      [conversaId]
-    );
-    return NextResponse.json({ mensagens: msgs });
-  }
+  return await withTenant(ctx.workspaceId, async (client) => {
+    if (conversaId) {
+      // Load messages for a specific conversation
+      const { rows: msgs } = await client.query(
+        `SELECT id, role, content, created_at FROM assistente_mensagens
+         WHERE conversa_id = $1 ORDER BY created_at ASC`,
+        [conversaId]
+      );
+      return NextResponse.json({ mensagens: msgs });
+    }
 
-  // List conversations
-  const { rows: conversas } = await dbQuery(
-    `SELECT id, titulo, updated_at FROM assistente_conversas
-     WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 50`,
-    [ctx.user.id]
-  );
-  return NextResponse.json({ conversas });
+    // List conversations
+    const { rows: conversas } = await client.query(
+      `SELECT id, titulo, updated_at FROM assistente_conversas
+       WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 50`,
+      [ctx.user.id]
+    );
+    return NextResponse.json({ conversas });
+  });
 }
 
 // ============================================================================
@@ -579,56 +584,65 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Mensagem muito longa (máx 5000 caracteres)' }, { status: 400 });
     }
 
-    let activeConversaId = conversaId;
+    // Pre-stream DB operations with tenant context
+    const { activeConversaId, history } = await withTenant(ctx.workspaceId, async (client) => {
+      let activeId = conversaId;
 
-    // Create conversation if not provided
-    if (!activeConversaId) {
-      const titulo = message.slice(0, 80) + (message.length > 80 ? '...' : '');
-      const { rows } = await dbQuery(
-        `INSERT INTO assistente_conversas (user_id, titulo) VALUES ($1, $2) RETURNING id`,
-        [ctx.user.id, titulo]
-      );
-      activeConversaId = rows[0].id;
-    } else {
-      const { rows } = await dbQuery(
-        `SELECT id FROM assistente_conversas WHERE id = $1 AND user_id = $2`,
-        [activeConversaId, ctx.user.id]
-      );
-      if (rows.length === 0) {
-        return NextResponse.json({ error: 'Conversa não encontrada' }, { status: 404 });
+      // Create conversation if not provided
+      if (!activeId) {
+        const titulo = message.slice(0, 80) + (message.length > 80 ? '...' : '');
+        const { rows } = await client.query(
+          `INSERT INTO assistente_conversas (user_id, titulo) VALUES ($1, $2) RETURNING id`,
+          [ctx.user.id, titulo]
+        );
+        activeId = rows[0].id;
+      } else {
+        const { rows } = await client.query(
+          `SELECT id FROM assistente_conversas WHERE id = $1 AND user_id = $2`,
+          [activeId, ctx.user.id]
+        );
+        if (rows.length === 0) {
+          throw Object.assign(new Error('Conversa não encontrada'), { statusCode: 404 });
+        }
       }
-    }
 
-    // Save user message
-    await dbQuery(
-      `INSERT INTO assistente_mensagens (conversa_id, role, content) VALUES ($1, 'user', $2)`,
-      [activeConversaId, message.trim()]
-    );
+      // Save user message
+      await client.query(
+        `INSERT INTO assistente_mensagens (conversa_id, role, content) VALUES ($1, 'user', $2)`,
+        [activeId, message.trim()]
+      );
 
-    // Load conversation history
-    const { rows: history } = await dbQuery(
-      `SELECT role, content FROM assistente_mensagens
-       WHERE conversa_id = $1 ORDER BY created_at ASC LIMIT 20`,
-      [activeConversaId]
-    );
+      // Load conversation history
+      const { rows: historyRows } = await client.query(
+        `SELECT role, content FROM assistente_mensagens
+         WHERE conversa_id = $1 ORDER BY created_at ASC LIMIT 20`,
+        [activeId]
+      );
+
+      return { activeConversaId: activeId, history: historyRows };
+    });
 
     const corretorNome = ctx.user.nome || 'Corretor';
     const personalizedSystem = `${SYSTEM_PROMPT}\n\nVocê está conversando com ${corretorNome}. O workspace_id deste corretor é ${ctx.workspaceId}.`;
 
     const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: personalizedSystem },
-      ...history.map((m) => ({
-        role: (m as any).role as 'user' | 'assistant',
-        content: (m as any).content as string,
+      ...history.map((m: any) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content as string,
       })),
     ];
 
     const openai = getOpenAI();
 
     // Single streaming call with tool handling
+    // Note: streamWithTools uses dbQuery for fire-and-forget writes after stream completes
     return streamWithTools(openai, openaiMessages, activeConversaId, ctx.workspaceId);
 
   } catch (error: any) {
+    if (error.statusCode === 404) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     console.error('[Assistente] Error:', error);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }

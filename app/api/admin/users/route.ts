@@ -4,6 +4,7 @@ import { normalizePhone } from "@/lib/supabase";
 import { getAuthenticatedUser } from "@/lib/api-auth";
 import { requireWorkspaceContext } from "@/lib/api-helpers";
 import { validateRequest, AdminUserCreateSchema } from "@/lib/validation-schemas";
+import { withTenant } from "@/lib/tenant-context";
 
 // GET - List all users
 export async function GET(request: NextRequest) {
@@ -18,26 +19,28 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const imobiliariaId = searchParams.get("imobiliaria_id");
 
-    let query = `
-      SELECT u.*, i.nome as imobiliaria_nome,
-        g.nome as gerente_nome
-      FROM users u
-      LEFT JOIN imobiliarias i ON i.id = u.imobiliaria_id
-      LEFT JOIN users g ON g.id = u.gerente_id
-      WHERE u.workspace_id = $1
-    `;
-    const params: any[] = [ctx.workspaceId];
+    return await withTenant(ctx.workspaceId, async (client) => {
+      let query = `
+        SELECT u.*, i.nome as imobiliaria_nome,
+          g.nome as gerente_nome
+        FROM users u
+        LEFT JOIN imobiliarias i ON i.id = u.imobiliaria_id
+        LEFT JOIN users g ON g.id = u.gerente_id
+        WHERE u.workspace_id = $1
+      `;
+      const params: any[] = [ctx.workspaceId];
 
-    if (imobiliariaId) {
-      query += ` AND u.imobiliaria_id = $2`;
-      params.push(imobiliariaId);
-    }
+      if (imobiliariaId) {
+        query += ` AND u.imobiliaria_id = $2`;
+        params.push(imobiliariaId);
+      }
 
-    query += ` ORDER BY u.nome ASC`;
+      query += ` ORDER BY u.nome ASC`;
 
-    const { rows } = await dbQuery(query, params);
+      const { rows } = await client.query(query, params);
 
-    return NextResponse.json({ users: rows });
+      return NextResponse.json({ users: rows });
+    });
   } catch (error) {
     console.error("Error fetching users:", error);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

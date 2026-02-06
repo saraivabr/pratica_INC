@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { sendTextMessage, formatPhoneNumber, isInstanceConnected } from '@/lib/evolution-api';
-import { tenantQuery } from '@/lib/tenant-context';
+import { tenantQuery, withTenant } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutos max
@@ -124,129 +124,131 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Buscar leads pendentes
-    const leadsResult = await pool.query(
-      `SELECT * FROM disparo_leads WHERE disparo_id = $1 AND status = 'pendente' ORDER BY created_at ASC LIMIT $2`,
-      [disparoId, BATCH_SIZE]
-    );
+    return await withTenant(workspace_id, async (client) => {
+      // Buscar leads pendentes
+      const leadsResult = await client.query(
+        `SELECT * FROM disparo_leads WHERE disparo_id = $1 AND status = 'pendente' ORDER BY created_at ASC LIMIT $2`,
+        [disparoId, BATCH_SIZE]
+      );
 
-    const leads = leadsResult.rows;
-    let sent = 0;
-    let failed = 0;
-    const errors: any[] = [];
+      const leads = leadsResult.rows;
+      let sent = 0;
+      let failed = 0;
+      const errors: any[] = [];
 
-    for (let i = 0; i < leads.length; i++) {
-      const lead = leads[i];
+      for (let i = 0; i < leads.length; i++) {
+        const lead = leads[i];
 
-      // Re-check if disparo was cancelled
-      if (i > 0 && i % 5 === 0) {
-        const checkResult = await pool.query(
-          `SELECT status FROM disparos WHERE id = $1`,
-          [disparoId]
-        );
-        if (checkResult.rows[0]?.status !== 'enviando') {
-          console.log(`[Dispatch Disparos] Disparo ${disparoId} cancelado durante envio`);
-          break;
+        // Re-check if disparo was cancelled
+        if (i > 0 && i % 5 === 0) {
+          const checkResult = await client.query(
+            `SELECT status FROM disparos WHERE id = $1`,
+            [disparoId]
+          );
+          if (checkResult.rows[0]?.status !== 'enviando') {
+            console.log(`[Dispatch Disparos] Disparo ${disparoId} cancelado durante envio`);
+            break;
+          }
         }
-      }
 
-      try {
-        const formattedPhone = formatPhoneNumber(lead.lead_telefone);
-
-        await sendTextMessage(instance_name, {
-          number: formattedPhone,
-          text: lead.mensagem_gerada,
-        });
-
-        // Salvar no histórico de whatsapp_messages
         try {
-          await query.insert('whatsapp_messages', {
-            instance_name,
-            phone_number: lead.lead_telefone,
-            message_type: 'conversation',
-            message_text: lead.mensagem_gerada,
-            is_from_me: true,
-            status: 'sent',
-            timestamp: new Date().toISOString(),
-            raw_data: { disparo_id: disparoId, lead_id: lead.id },
+          const formattedPhone = formatPhoneNumber(lead.lead_telefone);
+
+          await sendTextMessage(instance_name, {
+            number: formattedPhone,
+            text: lead.mensagem_gerada,
           });
-        } catch (e) {
-          // Non-critical: don't fail if message save fails
-          console.warn(`[Dispatch Disparos] Erro ao salvar msg no histórico:`, (e as any).message);
+
+          // Salvar no histórico de whatsapp_messages
+          try {
+            await query.insert('whatsapp_messages', {
+              instance_name,
+              phone_number: lead.lead_telefone,
+              message_type: 'conversation',
+              message_text: lead.mensagem_gerada,
+              is_from_me: true,
+              status: 'sent',
+              timestamp: new Date().toISOString(),
+              raw_data: { disparo_id: disparoId, lead_id: lead.id },
+            });
+          } catch (e) {
+            // Non-critical: don't fail if message save fails
+            console.warn(`[Dispatch Disparos] Erro ao salvar msg no histórico:`, (e as any).message);
+          }
+
+          // Mark as sent
+          await client.query(
+            `UPDATE disparo_leads SET status = 'enviado', enviado_at = NOW() WHERE id = $1`,
+            [lead.id]
+          );
+
+          sent++;
+          console.log(`[Dispatch Disparos] ✓ Enviado para ${lead.lead_nome} (${i + 1}/${leads.length})`);
+
+          // Delay humanizado (exceto último)
+          if (i < leads.length - 1) {
+            const delayMs = calcularDelay(lead.mensagem_gerada, i);
+            console.log(`[Dispatch Disparos] Aguardando ${Math.round(delayMs / 1000)}s...`);
+            await delay(delayMs);
+          }
+        } catch (error: any) {
+          failed++;
+          errors.push({
+            lead_id: lead.id,
+            nome: lead.lead_nome,
+            error: error.message,
+            timestamp: new Date().toISOString(),
+          });
+
+          await client.query(
+            `UPDATE disparo_leads SET status = 'falhou', error_message = $1 WHERE id = $2`,
+            [error.message?.substring(0, 500), lead.id]
+          );
+
+          console.error(`[Dispatch Disparos] ✗ Erro para ${lead.lead_nome}:`, error.message);
         }
-
-        // Mark as sent
-        await pool.query(
-          `UPDATE disparo_leads SET status = 'enviado', enviado_at = NOW() WHERE id = $1`,
-          [lead.id]
-        );
-
-        sent++;
-        console.log(`[Dispatch Disparos] ✓ Enviado para ${lead.lead_nome} (${i + 1}/${leads.length})`);
-
-        // Delay humanizado (exceto último)
-        if (i < leads.length - 1) {
-          const delayMs = calcularDelay(lead.mensagem_gerada, i);
-          console.log(`[Dispatch Disparos] Aguardando ${Math.round(delayMs / 1000)}s...`);
-          await delay(delayMs);
-        }
-      } catch (error: any) {
-        failed++;
-        errors.push({
-          lead_id: lead.id,
-          nome: lead.lead_nome,
-          error: error.message,
-          timestamp: new Date().toISOString(),
-        });
-
-        await pool.query(
-          `UPDATE disparo_leads SET status = 'falhou', error_message = $1 WHERE id = $2`,
-          [error.message?.substring(0, 500), lead.id]
-        );
-
-        console.error(`[Dispatch Disparos] ✗ Erro para ${lead.lead_nome}:`, error.message);
       }
-    }
 
-    // Atualizar contadores do disparo
-    const newProcessed = disparo.processed_count + sent + failed;
-    const newSent = disparo.sent_count + sent;
-    const newFailed = disparo.failed_count + failed;
+      // Atualizar contadores do disparo
+      const newProcessed = disparo.processed_count + sent + failed;
+      const newSent = disparo.sent_count + sent;
+      const newFailed = disparo.failed_count + failed;
 
-    // Verificar se completou
-    const remainingResult = await pool.query(
-      `SELECT COUNT(*) as remaining FROM disparo_leads WHERE disparo_id = $1 AND status = 'pendente'`,
-      [disparoId]
-    );
-    const remaining = parseInt(remainingResult.rows[0].remaining);
-    const isComplete = remaining === 0;
+      // Verificar se completou
+      const remainingResult = await client.query(
+        `SELECT COUNT(*) as remaining FROM disparo_leads WHERE disparo_id = $1 AND status = 'pendente'`,
+        [disparoId]
+      );
+      const remaining = parseInt(remainingResult.rows[0].remaining);
+      const isComplete = remaining === 0;
 
-    await pool.query(
-      `UPDATE disparos SET
-        processed_count = $1, sent_count = $2, failed_count = $3,
-        status = $4, error_log = error_log || $5::jsonb,
-        completed_at = CASE WHEN $4 IN ('concluido', 'falhou') THEN NOW() ELSE completed_at END,
-        updated_at = NOW()
-       WHERE id = $6`,
-      [
-        newProcessed,
-        newSent,
-        newFailed,
-        isComplete ? 'concluido' : 'enviando',
-        JSON.stringify(errors),
-        disparoId,
-      ]
-    );
+      await client.query(
+        `UPDATE disparos SET
+          processed_count = $1, sent_count = $2, failed_count = $3,
+          status = $4, error_log = error_log || $5::jsonb,
+          completed_at = CASE WHEN $4 IN ('concluido', 'falhou') THEN NOW() ELSE completed_at END,
+          updated_at = NOW()
+         WHERE id = $6`,
+        [
+          newProcessed,
+          newSent,
+          newFailed,
+          isComplete ? 'concluido' : 'enviando',
+          JSON.stringify(errors),
+          disparoId,
+        ]
+      );
 
-    return NextResponse.json({
-      success: true,
-      disparo_id: disparoId,
-      processed: sent + failed,
-      sent,
-      failed,
-      remaining,
-      status: isComplete ? 'concluido' : 'enviando',
-      duration: Date.now() - startTime,
+      return NextResponse.json({
+        success: true,
+        disparo_id: disparoId,
+        processed: sent + failed,
+        sent,
+        failed,
+        remaining,
+        status: isComplete ? 'concluido' : 'enviando',
+        duration: Date.now() - startTime,
+      });
     });
   } catch (error: any) {
     console.error('[Dispatch Disparos] Erro geral:', error);

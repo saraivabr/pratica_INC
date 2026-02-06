@@ -30,6 +30,7 @@ import {
   syncMessagesToDatabase,
 } from '@/lib/whatsapp-sync/fetch';
 import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutos para operações longas
@@ -186,16 +187,18 @@ export async function POST(request: NextRequest) {
         });
 
         // Registrar execução no histórico
-        await pool.query(`
-          INSERT INTO whatsapp_sync_runs (
-            workspace_id,
-            status,
-            chats_synced,
-            contacts_synced,
-            started_at,
-            completed_at
-          ) VALUES ($1, 'completed', $2, $3, NOW(), NOW())
-        `, [workspaceId, chatsResult.synced, contactsResult.synced]);
+        await withTenant(workspaceId, async (client) => {
+          await client.query(`
+            INSERT INTO whatsapp_sync_runs (
+              workspace_id,
+              status,
+              chats_synced,
+              contacts_synced,
+              started_at,
+              completed_at
+            ) VALUES ($1, 'completed', $2, $3, NOW(), NOW())
+          `, [workspaceId, chatsResult.synced, contactsResult.synced]);
+        });
 
         // Combinar erros
         if (chatsResult.errors.length > 0) {

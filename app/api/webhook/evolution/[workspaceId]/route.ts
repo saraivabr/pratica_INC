@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getWorkspace, updateWorkspace, tenantQuery } from '@/lib/tenant-context';
+import { getWorkspace, updateWorkspace, tenantQuery, withTenant } from '@/lib/tenant-context';
 import {
   getConversationByPhone,
   pauseBot,
@@ -153,27 +153,48 @@ export async function POST(
  * IMPORTANTE: Filtra por workspace_id para garantir isolamento entre tenants
  */
 async function findUserByPhone(phone: string, workspaceId: number) {
-  const numbers = phone.replace(/\D/g, '');
+  return await withTenant(workspaceId, async (client) => {
+    const numbers = phone.replace(/\D/g, '');
 
-  // Possible formats to search
-  const formats = [
-    `+${numbers}`,
-    `+55${numbers}`,
-    numbers,
-    numbers.startsWith('55') ? numbers.slice(2) : numbers,
-    numbers.startsWith('55') ? `+${numbers}` : `+55${numbers}`,
-  ];
+    // Possible formats to search
+    const formats = [
+      `+${numbers}`,
+      `+55${numbers}`,
+      numbers,
+      numbers.startsWith('55') ? numbers.slice(2) : numbers,
+      numbers.startsWith('55') ? `+${numbers}` : `+55${numbers}`,
+    ];
 
-  const uniqueFormats = [...new Set(formats)];
+    const uniqueFormats = [...new Set(formats)];
 
-  for (const format of uniqueFormats) {
-    const { rows } = await dbQuery(
+    for (const format of uniqueFormats) {
+      const { rows } = await client.query(
+        `select u.*, i.nome as imobiliaria_nome
+         from users u
+         left join imobiliarias i on i.id = u.imobiliaria_id
+         where u.telefone = $1 and u.workspace_id = $2
+         limit 1`,
+        [format, workspaceId]
+      );
+      const data = rows[0];
+
+      if (data) {
+        if (data.imobiliaria_nome) {
+          data.imobiliarias = { nome: data.imobiliaria_nome };
+        }
+        return data;
+      }
+    }
+
+    // Try LIKE search with last 9 digits
+    const lastDigits = numbers.slice(-9);
+    const { rows } = await client.query(
       `select u.*, i.nome as imobiliaria_nome
        from users u
        left join imobiliarias i on i.id = u.imobiliaria_id
-       where u.telefone = $1 and u.workspace_id = $2
+       where u.telefone like $1 and u.workspace_id = $2
        limit 1`,
-      [format, workspaceId]
+      [`%${lastDigits}`, workspaceId]
     );
     const data = rows[0];
 
@@ -181,29 +202,10 @@ async function findUserByPhone(phone: string, workspaceId: number) {
       if (data.imobiliaria_nome) {
         data.imobiliarias = { nome: data.imobiliaria_nome };
       }
-      return data;
     }
-  }
 
-  // Try LIKE search with last 9 digits
-  const lastDigits = numbers.slice(-9);
-  const { rows } = await dbQuery(
-    `select u.*, i.nome as imobiliaria_nome
-     from users u
-     left join imobiliarias i on i.id = u.imobiliaria_id
-     where u.telefone like $1 and u.workspace_id = $2
-     limit 1`,
-    [`%${lastDigits}`, workspaceId]
-  );
-  const data = rows[0];
-
-  if (data) {
-    if (data.imobiliaria_nome) {
-      data.imobiliarias = { nome: data.imobiliaria_nome };
-    }
-  }
-
-  return data;
+    return data;
+  });
 }
 
 /**
@@ -260,29 +262,31 @@ async function handleConnectionUpdate(workspaceId: number, data: any) {
   // Atualizar status de conexão no registro do usuário (para Salva-Leads)
   // O nome da instância segue o padrão: corretor-{userId}-{timestamp}
   // userId pode ser UUID (ex: d027e287-919d-4fbd-af01-d6bfc84e1855) ou numérico
-  const userIdMatch = instanceName?.match(/^corretor-([a-f0-9-]+)-\d+$/);
-  if (userIdMatch) {
-    const userId = userIdMatch[1];
-    // IMPORTANTE: Só atualizar se esta é a instância ATUAL do usuário
-    // Evita que instâncias antigas sobrescrevam o status da instância nova
-    const result = await dbQuery(
-      `UPDATE users SET evolution_connected = $1, updated_at = NOW()
-       WHERE id = $2 AND evolution_instance_name = $3`,
-      [isConnected, userId, instanceName]
-    );
-    if (result.rowCount && result.rowCount > 0) {
-      console.log(`[Connection Update] User ${userId} evolution_connected = ${isConnected}`);
+  await withTenant(workspaceId, async (client) => {
+    const userIdMatch = instanceName?.match(/^corretor-([a-f0-9-]+)-\d+$/);
+    if (userIdMatch) {
+      const userId = userIdMatch[1];
+      // IMPORTANTE: Só atualizar se esta é a instância ATUAL do usuário
+      // Evita que instâncias antigas sobrescrevam o status da instância nova
+      const result = await client.query(
+        `UPDATE users SET evolution_connected = $1, updated_at = NOW()
+         WHERE id = $2 AND evolution_instance_name = $3`,
+        [isConnected, userId, instanceName]
+      );
+      if (result.rowCount && result.rowCount > 0) {
+        console.log(`[Connection Update] User ${userId} evolution_connected = ${isConnected}`);
+      } else {
+        console.log(`[Connection Update] Ignored stale instance ${instanceName} (user ${userId} has a different current instance)`);
+      }
     } else {
-      console.log(`[Connection Update] Ignored stale instance ${instanceName} (user ${userId} has a different current instance)`);
+      // Fallback: buscar usuário pelo nome da instância (só atualiza se é a instância atual)
+      const result = await client.query(
+        `UPDATE users SET evolution_connected = $1, updated_at = NOW() WHERE evolution_instance_name = $2`,
+        [isConnected, instanceName]
+      );
+      console.log(`[Connection Update] Updated ${result.rowCount || 0} users with instance ${instanceName} -> connected = ${isConnected}`);
     }
-  } else {
-    // Fallback: buscar usuário pelo nome da instância (só atualiza se é a instância atual)
-    const result = await dbQuery(
-      `UPDATE users SET evolution_connected = $1, updated_at = NOW() WHERE evolution_instance_name = $2`,
-      [isConnected, instanceName]
-    );
-    console.log(`[Connection Update] Updated ${result.rowCount || 0} users with instance ${instanceName} -> connected = ${isConnected}`);
-  }
+  });
 
   console.log(`[Connection Update] Instance: ${instanceName}, State: ${state}, Connected: ${isConnected}`);
 }
@@ -330,27 +334,29 @@ async function handleNewMessage(workspaceId: number, data: any) {
     // IMPORTANTE: O índice único é (instance_name, message_id), não (workspace_id, message_id)
     const messageId = message.key?.id;
     if (messageId) {
-      await dbQuery(
-        `INSERT INTO whatsapp_messages (
-          workspace_id, instance_name, phone_number, message_id, message_type,
-          message_text, is_from_me, timestamp, raw_data
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT (instance_name, message_id)
-        DO UPDATE SET
-          updated_at = NOW(),
-          raw_data = EXCLUDED.raw_data`,
-        [
-          workspaceId,
-          data.instance,
-          phoneNumber,
-          messageId,
-          messageType,
-          messageText,
-          isFromMe,
-          timestamp.toISOString(),
-          JSON.stringify(message),
-        ]
-      );
+      await withTenant(workspaceId, async (client) => {
+        await client.query(
+          `INSERT INTO whatsapp_messages (
+            workspace_id, instance_name, phone_number, message_id, message_type,
+            message_text, is_from_me, timestamp, raw_data
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          ON CONFLICT (instance_name, message_id)
+          DO UPDATE SET
+            updated_at = NOW(),
+            raw_data = EXCLUDED.raw_data`,
+          [
+            workspaceId,
+            data.instance,
+            phoneNumber,
+            messageId,
+            messageType,
+            messageText,
+            isFromMe,
+            timestamp.toISOString(),
+            JSON.stringify(message),
+          ]
+        );
+      });
     } else {
       // Mensagens sem ID (raro, mas possível)
       const query = tenantQuery(workspaceId);

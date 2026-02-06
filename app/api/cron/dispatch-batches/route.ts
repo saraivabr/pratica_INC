@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { sendTextMessage, formatPhoneNumber, isInstanceConnected } from '@/lib/evolution-api';
-import { tenantQuery } from '@/lib/tenant-context';
+import { tenantQuery, withTenant } from '@/lib/tenant-context';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -282,86 +282,88 @@ async function processBatch(batch: BatchDB): Promise<{
     throw new Error('Instância WhatsApp desconectada');
   }
 
-  // Buscar evento
-  const eventoResult = await pool.query<EventoDB>(
-    `SELECT id, nome, descricao, data_hora, local FROM eventos WHERE id = $1`,
-    [evento_id]
-  );
+  return await withTenant(effectiveWorkspaceId, async (client) => {
+    // Buscar evento
+    const eventoResult = await client.query<EventoDB>(
+      `SELECT id, nome, descricao, data_hora, local FROM eventos WHERE id = $1`,
+      [evento_id]
+    );
 
-  if (eventoResult.rows.length === 0) {
-    throw new Error('Evento não encontrado');
-  }
-
-  const evento = eventoResult.rows[0];
-
-  // Buscar convidados pendentes do batch
-  const convidadosResult = await pool.query<ConvidadoDB>(
-    `SELECT id, nome, celular FROM evento_convidados
-     WHERE dispatch_batch_id = $1
-       AND convite_enviado_at IS NULL
-     LIMIT $2`,
-    [batchId, BATCH_SIZE]
-  );
-
-  const convidados = convidadosResult.rows;
-  const result = { processed: 0, sent: 0, failed: 0, errors: [] as any[] };
-
-  // Processar cada convidado
-  for (let i = 0; i < convidados.length; i++) {
-    const convidado = convidados[i];
-    result.processed++;
-
-    try {
-      // Gerar mensagem única usando IA
-      const mensagem = await gerarMensagemConvite(convidado.nome, evento);
-
-      // Enviar via Evolution API
-      const sendResult = await sendTextMessage(instance_name, {
-        number: formatPhoneNumber(convidado.celular),
-        text: mensagem,
-      });
-
-      // Atualizar convidado
-      await pool.query(
-        `UPDATE evento_convidados SET convite_enviado_at = NOW() WHERE id = $1`,
-        [convidado.id]
-      );
-
-      // Salvar mensagem no histórico
-      await query.insert('whatsapp_messages', {
-        instance_name,
-        phone_number: convidado.celular,
-        message_id: sendResult.key?.id,
-        message_type: 'conversation',
-        message_text: mensagem,
-        is_from_me: true,
-        status: 'sent',
-        timestamp: new Date().toISOString(),
-        raw_data: { ...sendResult, evento_id, convidado_id: convidado.id, batch_id: batchId },
-      });
-
-      result.sent++;
-      console.log(`[Dispatch Batch ${batchId}] ✓ Enviado para ${convidado.nome} (${i + 1}/${convidados.length})`);
-
-      // Delay humanizado entre envios (exceto o último)
-      if (i < convidados.length - 1) {
-        const delayMs = calcularDelayHumanizado(mensagem, i);
-        console.log(`[Dispatch Batch ${batchId}] Aguardando ${Math.round(delayMs/1000)}s antes do próximo envio...`);
-        await delay(delayMs);
-      }
-    } catch (error: any) {
-      result.failed++;
-      result.errors.push({
-        convidado_id: convidado.id,
-        nome: convidado.nome,
-        error: error.message || 'Erro desconhecido',
-        timestamp: new Date().toISOString(),
-      });
-      console.error(`[Dispatch Batch ${batchId}] Erro ao enviar para ${convidado.nome}:`, error.message);
+    if (eventoResult.rows.length === 0) {
+      throw new Error('Evento não encontrado');
     }
-  }
 
-  return result;
+    const evento = eventoResult.rows[0];
+
+    // Buscar convidados pendentes do batch
+    const convidadosResult = await client.query<ConvidadoDB>(
+      `SELECT id, nome, celular FROM evento_convidados
+       WHERE dispatch_batch_id = $1
+         AND convite_enviado_at IS NULL
+       LIMIT $2`,
+      [batchId, BATCH_SIZE]
+    );
+
+    const convidados = convidadosResult.rows;
+    const result = { processed: 0, sent: 0, failed: 0, errors: [] as any[] };
+
+    // Processar cada convidado
+    for (let i = 0; i < convidados.length; i++) {
+      const convidado = convidados[i];
+      result.processed++;
+
+      try {
+        // Gerar mensagem única usando IA
+        const mensagem = await gerarMensagemConvite(convidado.nome, evento);
+
+        // Enviar via Evolution API
+        const sendResult = await sendTextMessage(instance_name, {
+          number: formatPhoneNumber(convidado.celular),
+          text: mensagem,
+        });
+
+        // Atualizar convidado
+        await client.query(
+          `UPDATE evento_convidados SET convite_enviado_at = NOW() WHERE id = $1`,
+          [convidado.id]
+        );
+
+        // Salvar mensagem no histórico
+        await query.insert('whatsapp_messages', {
+          instance_name,
+          phone_number: convidado.celular,
+          message_id: sendResult.key?.id,
+          message_type: 'conversation',
+          message_text: mensagem,
+          is_from_me: true,
+          status: 'sent',
+          timestamp: new Date().toISOString(),
+          raw_data: { ...sendResult, evento_id, convidado_id: convidado.id, batch_id: batchId },
+        });
+
+        result.sent++;
+        console.log(`[Dispatch Batch ${batchId}] ✓ Enviado para ${convidado.nome} (${i + 1}/${convidados.length})`);
+
+        // Delay humanizado entre envios (exceto o último)
+        if (i < convidados.length - 1) {
+          const delayMs = calcularDelayHumanizado(mensagem, i);
+          console.log(`[Dispatch Batch ${batchId}] Aguardando ${Math.round(delayMs/1000)}s antes do próximo envio...`);
+          await delay(delayMs);
+        }
+      } catch (error: any) {
+        result.failed++;
+        result.errors.push({
+          convidado_id: convidado.id,
+          nome: convidado.nome,
+          error: error.message || 'Erro desconhecido',
+          timestamp: new Date().toISOString(),
+        });
+        console.error(`[Dispatch Batch ${batchId}] Erro ao enviar para ${convidado.nome}:`, error.message);
+      }
+    }
+
+    return result;
+  });
 }
 
 /**

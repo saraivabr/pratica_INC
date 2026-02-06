@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchInstances, getConnectionStatus, getWebhook } from '@/lib/evolution-api';
 import pool from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -141,20 +142,22 @@ export async function GET(request: NextRequest) {
 
         if (workspaceId) {
           try {
-            const { rows: statsRows } = await pool.query(`
-              SELECT
-                COUNT(*) as total_messages,
-                MAX(timestamp) as last_message_at,
-                COUNT(DISTINCT phone_number) as unique_contacts
-              FROM whatsapp_messages
-              WHERE workspace_id = $1 AND instance_name = $2
-            `, [workspaceId, instanceName]);
+            await withTenant(workspaceId, async (client) => {
+              const { rows: statsRows } = await client.query(`
+                SELECT
+                  COUNT(*) as total_messages,
+                  MAX(timestamp) as last_message_at,
+                  COUNT(DISTINCT phone_number) as unique_contacts
+                FROM whatsapp_messages
+                WHERE workspace_id = $1 AND instance_name = $2
+              `, [workspaceId, instanceName]);
 
-            if (statsRows[0]) {
-              stats.totalMessages = parseInt(statsRows[0].total_messages) || 0;
-              stats.lastMessageAt = statsRows[0].last_message_at?.toISOString() || null;
-              stats.uniqueContacts = parseInt(statsRows[0].unique_contacts) || 0;
-            }
+              if (statsRows[0]) {
+                stats.totalMessages = parseInt(statsRows[0].total_messages) || 0;
+                stats.lastMessageAt = statsRows[0].last_message_at?.toISOString() || null;
+                stats.uniqueContacts = parseInt(statsRows[0].unique_contacts) || 0;
+              }
+            });
           } catch {
             // Ignorar erros de estatísticas
           }

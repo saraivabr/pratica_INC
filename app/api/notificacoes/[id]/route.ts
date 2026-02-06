@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbQuery } from '@/lib/db';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
+import { withTenant } from '@/lib/tenant-context';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -29,16 +29,18 @@ export async function PUT(
       );
     }
 
-    const { rows } = await dbQuery(
-      `UPDATE notificacoes SET lida = $1, updated_at = NOW() WHERE id = $2 AND workspace_id = $3 RETURNING *`,
-      [lida, id, ctx.workspaceId]
-    );
+    return await withTenant(ctx.workspaceId, async (client) => {
+      const { rows } = await client.query(
+        `UPDATE notificacoes SET lida = $1, updated_at = NOW() WHERE id = $2 AND workspace_id = $3 RETURNING *`,
+        [lida, id, ctx.workspaceId]
+      );
 
-    if (rows.length === 0) {
-      return NextResponse.json({ error: 'Notificação não encontrada' }, { status: 404 });
-    }
+      if (rows.length === 0) {
+        return NextResponse.json({ error: 'Notificação não encontrada' }, { status: 404 });
+      }
 
-    return NextResponse.json({ success: true, notificacao: rows[0] });
+      return NextResponse.json({ success: true, notificacao: rows[0] });
+    });
   } catch (error: any) {
     console.error('[PUT /api/notificacoes/[id]] Error:', error);
     return NextResponse.json(
@@ -61,16 +63,18 @@ export async function DELETE(
 
     const { id } = await context.params;
 
-    const { rows } = await dbQuery(
-      `DELETE FROM notificacoes WHERE id = $1 AND workspace_id = $2 RETURNING id`,
-      [id, ctx.workspaceId]
-    );
+    return await withTenant(ctx.workspaceId, async (client) => {
+      const { rows } = await client.query(
+        `DELETE FROM notificacoes WHERE id = $1 AND workspace_id = $2 RETURNING id`,
+        [id, ctx.workspaceId]
+      );
 
-    if (rows.length === 0) {
-      return NextResponse.json({ error: 'Notificação não encontrada' }, { status: 404 });
-    }
+      if (rows.length === 0) {
+        return NextResponse.json({ error: 'Notificação não encontrada' }, { status: 404 });
+      }
 
-    return NextResponse.json({ success: true, message: 'Notificação deletada' });
+      return NextResponse.json({ success: true, message: 'Notificação deletada' });
+    });
   } catch (error: any) {
     console.error('[DELETE /api/notificacoes/[id]] Error:', error);
     return NextResponse.json(

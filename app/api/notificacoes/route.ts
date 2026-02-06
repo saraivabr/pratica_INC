@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbQuery } from '@/lib/db';
 import { requireWorkspaceContext } from '@/lib/api-helpers';
 import { applyRateLimit } from '@/lib/rate-limit-helper';
 import { validateRequest, NotificacaoCreateSchema } from '@/lib/validation-schemas';
+import { withTenant } from '@/lib/tenant-context';
 
 /**
  * GET /api/notificacoes
@@ -16,19 +16,21 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
 
-    const { rows } = await dbQuery(
-      `
-      SELECT n.*, l.name as lead_nome, l.phone as lead_telefone
-      FROM notificacoes n
-      LEFT JOIN leads l ON n.lead_id = l.id
-      WHERE n.workspace_id = $1
-      ORDER BY n.created_at DESC
-      LIMIT $2
-      `,
-      [ctx.workspaceId, limit]
-    );
+    return await withTenant(ctx.workspaceId, async (client) => {
+      const { rows } = await client.query(
+        `
+        SELECT n.*, l.name as lead_nome, l.phone as lead_telefone
+        FROM notificacoes n
+        LEFT JOIN leads l ON n.lead_id = l.id
+        WHERE n.workspace_id = $1
+        ORDER BY n.created_at DESC
+        LIMIT $2
+        `,
+        [ctx.workspaceId, limit]
+      );
 
-    return NextResponse.json({ notificacoes: rows, total: rows.length });
+      return NextResponse.json({ notificacoes: rows, total: rows.length });
+    });
   } catch (error: any) {
     console.error('[GET /api/notificacoes] Error:', error);
     return NextResponse.json(
@@ -68,16 +70,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { rows } = await dbQuery(
-      `
-      INSERT INTO notificacoes (corretor_id, lead_id, tipo, mensagem, link_acao, metadata, workspace_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *
-      `,
-      [corretor_id, lead_id || null, tipo, mensagem, link_acao || null, metadata || {}, ctx.workspaceId]
-    );
+    return await withTenant(ctx.workspaceId, async (client) => {
+      const { rows } = await client.query(
+        `
+        INSERT INTO notificacoes (corretor_id, lead_id, tipo, mensagem, link_acao, metadata, workspace_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
+        `,
+        [corretor_id, lead_id || null, tipo, mensagem, link_acao || null, metadata || {}, ctx.workspaceId]
+      );
 
-    return NextResponse.json({ success: true, notificacao: rows[0] }, { status: 201 });
+      return NextResponse.json({ success: true, notificacao: rows[0] }, { status: 201 });
+    });
   } catch (error: any) {
     console.error('[POST /api/notificacoes] Error:', error);
     return NextResponse.json(
