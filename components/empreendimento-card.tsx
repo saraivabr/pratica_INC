@@ -120,26 +120,23 @@ export function EmpreendimentoCard({ empreendimento }: EmpreendimentoCardProps) 
                 </div>
             </div>
 
-            {/* Footer / Delivery + Quick Actions */}
-            <div className="mt-auto pt-1 sm:pt-2 flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground">
-                <span className="truncate">Entrega: {empreendimento.previsaoEntrega || "Sob consulta"}</span>
-                <div className="flex items-center gap-1 shrink-0 ml-2">
-                  {[
-                    { icon: Grid3X3, tab: "espelho", title: "Espelho" },
-                    { icon: Table, tab: "lista", title: "Tabela" },
-                    { icon: Calculator, tab: "simulacao", title: "Simular" },
-                  ].map(({ icon: Icon, tab, title }) => (
-                    <Link
-                      key={tab}
-                      href={`/empreendimentos/${empreendimento.id}?tab=${tab}`}
-                      onClick={(e) => e.stopPropagation()}
-                      title={title}
-                      className="p-1 rounded-md hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                    </Link>
-                  ))}
-                </div>
+            {/* Quick Actions — big, labeled, impossible to miss */}
+            <div className="mt-auto pt-2 sm:pt-3 grid grid-cols-3 gap-1.5 sm:gap-2 border-t border-border/50">
+              {[
+                { icon: Grid3X3, tab: "espelho", label: "Espelho", color: "text-violet-600 dark:text-violet-400", bg: "hover:bg-violet-50 dark:hover:bg-violet-950/30" },
+                { icon: Table, tab: "lista", label: "Preços", color: "text-emerald-600 dark:text-emerald-400", bg: "hover:bg-emerald-50 dark:hover:bg-emerald-950/30" },
+                { icon: Calculator, tab: "simulacao", label: "Simular", color: "text-blue-600 dark:text-blue-400", bg: "hover:bg-blue-50 dark:hover:bg-blue-950/30" },
+              ].map(({ icon: Icon, tab, label, color, bg }) => (
+                <Link
+                  key={tab}
+                  href={`/empreendimentos/${empreendimento.id}?tab=${tab}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`flex flex-col items-center justify-center gap-0.5 sm:gap-1 py-2 sm:py-2.5 rounded-lg ${bg} transition-colors group/action`}
+                >
+                  <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${color}`} />
+                  <span className={`text-[10px] sm:text-xs font-semibold ${color}`}>{label}</span>
+                </Link>
+              ))}
             </div>
         </div>
 
