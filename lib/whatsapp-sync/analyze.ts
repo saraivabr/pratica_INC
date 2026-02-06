@@ -214,7 +214,7 @@ export async function matchChatToLead(
   idlead: string;
   nome: string;
   telefone: string;
-  situacao_nome: string;
+  situacao: string;
   empreendimento?: string;
   ultima_interacao?: string;
 } | null> {
