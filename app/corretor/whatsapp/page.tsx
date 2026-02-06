@@ -122,8 +122,8 @@ export default function CorretorWhatsAppPage() {
 
   return (
     <AppShell title="WhatsApp">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-        <TabsList className="mx-4 mt-2 w-fit">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col -mx-3 sm:-mx-4 md:-mx-6 -mt-4 sm:-mt-6">
+        <TabsList className="mx-3 sm:mx-4 md:mx-6 mt-3 w-fit relative z-10">
           <TabsTrigger value="conversas" className="gap-1.5">
             <MessageSquare className="h-4 w-4" />
             Conversas
@@ -135,14 +135,14 @@ export default function CorretorWhatsAppPage() {
         </TabsList>
 
         <TabsContent value="conversas" className="flex-1 min-h-0">
-          <div className="h-[calc(100vh-170px)]">
+          <div className="h-[calc(100vh-130px)]">
             {instanceName && userId && (
               <ChatCRM instanceName={instanceName} userId={userId} />
             )}
           </div>
         </TabsContent>
 
-        <TabsContent value="automacoes" className="flex-1 overflow-auto">
+        <TabsContent value="automacoes" className="flex-1 overflow-auto px-3 sm:px-4 md:px-6">
           {instanceName && userId && (
             <WhatsAppAutomations
               instanceName={instanceName}
