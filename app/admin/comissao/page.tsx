@@ -7,6 +7,7 @@ import {
   Calculator,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   ChevronRight,
   DollarSign,
   Users,
@@ -386,6 +387,147 @@ function Section({
 }
 
 // ============================================================================
+// WIZARD STEPPER
+// ============================================================================
+
+const WIZARD_STEPS = [
+  { number: 1, label: "Dados do Negocio", icon: FileText },
+  { number: 2, label: "Proposta", icon: DollarSign },
+  { number: 3, label: "Comissoes", icon: Users },
+  { number: 4, label: "Resumo", icon: BarChart3 },
+] as const
+
+function WizardStepper({
+  currentStep,
+  onStepClick,
+}: {
+  currentStep: number
+  onStepClick: (step: number) => void
+}) {
+  return (
+    <>
+      {/* Desktop stepper */}
+      <div className="hidden sm:flex items-center justify-center gap-0">
+        {WIZARD_STEPS.map((step, i) => {
+          const StepIcon = step.icon
+          const isActive = currentStep === step.number
+          const isCompleted = currentStep > step.number
+          const isClickable = step.number < currentStep
+
+          return (
+            <div key={step.number} className="flex items-center">
+              {i > 0 && (
+                <div className={cn("h-0.5 w-10 lg:w-16 transition-colors", isCompleted ? "bg-emerald-400" : "bg-zinc-200 dark:bg-zinc-700")} />
+              )}
+              <button
+                onClick={() => isClickable && onStepClick(step.number)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-lg transition-all",
+                  isClickable && "cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                  !isClickable && !isActive && "cursor-default",
+                  isActive && "cursor-default"
+                )}
+              >
+                <div className={cn(
+                  "flex items-center justify-center h-8 w-8 rounded-full text-sm font-bold transition-all shrink-0",
+                  isActive && "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 ring-2 ring-zinc-900/20 dark:ring-white/20",
+                  isCompleted && "bg-emerald-500 text-white",
+                  !isActive && !isCompleted && "bg-zinc-200 dark:bg-zinc-700 text-zinc-400 dark:text-zinc-500"
+                )}>
+                  {isCompleted ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
+                </div>
+                <span className={cn(
+                  "text-sm font-medium hidden lg:inline transition-colors",
+                  isActive && "text-zinc-900 dark:text-zinc-100",
+                  isCompleted && "text-emerald-600 dark:text-emerald-400",
+                  !isActive && !isCompleted && "text-zinc-400 dark:text-zinc-500"
+                )}>
+                  {step.label}
+                </span>
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Mobile stepper */}
+      <div className="sm:hidden">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            Passo {currentStep} de {WIZARD_STEPS.length}
+          </span>
+          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            {WIZARD_STEPS[currentStep - 1].label}
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          {WIZARD_STEPS.map((step) => (
+            <button
+              key={step.number}
+              onClick={() => step.number < currentStep && onStepClick(step.number)}
+              className={cn(
+                "h-1.5 flex-1 rounded-full transition-all",
+                currentStep === step.number && "bg-zinc-900 dark:bg-white",
+                currentStep > step.number && "bg-emerald-400 cursor-pointer",
+                currentStep < step.number && "bg-zinc-200 dark:bg-zinc-700"
+              )}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ============================================================================
+// WIZARD NAVIGATION
+// ============================================================================
+
+function WizardNavigation({
+  currentStep,
+  totalSteps,
+  onPrevious,
+  onNext,
+  onSave,
+  saving,
+  canSave,
+  vendaId,
+}: {
+  currentStep: number
+  totalSteps: number
+  onPrevious: () => void
+  onNext: () => void
+  onSave: () => void
+  saving: boolean
+  canSave: boolean
+  vendaId: number | null
+}) {
+  return (
+    <div className="flex items-center justify-between pt-2">
+      {currentStep > 1 ? (
+        <Button variant="outline" onClick={onPrevious}>
+          <ChevronLeft className="h-4 w-4 mr-1.5" />
+          Anterior
+        </Button>
+      ) : (
+        <div />
+      )}
+      {currentStep < totalSteps ? (
+        <Button onClick={onNext}>
+          Proximo
+          <ChevronRight className="h-4 w-4 ml-1.5" />
+        </Button>
+      ) : (
+        <Button onClick={onSave} disabled={saving || !canSave} size="lg">
+          {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : vendaId ? <Check className="h-4 w-4 mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
+          {vendaId ? "Salvo" : "Salvar Comissao"}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
 // SORTABLE AUTONOMO ROW
 // ============================================================================
 
@@ -630,6 +772,10 @@ export default function ComissaoCalculadoraPage() {
   const [rateioGrid, setRateioGrid] = useState<Record<string, Record<string, CelulaRateio>>>({})
   const [rateioCalculado, setRateioCalculado] = useState(false)
 
+  // ── Wizard state ──
+  const [currentStep, setCurrentStep] = useState(1)
+  const TOTAL_STEPS = 4
+
   // ── localStorage persistence ──
   const [loaded, setLoaded] = useState(false)
 
@@ -658,6 +804,7 @@ export default function ComissaoCalculadoraPage() {
         if (data.clienteCep) setClienteCep(data.clienteCep)
         if (data.vendaId) setVendaId(data.vendaId)
         if (data.webropayStatus) setWebropayStatus(data.webropayStatus)
+        if (data.currentStep && data.currentStep >= 1 && data.currentStep <= 4) setCurrentStep(data.currentStep)
       }
     } catch { /* ignore */ }
     setLoaded(true)
@@ -672,10 +819,10 @@ export default function ComissaoCalculadoraPage() {
         valorImovel, percentualComissao, series, autonomos,
         clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero,
         clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep,
-        vendaId, webropayStatus,
+        vendaId, webropayStatus, currentStep,
       }))
     } catch { /* ignore */ }
-  }, [loaded, empreendimento, unidade, clienteNome, clienteCpf, valorImovel, percentualComissao, series, autonomos, clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero, clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep, vendaId, webropayStatus])
+  }, [loaded, empreendimento, unidade, clienteNome, clienteCpf, valorImovel, percentualComissao, series, autonomos, clienteEmail, clienteTelefone, clienteLogradouro, clienteNumero, clienteComplemento, clienteBairro, clienteCidade, clienteUf, clienteCep, vendaId, webropayStatus, currentStep])
 
   // ── DnD sensors ──
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -746,6 +893,7 @@ export default function ComissaoCalculadoraPage() {
     setClienteCep("")
     setVendaId(null)
     setWebropayStatus(null)
+    setCurrentStep(1)
     localStorage.removeItem(STORAGE_KEY)
   }, [])
 
@@ -1078,6 +1226,37 @@ export default function ComissaoCalculadoraPage() {
     }
   }, [vendaId])
 
+  // ── Wizard navigation handlers ──
+  const handleNext = useCallback(() => {
+    if (currentStep === 1) {
+      if (!empreendimento || valorImovel <= 0) {
+        toast.error("Preencha o empreendimento e valor do imovel")
+        return
+      }
+    }
+    if (currentStep === 2) {
+      if (series.length === 0) {
+        toast.error("Adicione pelo menos uma serie de parcelas")
+        return
+      }
+    }
+    if (currentStep === 3) {
+      if (autonomos.length === 0) {
+        toast.error("Adicione pelo menos um autonomo")
+        return
+      }
+    }
+    setCurrentStep(prev => Math.min(prev + 1, TOTAL_STEPS))
+  }, [currentStep, empreendimento, valorImovel, series, autonomos, TOTAL_STEPS])
+
+  const handlePrevious = useCallback(() => {
+    setCurrentStep(prev => Math.max(prev - 1, 1))
+  }, [])
+
+  const handleStepClick = useCallback((step: number) => {
+    if (step < currentStep) setCurrentStep(step)
+  }, [currentStep])
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -1119,630 +1298,699 @@ export default function ComissaoCalculadoraPage() {
           </div>
         </div>
 
-        {/* ── Section 1: Dados do Imovel ── */}
-        <Section title="Dados do Imovel e Cliente" icon={FileText} number={1}>
-          <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <Label>Empreendimento</Label>
-              <AutocompleteInput
-                value={empreendimento}
-                onChange={setEmpreendimento}
-                placeholder="Buscar empreendimento..."
-                fetchUrl={(q) => `/api/comissao/buscar/empreendimentos?busca=${encodeURIComponent(q)}`}
-                onSelect={(item: EmpreendimentoBusca) => {
-                  setEmpreendimentoId(item.id)
-                  setEmpreendimento(item.nome)
-                }}
-                getId={(item: EmpreendimentoBusca) => item.id}
-                getLabel={(item: EmpreendimentoBusca) => item.nome}
-                renderItem={(item: EmpreendimentoBusca) => (
-                  <div>
-                    <p className="font-medium">{item.nome}</p>
-                    {item.cidade && <p className="text-xs text-zinc-500">{item.cidade}{item.uf ? ` - ${item.uf}` : ""}</p>}
+        {/* Wizard Stepper */}
+        <WizardStepper currentStep={currentStep} onStepClick={handleStepClick} />
+
+        {/* ── Step 1: Dados do Negocio ── */}
+        {currentStep === 1 && (
+          <Card>
+            <div className="px-5 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-bold">1</div>
+                <FileText className="h-5 w-5 text-zinc-500" />
+                <span className="font-semibold text-zinc-900 dark:text-zinc-100">Dados do Imovel e Cliente</span>
+              </div>
+            </div>
+            <CardContent className="px-5 pb-5 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Empreendimento</Label>
+                  <AutocompleteInput
+                    value={empreendimento}
+                    onChange={setEmpreendimento}
+                    placeholder="Buscar empreendimento..."
+                    fetchUrl={(q) => `/api/comissao/buscar/empreendimentos?busca=${encodeURIComponent(q)}`}
+                    onSelect={(item: EmpreendimentoBusca) => {
+                      setEmpreendimentoId(item.id)
+                      setEmpreendimento(item.nome)
+                    }}
+                    getId={(item: EmpreendimentoBusca) => item.id}
+                    getLabel={(item: EmpreendimentoBusca) => item.nome}
+                    renderItem={(item: EmpreendimentoBusca) => (
+                      <div>
+                        <p className="font-medium">{item.nome}</p>
+                        {item.cidade && <p className="text-xs text-zinc-500">{item.cidade}{item.uf ? ` - ${item.uf}` : ""}</p>}
+                      </div>
+                    )}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Unidade</Label>
+                  {empreendimentoId ? (
+                    <AutocompleteInput
+                      value={unidade}
+                      onChange={setUnidade}
+                      placeholder="Buscar unidade..."
+                      fetchUrl={(q) => `/api/comissao/buscar/unidades/${empreendimentoId}?busca=${encodeURIComponent(q)}`}
+                      onSelect={(item: UnidadeBusca) => {
+                        const label = [item.bloco, item.codigo].filter(Boolean).join(" - ")
+                        setUnidade(label || item.id)
+                        if (item.valor_tabela && item.valor_tabela > 0) setValorImovel(item.valor_tabela)
+                      }}
+                      getId={(item: UnidadeBusca) => item.id}
+                      getLabel={(item: UnidadeBusca) => [item.bloco, item.codigo].filter(Boolean).join(" - ") || item.id}
+                      renderItem={(item: UnidadeBusca) => (
+                        <div className="flex items-center justify-between">
+                          <span>{[item.bloco, item.codigo].filter(Boolean).join(" - ")}{item.tipologia ? ` (${item.tipologia})` : ""}</span>
+                          {item.valor_tabela && <span className="text-xs text-zinc-500">{formatarMoeda(item.valor_tabela)}</span>}
+                        </div>
+                      )}
+                    />
+                  ) : (
+                    <Input placeholder="Selecione o empreendimento primeiro" value={unidade} onChange={e => setUnidade(e.target.value)} />
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nome do Cliente</Label>
+                  <Input placeholder="Nome completo" value={clienteNome} onChange={e => setClienteNome(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>CPF do Cliente</Label>
+                  <Input
+                    placeholder="000.000.000-00"
+                    value={clienteCpf}
+                    onChange={e => setClienteCpf(formatCpfMask(e.target.value))}
+                    maxLength={14}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Valor do Imovel (R$)</Label>
+                  <CurrencyInput value={valorImovel} onChange={setValorImovel} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>% Comissao</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number" step="0.1" min="0" max="100" className="flex-1"
+                      value={percentualComissao || ""} onChange={e => setPercentualComissao(parseFloat(e.target.value) || 0)}
+                    />
+                    <Badge variant="secondary" className="shrink-0 text-sm px-3 py-1.5">{formatarMoeda(valorComissao)}</Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dados adicionais do cliente (Webropay) - collapsible */}
+              <CollapsibleWebropay
+                clienteEmail={clienteEmail} setClienteEmail={setClienteEmail}
+                clienteTelefone={clienteTelefone} setClienteTelefone={setClienteTelefone}
+                clienteLogradouro={clienteLogradouro} setClienteLogradouro={setClienteLogradouro}
+                clienteNumero={clienteNumero} setClienteNumero={setClienteNumero}
+                clienteComplemento={clienteComplemento} setClienteComplemento={setClienteComplemento}
+                clienteBairro={clienteBairro} setClienteBairro={setClienteBairro}
+                clienteCidade={clienteCidade} setClienteCidade={setClienteCidade}
+                clienteUf={clienteUf} setClienteUf={setClienteUf}
+                clienteCep={clienteCep} setClienteCep={setClienteCep}
+                isComplete={webropayDadosCompletos}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Step 2: Proposta do Cliente ── */}
+        {currentStep === 2 && (
+          <Card>
+            <div className="px-5 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-bold">2</div>
+                  <DollarSign className="h-5 w-5 text-zinc-500" />
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Proposta do Cliente</span>
+                </div>
+                <Select onValueChange={loadTemplate}>
+                  <SelectTrigger className="h-8 w-[180px] text-xs">
+                    <SelectValue placeholder="Carregar template..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATES_PARCELAS.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        <div>
+                          <span className="font-medium">{t.nome}</span>
+                          <span className="text-zinc-400 ml-1.5 text-[10px]">{t.descricao}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <CardContent className="px-5 pb-5 pt-4">
+              <div className="space-y-3">
+                {series.length === 0 ? (
+                  <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
+                    Nenhuma serie adicionada. Use um template acima ou adicione manualmente.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {/* Desktop header */}
+                    <div className="hidden sm:grid grid-cols-[140px_70px_1fr_1fr_80px_72px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                      <span>Tipo</span>
+                      <span>Qtd</span>
+                      <span>Valor Unit.</span>
+                      <span>Valor Total</span>
+                      <span>% Imovel</span>
+                      <span></span>
+                    </div>
+                    {series.map(s => (
+                      <div key={s.id}>
+                        {/* Desktop */}
+                        <div className="hidden sm:grid grid-cols-[140px_70px_1fr_1fr_80px_72px] gap-2 items-center bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-2">
+                          <Select value={s.tipo} onValueChange={v => updateSerie(s.id, "tipo", v)}>
+                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(TIPO_PARCELA_LABELS).map(([key, label]) => (
+                                <SelectItem key={key} value={key}>{label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input type="number" min="1" className="h-9" value={s.quantidade || ""} onChange={e => updateSerie(s.id, "quantidade", parseInt(e.target.value) || 1)} />
+                          <CurrencyInput className="h-9" value={s.valorUnitario} onChange={v => updateSerie(s.id, "valorUnitario", v)} />
+                          <CurrencyInput className="h-9" value={s.valorTotal} onChange={v => updateSerie(s.id, "valorTotal", v)} />
+                          <Input type="number" step="0.01" min="0" max="100" className="h-9" value={s.percentualDoImovel || ""} onChange={e => updateSerie(s.id, "percentualDoImovel", parseFloat(e.target.value) || 0)} />
+                          <div className="flex gap-0.5">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-600" onClick={() => duplicateSerie(s.id)} title="Duplicar">
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-red-500" onClick={() => removeSerie(s.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Mobile */}
+                        <div className="sm:hidden bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Select value={s.tipo} onValueChange={v => updateSerie(s.id, "tipo", v)}>
+                              <SelectTrigger className="h-8 w-[130px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(TIPO_PARCELA_LABELS).map(([key, label]) => (
+                                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400" onClick={() => duplicateSerie(s.id)}>
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-red-500" onClick={() => removeSerie(s.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <span className="text-[10px] text-zinc-400 uppercase">Qtd</span>
+                              <Input type="number" min="1" className="h-8 text-sm" value={s.quantidade || ""} onChange={e => updateSerie(s.id, "quantidade", parseInt(e.target.value) || 1)} />
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-zinc-400 uppercase">Unit.</span>
+                              <CurrencyInput className="h-8 text-sm" value={s.valorUnitario} onChange={v => updateSerie(s.id, "valorUnitario", v)} />
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-zinc-400 uppercase">%</span>
+                              <Input type="number" step="0.01" className="h-8 text-sm" value={s.percentualDoImovel || ""} onChange={e => updateSerie(s.id, "percentualDoImovel", parseFloat(e.target.value) || 0)} />
+                            </div>
+                          </div>
+                          <div className="text-right text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                            Total: {formatarMoeda(s.valorTotal)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Unidade</Label>
-              {empreendimentoId ? (
-                <AutocompleteInput
-                  value={unidade}
-                  onChange={setUnidade}
-                  placeholder="Buscar unidade..."
-                  fetchUrl={(q) => `/api/comissao/buscar/unidades/${empreendimentoId}?busca=${encodeURIComponent(q)}`}
-                  onSelect={(item: UnidadeBusca) => {
-                    const label = [item.bloco, item.codigo].filter(Boolean).join(" - ")
-                    setUnidade(label || item.id)
-                    if (item.valor_tabela && item.valor_tabela > 0) setValorImovel(item.valor_tabela)
-                  }}
-                  getId={(item: UnidadeBusca) => item.id}
-                  getLabel={(item: UnidadeBusca) => [item.bloco, item.codigo].filter(Boolean).join(" - ") || item.id}
-                  renderItem={(item: UnidadeBusca) => (
-                    <div className="flex items-center justify-between">
-                      <span>{[item.bloco, item.codigo].filter(Boolean).join(" - ")}{item.tipologia ? ` (${item.tipologia})` : ""}</span>
-                      {item.valor_tabela && <span className="text-xs text-zinc-500">{formatarMoeda(item.valor_tabela)}</span>}
+
+                <div className="flex items-center justify-between pt-2">
+                  <Button variant="outline" size="sm" onClick={addSerie}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Adicionar Serie
+                  </Button>
+                  {series.length > 0 && (
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-zinc-500">
+                        Total: <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatarMoeda(totalProposta)}</span>
+                      </span>
+                      <Badge variant={Math.abs(totalPercentualProposta - 100) < 0.1 ? "default" : "destructive"} className="text-xs">
+                        {totalPercentualProposta.toFixed(1)}%
+                      </Badge>
                     </div>
                   )}
-                />
-              ) : (
-                <Input placeholder="Selecione o empreendimento primeiro" value={unidade} onChange={e => setUnidade(e.target.value)} />
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Nome do Cliente</Label>
-              <Input placeholder="Nome completo" value={clienteNome} onChange={e => setClienteNome(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>CPF do Cliente</Label>
-              <Input
-                placeholder="000.000.000-00"
-                value={clienteCpf}
-                onChange={e => setClienteCpf(formatCpfMask(e.target.value))}
-                maxLength={14}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Valor do Imovel (R$)</Label>
-              <CurrencyInput value={valorImovel} onChange={setValorImovel} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>% Comissao</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number" step="0.1" min="0" max="100" className="flex-1"
-                  value={percentualComissao || ""} onChange={e => setPercentualComissao(parseFloat(e.target.value) || 0)}
-                />
-                <Badge variant="secondary" className="shrink-0 text-sm px-3 py-1.5">{formatarMoeda(valorComissao)}</Badge>
-              </div>
-            </div>
-          </div>
-
-          {/* Dados adicionais do cliente (Webropay) - collapsible */}
-          <CollapsibleWebropay
-            clienteEmail={clienteEmail} setClienteEmail={setClienteEmail}
-            clienteTelefone={clienteTelefone} setClienteTelefone={setClienteTelefone}
-            clienteLogradouro={clienteLogradouro} setClienteLogradouro={setClienteLogradouro}
-            clienteNumero={clienteNumero} setClienteNumero={setClienteNumero}
-            clienteComplemento={clienteComplemento} setClienteComplemento={setClienteComplemento}
-            clienteBairro={clienteBairro} setClienteBairro={setClienteBairro}
-            clienteCidade={clienteCidade} setClienteCidade={setClienteCidade}
-            clienteUf={clienteUf} setClienteUf={setClienteUf}
-            clienteCep={clienteCep} setClienteCep={setClienteCep}
-            isComplete={webropayDadosCompletos}
-          />
-        </Section>
-
-        {/* ── Section 2: Proposta do Cliente ── */}
-        <Section
-          title="Proposta do Cliente"
-          icon={DollarSign}
-          number={2}
-          actions={
-            <Select onValueChange={loadTemplate}>
-              <SelectTrigger className="h-8 w-[180px] text-xs">
-                <SelectValue placeholder="Carregar template..." />
-              </SelectTrigger>
-              <SelectContent>
-                {TEMPLATES_PARCELAS.map(t => (
-                  <SelectItem key={t.id} value={t.id}>
-                    <div>
-                      <span className="font-medium">{t.nome}</span>
-                      <span className="text-zinc-400 ml-1.5 text-[10px]">{t.descricao}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          }
-        >
-          <div className="pt-4 space-y-3">
-            {series.length === 0 ? (
-              <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
-                Nenhuma serie adicionada. Use um template acima ou adicione manualmente.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {/* Desktop header */}
-                <div className="hidden sm:grid grid-cols-[140px_70px_1fr_1fr_80px_72px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                  <span>Tipo</span>
-                  <span>Qtd</span>
-                  <span>Valor Unit.</span>
-                  <span>Valor Total</span>
-                  <span>% Imovel</span>
-                  <span></span>
                 </div>
-                {series.map(s => (
-                  <div key={s.id}>
-                    {/* Desktop */}
-                    <div className="hidden sm:grid grid-cols-[140px_70px_1fr_1fr_80px_72px] gap-2 items-center bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-2">
-                      <Select value={s.tipo} onValueChange={v => updateSerie(s.id, "tipo", v)}>
-                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(TIPO_PARCELA_LABELS).map(([key, label]) => (
-                            <SelectItem key={key} value={key}>{label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input type="number" min="1" className="h-9" value={s.quantidade || ""} onChange={e => updateSerie(s.id, "quantidade", parseInt(e.target.value) || 1)} />
-                      <CurrencyInput className="h-9" value={s.valorUnitario} onChange={v => updateSerie(s.id, "valorUnitario", v)} />
-                      <CurrencyInput className="h-9" value={s.valorTotal} onChange={v => updateSerie(s.id, "valorTotal", v)} />
-                      <Input type="number" step="0.01" min="0" max="100" className="h-9" value={s.percentualDoImovel || ""} onChange={e => updateSerie(s.id, "percentualDoImovel", parseFloat(e.target.value) || 0)} />
-                      <div className="flex gap-0.5">
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-600" onClick={() => duplicateSerie(s.id)} title="Duplicar">
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-red-500" onClick={() => removeSerie(s.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
 
-                    {/* Mobile */}
-                    <div className="sm:hidden bg-zinc-50 dark:bg-zinc-800/40 rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Select value={s.tipo} onValueChange={v => updateSerie(s.id, "tipo", v)}>
-                          <SelectTrigger className="h-8 w-[130px]"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(TIPO_PARCELA_LABELS).map(([key, label]) => (
-                              <SelectItem key={key} value={key}>{label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400" onClick={() => duplicateSerie(s.id)}>
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-red-500" onClick={() => removeSerie(s.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <span className="text-[10px] text-zinc-400 uppercase">Qtd</span>
-                          <Input type="number" min="1" className="h-8 text-sm" value={s.quantidade || ""} onChange={e => updateSerie(s.id, "quantidade", parseInt(e.target.value) || 1)} />
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-zinc-400 uppercase">Unit.</span>
-                          <CurrencyInput className="h-8 text-sm" value={s.valorUnitario} onChange={v => updateSerie(s.id, "valorUnitario", v)} />
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-zinc-400 uppercase">%</span>
-                          <Input type="number" step="0.01" className="h-8 text-sm" value={s.percentualDoImovel || ""} onChange={e => updateSerie(s.id, "percentualDoImovel", parseFloat(e.target.value) || 0)} />
-                        </div>
-                      </div>
-                      <div className="text-right text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                        Total: {formatarMoeda(s.valorTotal)}
-                      </div>
-                    </div>
+                {series.length > 0 && Math.abs(totalPercentualProposta - 100) >= 0.1 && (
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>A soma dos percentuais e <strong>{totalPercentualProposta.toFixed(1)}%</strong>. Idealmente deveria ser 100% do valor do imovel.</span>
                   </div>
-                ))}
+                )}
               </div>
-            )}
+            </CardContent>
+          </Card>
+        )}
 
-            <div className="flex items-center justify-between pt-2">
-              <Button variant="outline" size="sm" onClick={addSerie}>
-                <Plus className="h-4 w-4 mr-1.5" />
-                Adicionar Serie
-              </Button>
-              {series.length > 0 && (
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-zinc-500">
-                    Total: <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatarMoeda(totalProposta)}</span>
-                  </span>
-                  <Badge variant={Math.abs(totalPercentualProposta - 100) < 0.1 ? "default" : "destructive"} className="text-xs">
-                    {totalPercentualProposta.toFixed(1)}%
-                  </Badge>
+        {/* ── Step 3: Comissoes ── */}
+        {currentStep === 3 && (
+          <Card>
+            <div className="px-5 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-bold">3</div>
+                  <Users className="h-5 w-5 text-zinc-500" />
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Comissoes dos Autonomos</span>
                 </div>
-              )}
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={loadDefaultTeam}>
+                  <Zap className="h-3.5 w-3.5 mr-1" />
+                  Equipe Padrao
+                </Button>
+              </div>
             </div>
+            <CardContent className="px-5 pb-5 pt-4">
+              <div className="space-y-3">
+                {autonomos.length === 0 ? (
+                  <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
+                    Nenhum autonomo adicionado. Use &quot;Equipe Padrao&quot; ou adicione manualmente.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {/* Desktop header */}
+                    <div className="hidden sm:grid grid-cols-[28px_1fr_140px_140px_80px_1fr_40px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                      <span></span>
+                      <span>Nome</span>
+                      <span>Cargo</span>
+                      <span>CPF/CNPJ</span>
+                      <span>%</span>
+                      <span>Valor Bruto</span>
+                      <span></span>
+                    </div>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                      <SortableContext items={autonomos.map(a => a.id)} strategy={verticalListSortingStrategy}>
+                        {autonomos.map(a => (
+                          <SortableAutonomoRow
+                            key={a.id}
+                            autonomo={a}
+                            totalAutonomos={autonomos.length}
+                            valorComissao={valorComissao}
+                            onUpdate={updateAutonomo}
+                            onRemove={removeAutonomo}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                  </div>
+                )}
 
-            {series.length > 0 && Math.abs(totalPercentualProposta - 100) >= 0.1 && (
-              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>A soma dos percentuais e <strong>{totalPercentualProposta.toFixed(1)}%</strong>. Idealmente deveria ser 100% do valor do imovel.</span>
-              </div>
-            )}
-          </div>
-        </Section>
-
-        {/* ── Section 3: Autonomos ── */}
-        <Section
-          title="Comissoes dos Autonomos"
-          icon={Users}
-          number={3}
-          actions={
-            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={loadDefaultTeam}>
-              <Zap className="h-3.5 w-3.5 mr-1" />
-              Equipe Padrao
-            </Button>
-          }
-        >
-          <div className="pt-4 space-y-3">
-            {autonomos.length === 0 ? (
-              <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
-                Nenhum autonomo adicionado. Use &quot;Equipe Padrao&quot; ou adicione manualmente.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {/* Desktop header */}
-                <div className="hidden sm:grid grid-cols-[28px_1fr_140px_140px_80px_1fr_40px] gap-2 px-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                  <span></span>
-                  <span>Nome</span>
-                  <span>Cargo</span>
-                  <span>CPF/CNPJ</span>
-                  <span>%</span>
-                  <span>Valor Bruto</span>
-                  <span></span>
+                <div className="flex items-center justify-between pt-2">
+                  <Button variant="outline" size="sm" onClick={addAutonomo}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Adicionar Autonomo
+                  </Button>
+                  {autonomos.length > 0 && (
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-zinc-500">
+                        Total: <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatarMoeda(totalValorAutonomos)}</span>
+                      </span>
+                      <Badge variant={Math.abs(totalPercentualAutonomos - 100) < 0.1 ? "default" : "secondary"} className="text-xs">
+                        {totalPercentualAutonomos.toFixed(1)}%
+                      </Badge>
+                    </div>
+                  )}
                 </div>
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={autonomos.map(a => a.id)} strategy={verticalListSortingStrategy}>
-                    {autonomos.map(a => (
-                      <SortableAutonomoRow
-                        key={a.id}
-                        autonomo={a}
-                        totalAutonomos={autonomos.length}
-                        valorComissao={valorComissao}
-                        onUpdate={updateAutonomo}
-                        onRemove={removeAutonomo}
-                      />
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              </div>
-            )}
 
-            <div className="flex items-center justify-between pt-2">
-              <Button variant="outline" size="sm" onClick={addAutonomo}>
-                <Plus className="h-4 w-4 mr-1.5" />
-                Adicionar Autonomo
-              </Button>
-              {autonomos.length > 0 && (
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-zinc-500">
-                    Total: <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatarMoeda(totalValorAutonomos)}</span>
-                  </span>
-                  <Badge variant={Math.abs(totalPercentualAutonomos - 100) < 0.1 ? "default" : "secondary"} className="text-xs">
-                    {totalPercentualAutonomos.toFixed(1)}%
-                  </Badge>
+                {autonomos.length > 0 && totalPercentualAutonomos > 100.1 && (
+                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>A soma dos percentuais ({totalPercentualAutonomos.toFixed(1)}%) ultrapassa 100% da comissao.</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Step 4: Resumo e Pagadoria ── */}
+        {currentStep === 4 && (
+          <>
+            {/* Rateio */}
+            <Card>
+              <div className="px-5 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-bold">4</div>
+                  <BarChart3 className="h-5 w-5 text-zinc-500" />
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Controle de Pagamentos (Rateio)</span>
                 </div>
-              )}
-            </div>
-
-            {autonomos.length > 0 && totalPercentualAutonomos > 100.1 && (
-              <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>A soma dos percentuais ({totalPercentualAutonomos.toFixed(1)}%) ultrapassa 100% da comissao.</span>
               </div>
-            )}
-          </div>
-        </Section>
+              <CardContent className="px-5 pb-5 pt-4">
+                <div className="space-y-4">
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    Distribuicao automatica por prioridade. Volte ao passo 3 para reordenar autonomos.
+                  </p>
 
-        {/* ── Section 4: Rateio ── */}
-        <Section title="Controle de Pagamentos (Rateio)" icon={BarChart3} number={4} defaultOpen={false}>
-          <div className="pt-4 space-y-4">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Distribuicao automatica por prioridade. Arraste os autonomos acima para reordenar.
-            </p>
-
-            {rateioCalculado && parcelaLabels.length > 0 && autonomos.length > 0 ? (
-              <div className="overflow-x-auto -mx-5 px-5">
-                <table className="w-full text-sm border-collapse min-w-[600px]">
-                  <thead>
-                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                      <th className="text-left py-2 pr-3 font-medium text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider sticky left-0 bg-white dark:bg-zinc-900 z-10">Autonomo</th>
-                      {parcelaLabels.map((label, i) => (
-                        <th key={i} className="text-right py-2 px-2 font-medium text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider whitespace-nowrap">{label}</th>
-                      ))}
-                      <th className="text-right py-2 pl-3 font-bold text-zinc-700 dark:text-zinc-300 text-xs uppercase tracking-wider">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {autonomos.sort((a, b) => a.prioridade - b.prioridade).map(auto => {
-                      const row = rateioGrid[auto.id] || {}
-                      const totalRow = Object.values(row).reduce((acc, c) => acc + c.valor, 0)
-                      return (
-                        <tr key={auto.id} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-                          <td className="py-2 pr-3 font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap sticky left-0 bg-white dark:bg-zinc-900 z-10">
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-[10px] font-bold text-zinc-600 dark:text-zinc-300">{auto.prioridade}</span>
-                              <span className="truncate max-w-[120px]">{auto.nome || "Sem nome"}</span>
-                            </div>
-                          </td>
-                          {parcelaLabels.map((_, pIdx) => {
-                            const val = row[`p_${pIdx}`]?.valor || 0
+                  {rateioCalculado && parcelaLabels.length > 0 && autonomos.length > 0 ? (
+                    <div className="overflow-x-auto -mx-5 px-5">
+                      <table className="w-full text-sm border-collapse min-w-[600px]">
+                        <thead>
+                          <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                            <th className="text-left py-2 pr-3 font-medium text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider sticky left-0 bg-white dark:bg-zinc-900 z-10">Autonomo</th>
+                            {parcelaLabels.map((label, i) => (
+                              <th key={i} className="text-right py-2 px-2 font-medium text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider whitespace-nowrap">{label}</th>
+                            ))}
+                            <th className="text-right py-2 pl-3 font-bold text-zinc-700 dark:text-zinc-300 text-xs uppercase tracking-wider">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {autonomos.sort((a, b) => a.prioridade - b.prioridade).map(auto => {
+                            const row = rateioGrid[auto.id] || {}
+                            const totalRow = Object.values(row).reduce((acc, c) => acc + c.valor, 0)
                             return (
-                              <td key={pIdx} className={cn("text-right py-2 px-2 tabular-nums whitespace-nowrap", val > 0 ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-300 dark:text-zinc-600")}>
-                                {val > 0 ? formatarMoeda(val) : "-"}
-                              </td>
+                              <tr key={auto.id} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+                                <td className="py-2 pr-3 font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap sticky left-0 bg-white dark:bg-zinc-900 z-10">
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-[10px] font-bold text-zinc-600 dark:text-zinc-300">{auto.prioridade}</span>
+                                    <span className="truncate max-w-[120px]">{auto.nome || "Sem nome"}</span>
+                                  </div>
+                                </td>
+                                {parcelaLabels.map((_, pIdx) => {
+                                  const val = row[`p_${pIdx}`]?.valor || 0
+                                  return (
+                                    <td key={pIdx} className={cn("text-right py-2 px-2 tabular-nums whitespace-nowrap", val > 0 ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-300 dark:text-zinc-600")}>
+                                      {val > 0 ? formatarMoeda(val) : "-"}
+                                    </td>
+                                  )
+                                })}
+                                <td className="text-right py-2 pl-3 font-semibold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(arredondarValor(totalRow))}</td>
+                              </tr>
                             )
                           })}
-                          <td className="text-right py-2 pl-3 font-semibold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(arredondarValor(totalRow))}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 border-zinc-300 dark:border-zinc-600">
-                      <td className="py-2 pr-3 font-bold text-zinc-700 dark:text-zinc-300 text-xs uppercase sticky left-0 bg-white dark:bg-zinc-900 z-10">Total</td>
-                      {parcelaLabels.map((_, pIdx) => {
-                        const colTotal = autonomos.reduce((acc, auto) => acc + (rateioGrid[auto.id]?.[`p_${pIdx}`]?.valor || 0), 0)
-                        return (<td key={pIdx} className="text-right py-2 px-2 font-semibold text-zinc-700 dark:text-zinc-300 tabular-nums whitespace-nowrap">{formatarMoeda(arredondarValor(colTotal))}</td>)
-                      })}
-                      <td className="text-right py-2 pl-3 font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
-                        {formatarMoeda(arredondarValor(autonomos.reduce((acc, auto) => {
-                          const row = rateioGrid[auto.id] || {}
-                          return acc + Object.values(row).reduce((a, c) => a + c.valor, 0)
-                        }, 0)))}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
-                Adicione series de parcelas e autonomos para ver o rateio automatico.
-              </div>
-            )}
-          </div>
-        </Section>
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-zinc-300 dark:border-zinc-600">
+                            <td className="py-2 pr-3 font-bold text-zinc-700 dark:text-zinc-300 text-xs uppercase sticky left-0 bg-white dark:bg-zinc-900 z-10">Total</td>
+                            {parcelaLabels.map((_, pIdx) => {
+                              const colTotal = autonomos.reduce((acc, auto) => acc + (rateioGrid[auto.id]?.[`p_${pIdx}`]?.valor || 0), 0)
+                              return (<td key={pIdx} className="text-right py-2 px-2 font-semibold text-zinc-700 dark:text-zinc-300 tabular-nums whitespace-nowrap">{formatarMoeda(arredondarValor(colTotal))}</td>)
+                            })}
+                            <td className="text-right py-2 pl-3 font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
+                              {formatarMoeda(arredondarValor(autonomos.reduce((acc, auto) => {
+                                const row = rateioGrid[auto.id] || {}
+                                return acc + Object.values(row).reduce((a, c) => a + c.valor, 0)
+                              }, 0)))}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-sm">
+                      Adicione series de parcelas e autonomos para ver o rateio automatico.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* ── Section 5: Resumo Financeiro ── */}
-        <Section title="Resumo Financeiro" icon={Calculator} number={5}>
-          <div className="pt-4">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
-                <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Valor do Imovel</p>
-                <p className="text-base sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(valorImovel)}</p>
+            {/* Resumo Financeiro */}
+            <Card>
+              <div className="px-5 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="flex items-center gap-3">
+                  <Calculator className="h-5 w-5 text-zinc-500" />
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Resumo Financeiro</span>
+                </div>
               </div>
-              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
-                <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Comissao ({percentualComissao}%)</p>
-                <p className="text-base sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(valorComissao)}</p>
-              </div>
-              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
-                <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Total Proposta</p>
-                <p className={cn("text-base sm:text-xl font-bold tabular-nums", Math.abs(totalPercentualProposta - 100) < 0.1 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
-                  {formatarMoeda(totalProposta)}
-                </p>
-                <p className="text-[10px] sm:text-xs text-zinc-400">{totalPercentualProposta.toFixed(1)}% do imovel</p>
-              </div>
-              <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
-                <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Total Comissoes</p>
-                <p className={cn("text-base sm:text-xl font-bold tabular-nums", totalPercentualAutonomos <= 100.1 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
-                  {formatarMoeda(totalValorAutonomos)}
-                </p>
-                <p className="text-[10px] sm:text-xs text-zinc-400">{totalPercentualAutonomos.toFixed(1)}% da comissao</p>
-              </div>
-            </div>
-
-            <div className="mt-4 bg-zinc-900 dark:bg-white rounded-xl p-4 sm:p-5 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium">Contrato Liquido</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Proposta - Comissoes</p>
-              </div>
-              <p className="text-xl sm:text-2xl font-bold text-white dark:text-zinc-900 tabular-nums">{formatarMoeda(contratoLiquido)}</p>
-            </div>
-
-            {/* Progress bar */}
-            {(() => {
-              const checks = [
-                valorImovel > 0,
-                series.length > 0 && Math.abs(totalPercentualProposta - 100) < 0.5,
-                autonomos.length > 0 && totalPercentualAutonomos <= 100.1,
-                rateioCalculado,
-                webropayDadosCompletos,
-              ]
-              const done = checks.filter(Boolean).length
-              const pct = Math.round((done / checks.length) * 100)
-              return (
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500 dark:text-zinc-400 font-medium">Preenchimento</span>
-                    <span className={cn("font-bold", pct === 100 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-300")}>{pct}%</span>
+              <CardContent className="px-5 pb-5 pt-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
+                    <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Valor do Imovel</p>
+                    <p className="text-base sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(valorImovel)}</p>
                   </div>
-                  <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                    <div className={cn("h-full rounded-full transition-all duration-500", pct === 100 ? "bg-emerald-500" : "bg-zinc-400 dark:bg-zinc-500")} style={{ width: `${pct}%` }} />
+                  <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
+                    <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Comissao ({percentualComissao}%)</p>
+                    <p className="text-base sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatarMoeda(valorComissao)}</p>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
+                    <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Total Proposta</p>
+                    <p className={cn("text-base sm:text-xl font-bold tabular-nums", Math.abs(totalPercentualProposta - 100) < 0.1 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
+                      {formatarMoeda(totalProposta)}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-zinc-400">{totalPercentualProposta.toFixed(1)}% do imovel</p>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-xl p-3 sm:p-4 space-y-1">
+                    <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">Total Comissoes</p>
+                    <p className={cn("text-base sm:text-xl font-bold tabular-nums", totalPercentualAutonomos <= 100.1 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                      {formatarMoeda(totalValorAutonomos)}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-zinc-400">{totalPercentualAutonomos.toFixed(1)}% da comissao</p>
                   </div>
                 </div>
-              )
-            })()}
 
-            <div className="mt-4 space-y-3">
-              <div>
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Dados</p>
-                <div className="flex flex-wrap gap-2">
-                  <StatusPill ok={valorImovel > 0} label="Valor do imovel" />
-                  <StatusPill ok={series.length > 0 && Math.abs(totalPercentualProposta - 100) < 0.5} label="Proposta completa" />
+                <div className="mt-4 bg-zinc-900 dark:bg-white rounded-xl p-4 sm:p-5 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium">Contrato Liquido</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Proposta - Comissoes</p>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-white dark:text-zinc-900 tabular-nums">{formatarMoeda(contratoLiquido)}</p>
                 </div>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Financeiro</p>
-                <div className="flex flex-wrap gap-2">
-                  <StatusPill ok={autonomos.length > 0 && totalPercentualAutonomos <= 100.1} label="Comissoes validas" />
-                  <StatusPill ok={rateioCalculado} label="Rateio calculado" />
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Pagadoria</p>
-                <div className="flex flex-wrap gap-2">
-                  <StatusPill ok={webropayDadosCompletos} label="Dados Webropay completos" />
-                  {webropayStatus && <StatusPill ok={webropayStatus === 'enviada' || webropayStatus === 'liberada'} label={`Pagadoria: ${WEBROPAY_STATUS_LABELS[webropayStatus]}`} />}
-                </div>
-              </div>
-            </div>
-          </div>
-        </Section>
-        {/* ── Section 6: Webropay ── */}
-        <Section title="Envio para Pagadoria (Webropay)" icon={Send} number={6} defaultOpen={!!vendaId}>
-          {!vendaId ? (
-            <div className="pt-4 flex flex-col items-center justify-center py-8 text-center">
-              <div className="h-12 w-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
-                <Send className="h-5 w-5 text-zinc-400" />
-              </div>
-              <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Salve a comissao para desbloquear</p>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">Apos salvar, voce podera enviar para a pagadoria Webropay</p>
-            </div>
-          ) : (
-            <div className="pt-4 space-y-4">
-              {/* Status stepper */}
-              <div className="flex items-center gap-2">
-                {(["enviada", "liberada"] as const).map((step, i) => {
-                  const isActive = webropayStatus === step
-                  const isPast = webropayStatus === "liberada" && step === "enviada"
+
+                {/* Progress bar */}
+                {(() => {
+                  const checks = [
+                    valorImovel > 0,
+                    series.length > 0 && Math.abs(totalPercentualProposta - 100) < 0.5,
+                    autonomos.length > 0 && totalPercentualAutonomos <= 100.1,
+                    rateioCalculado,
+                    webropayDadosCompletos,
+                  ]
+                  const done = checks.filter(Boolean).length
+                  const pct = Math.round((done / checks.length) * 100)
                   return (
-                    <div key={step} className="flex items-center gap-2">
-                      {i > 0 && <div className={cn("h-0.5 w-8", isPast || isActive ? "bg-emerald-400" : "bg-zinc-200 dark:bg-zinc-700")} />}
-                      <div className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border",
-                        isActive ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
-                          : isPast ? "border-emerald-200 bg-emerald-50/50 text-emerald-500 dark:border-emerald-800 dark:bg-emerald-900/10 dark:text-emerald-500"
-                          : "border-zinc-200 bg-zinc-50 text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500"
-                      )}>
-                        {isPast ? <Check className="h-3 w-3" /> : isActive ? <Check className="h-3 w-3" /> : <span className="h-3 w-3 rounded-full border border-current inline-block" />}
-                        {step === "enviada" ? "Enviada" : "Liberada"}
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-500 dark:text-zinc-400 font-medium">Preenchimento</span>
+                        <span className={cn("font-bold", pct === 100 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-300")}>{pct}%</span>
+                      </div>
+                      <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                        <div className={cn("h-full rounded-full transition-all duration-500", pct === 100 ? "bg-emerald-500" : "bg-zinc-400 dark:bg-zinc-500")} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   )
-                })}
-                {webropayStatus === "distratada" && (
-                  <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 ml-2">Distratada</Badge>
-                )}
-                {webropayStatus === "bloqueada" && (
-                  <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 ml-2">Bloqueada</Badge>
-                )}
-                {!webropayStatus && (
-                  <Badge variant="secondary">Pendente de envio</Badge>
-                )}
-                <span className="text-xs text-zinc-400 ml-auto">ID: {vendaId}</span>
-              </div>
+                })()}
 
-              {/* Validation warnings */}
-              {!webropayDadosCompletos && !webropayStatus && (
-                <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-3 text-sm text-amber-700 dark:text-amber-300 flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div className="mt-4 space-y-3">
                   <div>
-                    <p className="font-medium">Dados incompletos para envio</p>
-                    <ul className="mt-1 text-xs space-y-0.5">
-                      {!clienteEmail && <li>- Email do cliente obrigatório</li>}
-                      {!clienteLogradouro && <li>- Endereço do cliente obrigatório</li>}
-                      {autonomos.some(a => !a.documento || a.documento.replace(/\D/g, "").length < 11) && <li>- Todos os autônomos devem ter CPF/CNPJ</li>}
-                    </ul>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Dados</p>
+                    <div className="flex flex-wrap gap-2">
+                      <StatusPill ok={valorImovel > 0} label="Valor do imovel" />
+                      <StatusPill ok={series.length > 0 && Math.abs(totalPercentualProposta - 100) < 0.5} label="Proposta completa" />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Financeiro</p>
+                    <div className="flex flex-wrap gap-2">
+                      <StatusPill ok={autonomos.length > 0 && totalPercentualAutonomos <= 100.1} label="Comissoes validas" />
+                      <StatusPill ok={rateioCalculado} label="Rateio calculado" />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Pagadoria</p>
+                    <div className="flex flex-wrap gap-2">
+                      <StatusPill ok={webropayDadosCompletos} label="Dados Webropay completos" />
+                      {webropayStatus && <StatusPill ok={webropayStatus === 'enviada' || webropayStatus === 'liberada'} label={`Pagadoria: ${WEBROPAY_STATUS_LABELS[webropayStatus]}`} />}
+                    </div>
                   </div>
                 </div>
-              )}
+              </CardContent>
+            </Card>
 
-              {/* Action buttons */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Enviar */}
-                {(!webropayStatus || webropayStatus === "bloqueada") && (
-                  <Button
-                    size="sm"
-                    onClick={handleEnviarWebropay}
-                    disabled={webropayLoading || !webropayDadosCompletos}
-                  >
-                    {webropayLoading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Send className="h-4 w-4 mr-1.5" />}
-                    Enviar para Webropay
-                  </Button>
-                )}
-
-                {/* Liberar */}
-                {webropayStatus === "enviada" && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="outline" className="text-emerald-600" disabled={webropayLoading}>
-                        <Unlock className="h-4 w-4 mr-1.5" />
-                        Liberar Pagamento
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Liberar pagamento?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Isso liberará os boletos para pagamento dos corretores. Esta ação não pode ser desfeita facilmente.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleLiberarWebropay}>Confirmar Liberação</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-
-                {/* Bloquear */}
-                {webropayStatus === "enviada" && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="outline" className="text-orange-600" disabled={webropayLoading}>
-                        <Lock className="h-4 w-4 mr-1.5" />
-                        Bloquear
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Bloquear venda?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Isso bloqueará todos os pagamentos desta venda na Webropay.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleBloquearWebropay}>Confirmar Bloqueio</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-
-                {/* Distratar */}
-                {(webropayStatus === "enviada" || webropayStatus === "liberada") && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="outline" className="text-red-600" disabled={webropayLoading}>
-                        <Ban className="h-4 w-4 mr-1.5" />
-                        Distratar
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Distratar venda?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Informe o motivo do distrato. A venda será cancelada na Webropay.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <div className="px-6 pb-2">
-                        <Textarea
-                          placeholder="Motivo do distrato..."
-                          value={distratoMotivo}
-                          onChange={e => setDistratoMotivo(e.target.value)}
-                          className="min-h-[80px]"
-                        />
-                      </div>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setDistratoMotivo("")}>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleDistratarWebropay}
-                          disabled={!distratoMotivo.trim()}
-                          className="bg-red-600 hover:bg-red-700"
-                        >
-                          Confirmar Distrato
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </div>
-
-              {/* Loading indicator */}
-              {webropayLoading && (
-                <div className="flex items-center gap-2 text-sm text-zinc-500">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Processando...
+            {/* Webropay */}
+            <Card>
+              <div className="px-5 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="flex items-center gap-3">
+                  <Send className="h-5 w-5 text-zinc-500" />
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Envio para Pagadoria (Webropay)</span>
                 </div>
-              )}
-            </div>
-          )}
-        </Section>
+              </div>
+              <CardContent className="px-5 pb-5 pt-4">
+                {!vendaId ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="h-12 w-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
+                      <Send className="h-5 w-5 text-zinc-400" />
+                    </div>
+                    <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Salve a comissao para desbloquear</p>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">Apos salvar, voce podera enviar para a pagadoria Webropay</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Status stepper */}
+                    <div className="flex items-center gap-2">
+                      {(["enviada", "liberada"] as const).map((step, i) => {
+                        const isActive = webropayStatus === step
+                        const isPast = webropayStatus === "liberada" && step === "enviada"
+                        return (
+                          <div key={step} className="flex items-center gap-2">
+                            {i > 0 && <div className={cn("h-0.5 w-8", isPast || isActive ? "bg-emerald-400" : "bg-zinc-200 dark:bg-zinc-700")} />}
+                            <div className={cn(
+                              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border",
+                              isActive ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
+                                : isPast ? "border-emerald-200 bg-emerald-50/50 text-emerald-500 dark:border-emerald-800 dark:bg-emerald-900/10 dark:text-emerald-500"
+                                : "border-zinc-200 bg-zinc-50 text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500"
+                            )}>
+                              {isPast ? <Check className="h-3 w-3" /> : isActive ? <Check className="h-3 w-3" /> : <span className="h-3 w-3 rounded-full border border-current inline-block" />}
+                              {step === "enviada" ? "Enviada" : "Liberada"}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {webropayStatus === "distratada" && (
+                        <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 ml-2">Distratada</Badge>
+                      )}
+                      {webropayStatus === "bloqueada" && (
+                        <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 ml-2">Bloqueada</Badge>
+                      )}
+                      {!webropayStatus && (
+                        <Badge variant="secondary">Pendente de envio</Badge>
+                      )}
+                      <span className="text-xs text-zinc-400 ml-auto">ID: {vendaId}</span>
+                    </div>
+
+                    {/* Validation warnings */}
+                    {!webropayDadosCompletos && !webropayStatus && (
+                      <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-3 text-sm text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="font-medium">Dados incompletos para envio</p>
+                          <ul className="mt-1 text-xs space-y-0.5">
+                            {!clienteEmail && <li>- Email do cliente obrigatorio</li>}
+                            {!clienteLogradouro && <li>- Endereco do cliente obrigatorio</li>}
+                            {autonomos.some(a => !a.documento || a.documento.replace(/\D/g, "").length < 11) && <li>- Todos os autonomos devem ter CPF/CNPJ</li>}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Enviar */}
+                      {(!webropayStatus || webropayStatus === "bloqueada") && (
+                        <Button
+                          size="sm"
+                          onClick={handleEnviarWebropay}
+                          disabled={webropayLoading || !webropayDadosCompletos}
+                        >
+                          {webropayLoading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Send className="h-4 w-4 mr-1.5" />}
+                          Enviar para Webropay
+                        </Button>
+                      )}
+
+                      {/* Liberar */}
+                      {webropayStatus === "enviada" && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="text-emerald-600" disabled={webropayLoading}>
+                              <Unlock className="h-4 w-4 mr-1.5" />
+                              Liberar Pagamento
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Liberar pagamento?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Isso liberara os boletos para pagamento dos corretores. Esta acao nao pode ser desfeita facilmente.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleLiberarWebropay}>Confirmar Liberacao</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+
+                      {/* Bloquear */}
+                      {webropayStatus === "enviada" && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="text-orange-600" disabled={webropayLoading}>
+                              <Lock className="h-4 w-4 mr-1.5" />
+                              Bloquear
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Bloquear venda?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Isso bloqueara todos os pagamentos desta venda na Webropay.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleBloquearWebropay}>Confirmar Bloqueio</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+
+                      {/* Distratar */}
+                      {(webropayStatus === "enviada" || webropayStatus === "liberada") && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="text-red-600" disabled={webropayLoading}>
+                              <Ban className="h-4 w-4 mr-1.5" />
+                              Distratar
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Distratar venda?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Informe o motivo do distrato. A venda sera cancelada na Webropay.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <div className="px-6 pb-2">
+                              <Textarea
+                                placeholder="Motivo do distrato..."
+                                value={distratoMotivo}
+                                onChange={e => setDistratoMotivo(e.target.value)}
+                                className="min-h-[80px]"
+                              />
+                            </div>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setDistratoMotivo("")}>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handleDistratarWebropay}
+                                disabled={!distratoMotivo.trim()}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Confirmar Distrato
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+
+                    {/* Loading indicator */}
+                    {webropayLoading && (
+                      <div className="flex items-center gap-2 text-sm text-zinc-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Processando...
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* Wizard Navigation */}
+        <WizardNavigation
+          currentStep={currentStep}
+          totalSteps={TOTAL_STEPS}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          onSave={handleSave}
+          saving={saving}
+          canSave={!!empreendimento && valorImovel > 0}
+          vendaId={vendaId}
+        />
       </div>
 
       {/* Print styles */}
