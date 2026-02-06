@@ -227,7 +227,8 @@ function LoginContent() {
 
       if (data.autoLogin && data.sessionId && data.user) {
         login(data.user, data.sessionId);
-        router.push("/");
+        sessionStorage.removeItem("splash_seen");
+        router.push("/splash");
         return;
       }
 
@@ -279,12 +280,12 @@ function LoginContent() {
       setSuccess(true);
       setTimeout(() => {
         login(data.user, data.sessionId);
-        // Redirect new registrations to WhatsApp onboarding, others based on role
+        // Redirect new registrations to WhatsApp onboarding, others to splash
         if (isNewRegistration) {
           router.push("/onboarding/whatsapp");
         } else {
-          const role = data.user?.role;
-          router.push((role === 'admin' || role === 'gerente') ? '/admin' : '/corretor');
+          sessionStorage.removeItem("splash_seen");
+          router.push("/splash");
         }
       }, 1000);
     } catch (err) {

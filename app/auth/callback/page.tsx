@@ -41,10 +41,9 @@ function AuthCallbackContent() {
         setStatus("success");
         setMessage(`Bem-vindo, ${authData.user.nome || "Corretor"}!`);
 
-        // Redirect based on role
-        const role = authData.user?.role;
-        const dest = (role === 'admin' || role === 'gerente') ? '/admin' : '/corretor';
-        setTimeout(() => router.push(dest), 1500);
+        // Redirect to splash screen
+        sessionStorage.removeItem("splash_seen");
+        setTimeout(() => router.push("/splash"), 1500);
       } catch (error) {
         console.error("Auth callback error:", error);
         setStatus("error");
