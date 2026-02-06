@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import { normalizePhone } from '@/lib/supabase';
 import OpenAI from 'openai';
 import { sendReaction, sendTextMessage } from '@/lib/zapi';
@@ -487,27 +488,49 @@ async function maybeReactToMessage(
  * IMPORTANTE: Filtra por workspace_id para garantir isolamento entre tenants
  */
 async function findUserByPhone(phone: string, workspaceId: number): Promise<User | undefined> {
-  const numbers = phone.replace(/\D/g, '');
+  return await withTenant(workspaceId, async (client) => {
+    const numbers = phone.replace(/\D/g, '');
 
-  // Formatos possíveis para buscar
-  const formats = [
-    `+${numbers}`,
-    `+55${numbers}`,
-    numbers,
-    numbers.startsWith('55') ? numbers.slice(2) : numbers,
-    numbers.startsWith('55') ? `+${numbers}` : `+55${numbers}`,
-  ];
+    // Formatos possíveis para buscar
+    const formats = [
+      `+${numbers}`,
+      `+55${numbers}`,
+      numbers,
+      numbers.startsWith('55') ? numbers.slice(2) : numbers,
+      numbers.startsWith('55') ? `+${numbers}` : `+55${numbers}`,
+    ];
 
-  const uniqueFormats = [...new Set(formats)];
+    const uniqueFormats = [...new Set(formats)];
 
-  for (const format of uniqueFormats) {
-    const { rows } = await dbQuery(
+    for (const format of uniqueFormats) {
+      const { rows } = await client.query(
+        `select u.*, i.nome as imobiliaria_nome
+         from users u
+         left join imobiliarias i on i.id = u.imobiliaria_id
+         where u.telefone = $1 and u.workspace_id = $2
+         limit 1`,
+        [format, workspaceId]
+      );
+      const data = rows[0];
+
+      if (data) {
+        if (data.imobiliaria_nome) {
+          data.imobiliarias = { nome: data.imobiliaria_nome };
+        }
+        return data as User;
+      }
+    }
+
+    // Tenta busca com LIKE para pegar variações
+    const lastDigits = numbers.slice(-9);
+
+    const { rows } = await client.query(
       `select u.*, i.nome as imobiliaria_nome
        from users u
        left join imobiliarias i on i.id = u.imobiliaria_id
-       where u.telefone = $1 and u.workspace_id = $2
+       where u.telefone like $1 and u.workspace_id = $2
        limit 1`,
-      [format, workspaceId]
+      [`%${lastDigits}`, workspaceId]
     );
     const data = rows[0];
 
@@ -517,29 +540,9 @@ async function findUserByPhone(phone: string, workspaceId: number): Promise<User
       }
       return data as User;
     }
-  }
 
-  // Tenta busca com LIKE para pegar variações
-  const lastDigits = numbers.slice(-9);
-
-  const { rows } = await dbQuery(
-    `select u.*, i.nome as imobiliaria_nome
-     from users u
-     left join imobiliarias i on i.id = u.imobiliaria_id
-     where u.telefone like $1 and u.workspace_id = $2
-     limit 1`,
-    [`%${lastDigits}`, workspaceId]
-  );
-  const data = rows[0];
-
-  if (data) {
-    if (data.imobiliaria_nome) {
-      data.imobiliarias = { nome: data.imobiliaria_nome };
-    }
-    return data as User;
-  }
-
-  return undefined;
+    return undefined;
+  });
 }
 
 // ============================================
@@ -627,13 +630,15 @@ async function handleSharedContact(
     return;
   }
 
-  const { rows: newUserRows } = await dbQuery(
-    `insert into users (telefone, nome, role, imobiliaria_id, gerente_id, onboarding_status, is_active, workspace_id)
-     values ($1, $2, 'corretor', $3, $4, 'completed', true, $5)
-     returning *`,
-    [newPhone, newName, sender.imobiliaria_id || null, sender.id, workspaceId]
-  );
-  const newUser = newUserRows[0];
+  const newUser = await withTenant(workspaceId, async (client) => {
+    const { rows: newUserRows } = await client.query(
+      `insert into users (telefone, nome, role, imobiliaria_id, gerente_id, onboarding_status, is_active, workspace_id)
+       values ($1, $2, 'corretor', $3, $4, 'completed', true, $5)
+       returning *`,
+      [newPhone, newName, sender.imobiliaria_id || null, sender.id, workspaceId]
+    );
+    return newUserRows[0];
+  });
 
   if (!newUser) {
     await sendTextMessage(
