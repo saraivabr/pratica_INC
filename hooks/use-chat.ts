@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import type { Conversation, Message, SearchResult } from '@/components/corretor/chat/types';
 
@@ -21,7 +21,7 @@ export function useConversations(instanceName: string) {
         totalUnread: json.total_unread || 0,
       };
     },
-    refetchInterval: 15000,
+    refetchInterval: 8000,
     enabled: !!instanceName,
   });
 
@@ -39,6 +39,8 @@ export function useConversations(instanceName: string) {
 export function useMessages(instanceName: string, phone: string | null) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const prevCountRef = useRef(0);
+  const markedReadRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<{ messages: Message[]; aiAnalysis: any; unreadCount: number }>({
     queryKey: ['chat-messages', instanceName, phone],
@@ -54,14 +56,30 @@ export function useMessages(instanceName: string, phone: string | null) {
         unreadCount: json.unread_count || 0,
       };
     },
-    refetchInterval: 10000,
+    refetchInterval: 5000,
     enabled: !!instanceName && !!phone,
   });
 
   // Reset counter when switching conversations
   useEffect(() => {
     prevCountRef.current = 0;
+    markedReadRef.current = null;
   }, [phone]);
+
+  // Auto mark-as-read when opening a conversation with unread messages
+  useEffect(() => {
+    const unread = data?.unreadCount ?? 0;
+    if (unread > 0 && phone && markedReadRef.current !== phone) {
+      markedReadRef.current = phone;
+      fetch('/api/whatsapp/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instanceName, phoneNumber: phone }),
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['chat-conversations', instanceName] });
+      }).catch(() => {});
+    }
+  }, [data?.unreadCount, phone, instanceName, queryClient]);
 
   // Auto-scroll when new messages arrive
   useEffect(() => {
@@ -95,7 +113,7 @@ export function useConnectionStatus() {
       const json = await res.json();
       return json.status === 'ready' || json.status === 'open';
     },
-    refetchInterval: 30000,
+    refetchInterval: 15000,
     initialData: false,
   });
 

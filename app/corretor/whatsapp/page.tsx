@@ -31,9 +31,10 @@ export default function CorretorWhatsAppPage() {
     }
   }, [authLoading, isAuthenticated, router])
 
-  // Check WhatsApp connection — same pattern as old /corretor/chat
+  // Check WhatsApp connection — polls every 30s to stay in sync
   useEffect(() => {
     let cancelled = false
+    let intervalId: NodeJS.Timeout | null = null
 
     const checkWhatsApp = async (attempt = 0) => {
       try {
@@ -41,7 +42,7 @@ export default function CorretorWhatsAppPage() {
         if (cancelled) return
 
         if (!res.ok) {
-          // Auth not ready yet — retry up to 3 times
+          // Auth not ready yet — retry up to 3 times on initial load
           if (attempt < 3) {
             retryRef.current = setTimeout(() => checkWhatsApp(attempt + 1), 1000)
             return
@@ -69,11 +70,14 @@ export default function CorretorWhatsAppPage() {
 
     if (isAuthenticated) {
       checkWhatsApp()
+      // Re-check every 30s to catch reconnections
+      intervalId = setInterval(() => checkWhatsApp(), 30000)
     }
 
     return () => {
       cancelled = true
       if (retryRef.current) clearTimeout(retryRef.current)
+      if (intervalId) clearInterval(intervalId)
     }
   }, [isAuthenticated])
 

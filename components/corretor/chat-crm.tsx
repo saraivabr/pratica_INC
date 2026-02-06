@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 import {
   Search,
@@ -29,6 +31,7 @@ import { ConversationItem } from './chat/conversation-item';
 import { ConnectionIndicator } from './chat/connection-indicator';
 import { ChatHeader } from './chat/chat-header';
 import { ChatInput } from './chat/chat-input';
+import { useRealtime } from '@/hooks/use-realtime';
 
 // Lazy load LeadPanel
 const LeadPanel = dynamic(() => import('./lead-panel').then(mod => mod.LeadPanel), {
@@ -46,6 +49,8 @@ interface ChatCRMProps {
 }
 
 export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
+  const queryClient = useQueryClient();
+
   // UI state only
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   const [showConversations, setShowConversations] = useState(true);
@@ -60,6 +65,9 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
   const { send, isSending } = useSendMessage(instanceName);
   const { results: searchResults, isSearching } = useServerSearch(searchQuery);
   const sendTyping = useSendTyping(instanceName);
+
+  // Real-time SSE updates (invalidates React Query on new messages)
+  useRealtime(instanceName);
 
   // Notifications
   const notifications = useWhatsAppNotifications(instanceName, {
@@ -94,6 +102,31 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
     if (!selectedPhone) return;
     await send({ phone: selectedPhone, message });
   };
+
+  const handleSendMedia = useCallback(async (data: { mediaUrl: string; fileName: string; mediaType: string; caption?: string }) => {
+    if (!selectedPhone) return;
+    try {
+      const res = await fetch('/api/whatsapp/send-media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instanceName,
+          phoneNumber: selectedPhone,
+          mediaUrl: data.mediaUrl,
+          fileName: data.fileName,
+          mediaType: data.mediaType,
+          caption: data.caption,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      // Refresh messages
+      queryClient.invalidateQueries({ queryKey: ['chat-messages', instanceName, selectedPhone] });
+      queryClient.invalidateQueries({ queryKey: ['chat-conversations', instanceName] });
+    } catch (err: any) {
+      toast.error('Erro ao enviar midia: ' + (err.message || 'Tente novamente'));
+    }
+  }, [instanceName, selectedPhone, queryClient]);
 
   // Use ref to avoid stale closure in LeadPanel callback
   const selectedPhoneRef = useRef(selectedPhone);
@@ -281,6 +314,7 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
               contactName={selectedConversation.contact_name}
               isSending={isSending}
               onSend={handleSend}
+              onSendMedia={handleSendMedia}
               onTyping={handleTyping}
               phoneNumber={selectedPhone}
               instanceName={instanceName}

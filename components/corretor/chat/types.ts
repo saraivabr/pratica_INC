@@ -6,10 +6,12 @@ export interface Message {
   message_type: string;
   media_url?: string;
   caption?: string;
+  mimetype?: string;
   is_from_me: boolean;
   timestamp: string;
   status?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
   contact_name?: string;
+  raw_data?: any;
 }
 
 export interface Conversation {

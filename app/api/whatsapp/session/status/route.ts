@@ -56,11 +56,11 @@ export async function GET(request: NextRequest) {
 
     const workspaceId = (workspace as any).id;
 
-    // Buscar instância do workspace (com fallback para tabela users)
+    // Buscar instância do user (per-user, NOT workspace-level)
     const userId = (user as any).id;
-    let instanceName = (workspace as any).evolution_instance_name || null;
+    let instanceName = (user as any).evolution_instance_name || null;
 
-    // Fallback: se workspace não tem instance_name, buscar do user
+    // Fallback: buscar do banco caso auth context não tenha
     if (!instanceName) {
       try {
         const { rows } = await (await import("@/lib/db")).dbQuery(

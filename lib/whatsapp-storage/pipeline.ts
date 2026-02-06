@@ -128,7 +128,8 @@ export async function upsertConversation(
   instanceName?: string
 ): Promise<void> {
   const db = getMongoDb();
-  const remoteJid = `${phoneNumber}@s.whatsapp.net`;
+  // Don't override @g.us for group chats
+  const remoteJid = phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`;
 
   const filter: Record<string, any> = { workspace_id: workspaceId, remote_jid: remoteJid };
   if (instanceName) filter.instance_name = instanceName;
@@ -167,7 +168,8 @@ export async function updateConversationOnMessage(
   instanceName?: string
 ): Promise<void> {
   const db = getMongoDb();
-  const remoteJid = `${phoneNumber}@s.whatsapp.net`;
+  // Don't override @g.us for group chats
+  const remoteJid = phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`;
 
   const filter: Record<string, any> = { workspace_id: workspaceId, remote_jid: remoteJid };
   if (instanceName) filter.instance_name = instanceName;

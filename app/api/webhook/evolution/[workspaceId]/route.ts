@@ -26,6 +26,8 @@ import {
 import { withProvider } from '@/lib/whatsapp-sender';
 import { dbQuery } from '@/lib/db';
 import { enqueueMessage } from '@/lib/message-queue';
+import { publishEvent } from '@/lib/sse-pubsub';
+import { downloadAndStoreMedia } from '@/lib/media-storage';
 import {
   getAgentConfig,
   isWithinBusinessHours,
@@ -266,6 +268,12 @@ async function handleConnectionUpdate(workspaceId: number, data: any) {
   });
 
   console.log(`[Connection Update] Instance: ${instanceName}, State: ${state}, Connected: ${isConnected}`);
+
+  // Push SSE event to connected clients
+  publishEvent(instanceName, {
+    type: 'connection_update',
+    data: { state, connected: isConnected },
+  }).catch(() => {});
 }
 
 /**
@@ -285,12 +293,36 @@ async function handleNewMessage(workspaceId: number, data: any) {
     const messageType = Object.keys(message.message || {})[0];
     const timestamp = new Date(message.messageTimestamp * 1000);
 
+    // Extract media fields from Evolution API payload
+    const msg = message.message || {};
+    const rawMediaUrl = msg.imageMessage?.url
+      || msg.videoMessage?.url
+      || msg.audioMessage?.url
+      || msg.documentMessage?.url
+      || msg.stickerMessage?.url
+      || null;
+
+    const caption = msg.imageMessage?.caption
+      || msg.videoMessage?.caption
+      || msg.documentMessage?.caption
+      || null;
+
+    const fileName = msg.documentMessage?.fileName || null;
+
+    const mimetype = msg.imageMessage?.mimetype
+      || msg.audioMessage?.mimetype
+      || msg.videoMessage?.mimetype
+      || msg.documentMessage?.mimetype
+      || msg.stickerMessage?.mimetype
+      || null;
+
     console.log('[New Message]', {
       from: phoneNumber,
       text: messageText,
       type: messageType,
       isFromMe,
       timestamp,
+      hasMedia: !!rawMediaUrl,
     });
 
     // Verificar se é uma conversa Salva-Leads ativa
@@ -310,24 +342,48 @@ async function handleNewMessage(workspaceId: number, data: any) {
     // Usar upsert para evitar duplicatas se webhook enviar mesmo evento duas vezes
     // IMPORTANTE: O índice único é (instance_name, message_id), não (workspace_id, message_id)
     const messageId = message.key?.id;
+
+    // Download media to local storage (non-blocking for speed, but we await to get the path)
+    let localMediaUrl: string | null = null;
+    if (rawMediaUrl && messageId) {
+      try {
+        localMediaUrl = await downloadAndStoreMedia(
+          data.instance,
+          messageId,
+          rawMediaUrl,
+          mimetype
+        );
+      } catch (err: any) {
+        console.error('[MediaStorage] Download error:', err.message);
+      }
+    }
+
+    const finalMediaUrl = localMediaUrl || rawMediaUrl;
+
     if (messageId) {
       await withTenant(workspaceId, async (client) => {
         await client.query(
           `INSERT INTO whatsapp_messages (
             workspace_id, instance_name, phone_number, message_id, message_type,
-            message_text, is_from_me, timestamp, raw_data
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            message_text, media_url, caption, mimetype, is_from_me, timestamp, raw_data
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
           ON CONFLICT (instance_name, message_id)
           DO UPDATE SET
             updated_at = NOW(),
-            raw_data = EXCLUDED.raw_data`,
+            raw_data = EXCLUDED.raw_data,
+            media_url = COALESCE(EXCLUDED.media_url, whatsapp_messages.media_url),
+            caption = COALESCE(EXCLUDED.caption, whatsapp_messages.caption),
+            mimetype = COALESCE(EXCLUDED.mimetype, whatsapp_messages.mimetype)`,
           [
             workspaceId,
             data.instance,
             phoneNumber,
             messageId,
             messageType,
-            messageText,
+            messageText || caption || '',
+            finalMediaUrl,
+            caption,
+            mimetype,
             isFromMe,
             timestamp.toISOString(),
             JSON.stringify(message),
@@ -342,7 +398,10 @@ async function handleNewMessage(workspaceId: number, data: any) {
         phone_number: phoneNumber,
         message_id: messageId,
         message_type: messageType,
-        message_text: messageText,
+        message_text: messageText || caption || '',
+        media_url: finalMediaUrl,
+        caption,
+        mimetype,
         is_from_me: isFromMe,
         timestamp: timestamp.toISOString(),
         raw_data: message,
@@ -367,6 +426,9 @@ async function handleNewMessage(workspaceId: number, data: any) {
         message_id: messageId,
         message_type: messageType,
         message_text: messageText,
+        media_url: finalMediaUrl,
+        caption,
+        mimetype,
         is_from_me: isFromMe,
         is_group: false,
         has_media: hasMedia,
@@ -380,7 +442,19 @@ async function handleNewMessage(workspaceId: number, data: any) {
       enqueueMessage(workspaceId, 'analyze_conversation', {
         phone_number: phoneNumber,
         workspace_id: workspaceId,
+        instance_name: data.instance,
       }).catch(err => console.error('[Pipeline] Enqueue analyze error:', err.message));
+
+      // Push SSE event for instant UI update
+      publishEvent(data.instance, {
+        type: 'new_message',
+        data: {
+          phone_number: phoneNumber,
+          is_from_me: isFromMe,
+          message_type: messageType,
+          preview: messageText?.slice(0, 80) || '',
+        },
+      }).catch(() => {});
     }
 
     // Apenas processar leads para mensagens recebidas
@@ -740,6 +814,16 @@ async function handleMessageUpdate(workspaceId: number, data: any) {
         { message_id: messageId },
         { status: newStatus }
       );
+
+      // Push SSE event for read receipts
+      const instanceName = data.instance;
+      if (instanceName) {
+        const phone = update.key?.remoteJid?.replace('@s.whatsapp.net', '');
+        publishEvent(instanceName, {
+          type: 'message_update',
+          data: { phone_number: phone, message_id: messageId, status: newStatus },
+        }).catch(() => {});
+      }
     }
   } catch (error) {
     console.error('[Handle Message Update] Error:', error);

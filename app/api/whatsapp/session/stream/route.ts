@@ -1,45 +1,81 @@
+/**
+ * SSE: Real-time WhatsApp events stream
+ *
+ * GET /api/whatsapp/session/stream
+ *
+ * Pushes events via Server-Sent Events when:
+ * - New message arrives (new_message)
+ * - Connection status changes (connection_update)
+ * - Message status updates (message_update)
+ *
+ * Client subscribes and invalidates React Query cache on events,
+ * giving the appearance of real-time updates without polling.
+ */
+
 import { NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/lib/api-auth";
-import { findUserWorkspace } from "@/lib/tenant-context";
+import { subscribeToInstance } from "@/lib/sse-pubsub";
 
 export const runtime = "nodejs";
-
-function getWorkerUrl() {
-  const base = process.env.WHATSAPP_WORKER_URL;
-  if (!base) {
-    throw new Error("WHATSAPP_WORKER_URL is required");
-  }
-  return base.replace(/\/$/, "");
-}
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const user = await getAuthenticatedUser(request);
   if (!user) {
-    return new Response("Não autorizado", { status: 401 });
+    return new Response("Unauthorized", { status: 401 });
   }
 
-  const workspace = await findUserWorkspace(user);
-  if (!workspace) {
-    return new Response("Workspace não configurado", { status: 400 });
+  const instanceName = (user as any).evolution_instance_name;
+  if (!instanceName) {
+    return new Response("No WhatsApp instance", { status: 400 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const channel = searchParams.get("channel");
-  if (!channel) {
-    return new Response("Canal não especificado", { status: 400 });
-  }
+  const { events, cleanup } = subscribeToInstance(instanceName);
 
-  const workerUrl = `${getWorkerUrl()}/api/whatsapp/${workspace.id}/${user.id}/stream?channel=${encodeURIComponent(channel)}`;
-  const workerResponse = await fetch(workerUrl, {
-    headers: { Accept: "text/event-stream" },
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+
+      // Send initial connected event
+      controller.enqueue(
+        encoder.encode(`event: connected\ndata: ${JSON.stringify({ instance: instanceName })}\n\n`)
+      );
+
+      try {
+        for await (const message of events) {
+          if (message === '') {
+            // Heartbeat to keep connection alive
+            controller.enqueue(encoder.encode(`: heartbeat\n\n`));
+          } else {
+            try {
+              const parsed = JSON.parse(message);
+              controller.enqueue(
+                encoder.encode(`event: ${parsed.type}\ndata: ${JSON.stringify(parsed.data || {})}\n\n`)
+              );
+            } catch {
+              controller.enqueue(
+                encoder.encode(`event: update\ndata: ${message}\n\n`)
+              );
+            }
+          }
+        }
+      } catch {
+        // Stream closed
+      } finally {
+        cleanup();
+      }
+    },
+    cancel() {
+      cleanup();
+    },
   });
 
-  return new Response(workerResponse.body, {
-    status: workerResponse.status,
+  return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no", // Disable nginx buffering
     },
   });
 }
