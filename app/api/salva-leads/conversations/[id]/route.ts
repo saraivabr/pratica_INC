@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getConversation } from '@/lib/salva-leads/conversation';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,6 +8,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const ctx = await requireWorkspaceContext(request);
+  if (ctx.error) return ctx.error;
+
   const { id: idStr } = await params;
   const id = parseInt(idStr);
 

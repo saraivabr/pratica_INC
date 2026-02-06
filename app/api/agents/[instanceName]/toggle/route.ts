@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { toggleAgentActive, getAgentConfig } from '@/lib/agents/config';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 interface RouteParams {
   params: Promise<{ instanceName: string }>;
@@ -9,11 +10,13 @@ interface RouteParams {
  * PATCH /api/agents/[instanceName]/toggle
  * Alterna o estado ativo/inativo de um agente
  */
-export async function PATCH(request: Request, { params }: RouteParams) {
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const { instanceName } = await params;
-    const { searchParams } = new URL(request.url);
-    const workspaceId = parseInt(searchParams.get('workspaceId') || '1', 10);
+    const workspaceId = ctx.workspaceId;
 
     // Verifica se agente existe
     const existingConfig = await getAgentConfig(workspaceId, instanceName);

@@ -6,25 +6,22 @@ import {
   resumeBot,
   updateConversationStatus
 } from '@/lib/salva-leads/conversation';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
 // GET: Listar conversas
 export async function GET(request: NextRequest) {
+  const ctx = await requireWorkspaceContext(request);
+  if (ctx.error) return ctx.error;
+
   const searchParams = request.nextUrl.searchParams;
 
-  const workspaceId = parseInt(searchParams.get('workspaceId') || '0');
+  const workspaceId = ctx.workspaceId;
   const status = searchParams.get('status') || undefined;
   const corretorId = searchParams.get('corretorId') || undefined;
   const limit = parseInt(searchParams.get('limit') || '50');
   const offset = parseInt(searchParams.get('offset') || '0');
-
-  if (!workspaceId) {
-    return NextResponse.json(
-      { error: 'workspaceId is required' },
-      { status: 400 }
-    );
-  }
 
   try {
     const conversations = await listConversations(workspaceId, {
@@ -44,7 +41,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('[Salva-Leads API] Erro listando conversas:', error);
     return NextResponse.json(
-      { error: error.message },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
@@ -53,6 +50,9 @@ export async function GET(request: NextRequest) {
 // PATCH: Atualizar conversa (pausar/retomar bot, mudar status)
 export async function PATCH(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const body = await request.json();
     const { id, action, status } = body;
 
@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest) {
   } catch (error: any) {
     console.error('[Salva-Leads API] Erro atualizando conversa:', error);
     return NextResponse.json(
-      { error: error.message },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }

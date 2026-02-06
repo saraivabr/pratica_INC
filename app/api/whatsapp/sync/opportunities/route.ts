@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 // Use nodejs runtime para acesso ao banco de dados PostgreSQL
 export const runtime = 'nodejs';
@@ -39,29 +40,17 @@ export const runtime = 'nodejs';
  */
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const searchParams = request.nextUrl.searchParams;
 
     // Parse query params
-    const workspaceIdParam = searchParams.get('workspaceId');
     const potential = searchParams.get('potential') || 'all';
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    // Validate workspaceId
-    if (!workspaceIdParam) {
-      return NextResponse.json(
-        { success: false, error: 'workspaceId e obrigatorio' },
-        { status: 400 }
-      );
-    }
-
-    const workspaceId = parseInt(workspaceIdParam, 10);
-    if (isNaN(workspaceId)) {
-      return NextResponse.json(
-        { success: false, error: 'workspaceId deve ser um numero' },
-        { status: 400 }
-      );
-    }
+    const workspaceId = ctx.workspaceId;
 
     // Validate potential filter
     const validPotentials = ['alto', 'medio', 'baixo', 'all'];

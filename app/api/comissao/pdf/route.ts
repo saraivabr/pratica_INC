@@ -7,12 +7,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createElement } from "react";
 import { ComissaoPDFTemplate } from "@/components/pdf-templates/comissao-template";
+import { requireWorkspaceContext } from "@/lib/api-helpers";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const data = await request.json();
 
     // Gerar PDF

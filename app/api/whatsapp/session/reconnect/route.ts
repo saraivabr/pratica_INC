@@ -8,9 +8,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getQRCode } from '@/lib/evolution-api';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const body = await request.json();
     const { instanceName } = body;
 

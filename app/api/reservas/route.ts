@@ -1,10 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 const BASE_URL = process.env.CVCRM_BASE_URL || 'https://pratica.cvcrm.com.br';
 const EMAIL = process.env.CVCRM_EMAIL || '';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     try {
+        const ctx = await requireWorkspaceContext(request);
+        if (ctx.error) return ctx.error;
+
         const token = process.env.CVCRM_TOKEN_RESERVA || '';
 
         if (!token) {

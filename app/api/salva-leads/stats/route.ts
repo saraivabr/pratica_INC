@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const workspaceId = parseInt(searchParams.get('workspaceId') || '0');
-  const period = searchParams.get('period') || '7d'; // 7d, 30d, all
+  const ctx = await requireWorkspaceContext(request);
+  if (ctx.error) return ctx.error;
 
-  if (!workspaceId) {
-    return NextResponse.json(
-      { error: 'workspaceId is required' },
-      { status: 400 }
-    );
-  }
+  const searchParams = request.nextUrl.searchParams;
+  const workspaceId = ctx.workspaceId;
+  const period = searchParams.get('period') || '7d'; // 7d, 30d, all
 
   try {
     // Calcular data de início baseado no período

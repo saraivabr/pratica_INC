@@ -98,7 +98,8 @@ interface SessionData {
 }
 
 function getSessionData(request: NextRequest): SessionData | null {
-  // Check for session cookie
+  // Check for non-httpOnly session cookie (pratica-session)
+  // This cookie contains role + workspaceId for middleware routing + client UI
   const sessionCookie = request.cookies.get('pratica-session')
 
   if (sessionCookie?.value) {
@@ -106,12 +107,14 @@ function getSessionData(request: NextRequest): SessionData | null {
       // Decode URL-encoded cookie value and parse JSON
       const decodedValue = decodeURIComponent(sessionCookie.value)
       const session = JSON.parse(decodedValue)
-      if (session.userId && session.phone) {
+
+      // New format: { role, workspaceId, userId, nome }
+      if (session.userId) {
         return {
           userId: session.userId,
-          phone: session.phone,
+          phone: session.phone, // may be undefined in new format, that's OK for routing
           role: session.role || 'corretor',
-          workspaceId: session.workspaceId  // NEW: User Workspace
+          workspaceId: session.workspaceId
         }
       }
     } catch {

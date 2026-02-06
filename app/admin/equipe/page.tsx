@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/tabs"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 interface Imobiliaria {
   id: string
@@ -190,18 +191,16 @@ export default function EquipePage() {
       const data = await res.json()
       if (data.success) {
         const r = data.results
-        alert(
-          `Sincronização completa!\n\n` +
-          `Imobiliárias:\n- Criadas: ${r.imobiliarias.created}\n- Atualizadas: ${r.imobiliarias.updated}\n\n` +
-          `Corretores:\n- Criados: ${r.corretores.created}\n- Atualizados: ${r.corretores.updated}\n- Vinculados: ${r.corretores.linked}`
+        toast.success(
+          `Sincronização completa! Imobiliárias: ${r.imobiliarias.created} criadas, ${r.imobiliarias.updated} atualizadas. Corretores: ${r.corretores.created} criados, ${r.corretores.updated} atualizados, ${r.corretores.linked} vinculados.`
         )
         fetchData()
         fetchSyncData()
       } else {
-        alert(`Erro: ${data.error}`)
+        toast.error(`Erro: ${data.error}`)
       }
     } catch (error) {
-      alert("Erro ao sincronizar")
+      toast.error("Erro ao sincronizar")
     }
     setSyncing(false)
   }
@@ -216,14 +215,14 @@ export default function EquipePage() {
       })
       const data = await res.json()
       if (data.success) {
-        alert(`Sincronização concluída!\nCriados: ${data.results.created}\nAtualizados: ${data.results.updated}`)
+        toast.success(`Sincronização concluída! Criados: ${data.results.created}, Atualizados: ${data.results.updated}`)
         fetchData()
         fetchSyncData()
       } else {
-        alert(`Erro: ${data.error}`)
+        toast.error(`Erro: ${data.error}`)
       }
     } catch (error) {
-      alert("Erro ao sincronizar")
+      toast.error("Erro ao sincronizar")
     }
     setSyncing(false)
   }
@@ -246,10 +245,10 @@ export default function EquipePage() {
         fetchData()
       } else {
         const data = await res.json()
-        alert(data.error || "Erro ao salvar")
+        toast.error(data.error || "Erro ao salvar")
       }
     } catch (error) {
-      alert("Erro ao salvar")
+      toast.error("Erro ao salvar")
     }
   }
 
@@ -271,10 +270,10 @@ export default function EquipePage() {
         fetchData()
       } else {
         const data = await res.json()
-        alert(data.error || "Erro ao salvar")
+        toast.error(data.error || "Erro ao salvar")
       }
     } catch (error) {
-      alert("Erro ao salvar")
+      toast.error("Erro ao salvar")
     }
   }
 
@@ -286,7 +285,7 @@ export default function EquipePage() {
       fetchData()
     } else {
       const data = await res.json()
-      alert(data.error || "Erro ao excluir")
+      toast.error(data.error || "Erro ao excluir")
     }
   }
 
@@ -298,7 +297,7 @@ export default function EquipePage() {
       fetchData()
     } else {
       const data = await res.json()
-      alert(data.error || "Erro ao excluir")
+      toast.error(data.error || "Erro ao excluir")
     }
   }
 

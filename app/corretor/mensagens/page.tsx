@@ -117,12 +117,10 @@ export default function CorretorMensagensPage() {
           setLoading(false)
         } else {
           // Sem mensagens - sincronizar automaticamente
-          console.log("[Mensagens] Nenhuma conversa encontrada, iniciando sync...")
           setSyncing(true)
           try {
             const syncRes = await fetch("/api/whatsapp/sync", { method: "POST" })
-            const syncData = await syncRes.json()
-            console.log("[Mensagens] Sync concluído:", syncData)
+            await syncRes.json()
             setSyncing(false)
 
             // Buscar novamente após sync

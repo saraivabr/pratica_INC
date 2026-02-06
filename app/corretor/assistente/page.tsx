@@ -18,6 +18,7 @@ import {
   Clock,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import ReactMarkdown from "react-markdown"
 
 interface Conversa {
@@ -65,7 +66,7 @@ export default function AssistentePage() {
     fetch("/api/assistente/chat", { method: "GET" })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data?.conversas) setConversas(data.conversas) })
-      .catch(() => {})
+      .catch((err) => { console.error('Erro ao carregar conversas:', err); toast.error('Erro ao carregar conversas'); })
   }, [isAuthenticated])
 
   // Scroll to bottom on new messages
@@ -150,7 +151,7 @@ export default function AssistentePage() {
                 return updated
               })
             }
-          } catch {}
+          } catch (err) { console.error('Erro no streaming:', err); toast.error('Erro ao processar resposta'); }
         }
       }
     } catch (err: any) {

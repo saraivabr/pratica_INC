@@ -3,12 +3,28 @@ import { dbQuery } from '@/lib/db';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 import { validateRequest, VerifyOTPSchema } from '@/lib/validation-schemas';
 import { normalizePhone } from '@/lib/supabase';
+import { setAuthCookie } from '@/lib/api-auth';
+import { timingSafeEqual } from 'crypto';
+
+/**
+ * Timing-safe OTP comparison to prevent timing attacks.
+ */
+function safeOtpCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a, 'utf-8');
+    const bufB = Buffer.from(b, 'utf-8');
+    if (bufA.length !== bufB.length) return false;
+    return timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(request: Request) {
   try {
     // Validate request body with Zod
     const validation = await validateRequest(request, VerifyOTPSchema);
-    
+
     if (!validation.success) {
       return NextResponse.json(
         { error: validation.error },
@@ -44,13 +60,13 @@ export async function POST(request: Request) {
 
     // Find session and verify OTP
     const { rows } = await dbQuery(
-      `select s.*, 
-              u.id as user_id, 
-              u.telefone, 
-              u.nome, 
-              u.role, 
-              u.gerente_id, 
-              u.avatar_url, 
+      `select s.*,
+              u.id as user_id,
+              u.telefone,
+              u.nome,
+              u.role,
+              u.gerente_id,
+              u.avatar_url,
               u.is_active,
               u.workspace_id,
               u.imobiliaria_id,
@@ -72,8 +88,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if OTP matches
-    if (session.otp_code !== otpCode) {
+    // Check if OTP matches (timing-safe comparison)
+    if (!session.otp_code || !safeOtpCompare(session.otp_code, otpCode)) {
       return NextResponse.json(
         { error: 'Código incorreto' },
         { status: 400 }
@@ -106,7 +122,8 @@ export async function POST(request: Request) {
       // Não bloquear login - workspace será criado automaticamente pelo requireWorkspaceContext
     }
 
-    return NextResponse.json({
+    // Build response with signed auth cookie
+    const responseData = {
       success: true,
       sessionId: session.id,
       user: {
@@ -122,7 +139,18 @@ export async function POST(request: Request) {
         imobiliaria: session.imobiliaria_nome,
         onboarding_status: session.onboarding_status,
       },
+    };
+
+    const response = NextResponse.json(responseData);
+
+    // Set signed httpOnly auth cookie + non-httpOnly session cookie
+    setAuthCookie(response, session.id, session.user_id, {
+      role: session.role,
+      workspaceId: session.workspace_id,
+      nome: session.nome,
     });
+
+    return response;
   } catch (error) {
     console.error('Error in verify-otp:', error);
     return NextResponse.json(

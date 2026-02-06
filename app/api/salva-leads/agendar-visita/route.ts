@@ -1,27 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/salva-leads/agendar-visita
- * 
+ *
  * Agenda uma visita e notifica o corretor
  * Body:
  * - lead_id (string)
  * - data_visita (string - ISO format)
  * - horario (string - "HH:mm")
  * - observacoes (string, opcional)
- * - workspace_id (number)
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { lead_id, data_visita, horario, observacoes, workspace_id } = body;
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
 
-    if (!lead_id || !data_visita || !horario || !workspace_id) {
+    const body = await request.json();
+    const { lead_id, data_visita, horario, observacoes } = body;
+    const workspace_id = ctx.workspaceId;
+
+    if (!lead_id || !data_visita || !horario) {
       return NextResponse.json(
-        { error: 'lead_id, data_visita, horario e workspace_id são obrigatórios' },
+        { error: 'lead_id, data_visita e horario são obrigatórios' },
         { status: 400 }
       );
     }

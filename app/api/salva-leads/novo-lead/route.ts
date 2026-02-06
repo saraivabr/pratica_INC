@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { calcularScoreLead, calcularLeadQualificado } from '@/lib/salva-leads/lead-scoring';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/salva-leads/novo-lead
- * 
+ *
  * Cria um novo lead com score automático
  * Body:
  * - nome (string)
@@ -16,12 +17,14 @@ export const dynamic = 'force-dynamic';
  * - imovel_nome (string)
  * - imovel_preco (number)
  * - filtros (object) - quartos, preco, bairro, etc
- * - workspace_id (number)
  * - corretor_id (string, opcional)
  * - source (string) - 'whatsapp_sofia', 'website', etc
  */
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const body = await request.json();
     const {
       nome,
@@ -31,15 +34,16 @@ export async function POST(request: NextRequest) {
       imovel_nome,
       imovel_preco,
       filtros = {},
-      workspace_id,
       corretor_id,
       source = 'whatsapp_sofia',
     } = body;
 
+    const workspace_id = ctx.workspaceId;
+
     // Validações
-    if (!nome || !whatsapp || !workspace_id) {
+    if (!nome || !whatsapp) {
       return NextResponse.json(
-        { error: 'nome, whatsapp e workspace_id são obrigatórios' },
+        { error: 'nome e whatsapp são obrigatórios' },
         { status: 400 }
       );
     }
@@ -149,7 +153,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[Novo-Lead] Erro:', error);
     return NextResponse.json(
-      { error: error.message },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }

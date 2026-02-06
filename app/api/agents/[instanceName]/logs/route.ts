@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getConversationLogs } from '@/lib/agents/config';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 interface RouteParams {
   params: Promise<{ instanceName: string }>;
@@ -10,19 +11,21 @@ interface RouteParams {
  * Lista logs de conversa com paginação
  *
  * Query params:
- * - workspaceId: ID do tenant (default: 1)
  * - page: Número da página (default: 1)
  * - limit: Itens por página (default: 20, max: 100)
  * - phoneNumber: Filtrar por número de telefone
  * - startDate: Data inicial (ISO string)
  * - endDate: Data final (ISO string)
  */
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const { instanceName } = await params;
     const { searchParams } = new URL(request.url);
 
-    const workspaceId = parseInt(searchParams.get('workspaceId') || '1', 10);
+    const workspaceId = ctx.workspaceId;
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const phoneNumber = searchParams.get('phoneNumber') || undefined;

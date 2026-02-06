@@ -8,6 +8,7 @@ import { createElement } from 'react';
 import { randomBytes } from 'crypto';
 import { validateRequest, WhatsAppSendMaterialSchema } from '@/lib/validation-schemas';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -74,6 +75,9 @@ function formatCurrency(value?: number): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     // Rate limiting
     const clientIp = request.headers.get('x-forwarded-for') || 'unknown';
     const rateLimit = await rateLimiter.check(`whatsapp:${clientIp}`, RateLimitConfigs.WHATSAPP_SEND);

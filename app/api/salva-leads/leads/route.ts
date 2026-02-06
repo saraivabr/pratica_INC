@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/salva-leads/leads
- * 
+ *
  * Lista leads com score e filtros
  * Query params:
- * - workspace_id (number) - obrigatório
  * - corretor_id (string, opcional)
  * - status (string, opcional) - novo, em_contato, agendado, visitou, etc
  * - qualificado (boolean, opcional) - true para só qualificados
@@ -18,21 +18,30 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const searchParams = request.nextUrl.searchParams;
-    const workspaceId = parseInt(searchParams.get('workspace_id') || '0');
+    const workspaceId = ctx.workspaceId;
     const corretorId = searchParams.get('corretor_id');
     const status = searchParams.get('status');
     const qualificado = searchParams.get('qualificado');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
-    const sort = searchParams.get('sort') || 'score DESC';
 
-    if (!workspaceId) {
-      return NextResponse.json(
-        { error: 'workspace_id é obrigatório' },
-        { status: 400 }
-      );
-    }
+    // Whitelist allowed sort options to prevent SQL injection
+    const ALLOWED_SORTS: Record<string, string> = {
+      'score': 'score DESC NULLS LAST',
+      'score_asc': 'score ASC NULLS LAST',
+      'created_at': 'created_at DESC',
+      'created_at_asc': 'created_at ASC',
+      'nome': 'COALESCE(nome, name) ASC',
+      'nome_desc': 'COALESCE(nome, name) DESC',
+      'updated_at': 'updated_at DESC',
+      'updated_at_asc': 'updated_at ASC',
+    };
+    const sortKey = searchParams.get('sort') || 'score';
+    const sort = ALLOWED_SORTS[sortKey] || ALLOWED_SORTS['score'];
 
     // Construir query dinâmica
     const conditions: string[] = ['workspace_id = $1'];

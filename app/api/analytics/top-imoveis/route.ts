@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const { searchParams } = new URL(request.url);
     const periodo = searchParams.get('periodo') || '30d';
     const limit = parseInt(searchParams.get('limit') || '10', 10);
@@ -24,12 +28,12 @@ export async function GET(request: NextRequest) {
         COUNT(*) FILTER (WHERE a.status = 'realizado') as visitas_realizadas
       FROM agendamentos a
       LEFT JOIN cvcrm_empreendimentos e ON e.cvcrm_id = a.empreendimento_id
-      WHERE COALESCE(a.imovel_id, a.empreendimento_id) IS NOT NULL ${dateFilter.replace('created_at', 'a.created_at')}
+      WHERE a.workspace_id = $1 AND COALESCE(a.imovel_id, a.empreendimento_id) IS NOT NULL ${dateFilter.replace('created_at', 'a.created_at')}
       GROUP BY COALESCE(a.imovel_id, a.empreendimento_id), COALESCE(a.imovel_nome, e.nome, 'Sem nome')
       ORDER BY total_agendamentos DESC
-      LIMIT $1
+      LIMIT $2
       `,
-      [limit]
+      [ctx.workspaceId, limit]
     );
 
     return NextResponse.json({

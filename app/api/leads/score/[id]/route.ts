@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { calculateLeadScore } from "@/utils/leadScore"
 import type { Lead } from "@/types/lead"
+import { requireWorkspaceContext } from "@/lib/api-helpers"
 
 /**
  * GET /api/leads/score/[id]
@@ -16,6 +17,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const ctx = await requireWorkspaceContext(request)
+    if (ctx.error) return ctx.error
+
     const { id } = await params
 
     if (!id) {

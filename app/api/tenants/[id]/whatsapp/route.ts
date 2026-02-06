@@ -14,12 +14,20 @@ import {
   getConnectionStatus,
   setWebhook,
 } from '@/lib/evolution-api';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
+    if (ctx.user.role !== 'admin' && ctx.user.role !== 'gerente') {
+      return NextResponse.json({ success: false, error: 'Acesso negado' }, { status: 403 });
+    }
+
     const params = await context.params;
     const workspaceId = parseInt(params.id);
 
@@ -79,6 +87,13 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
+    if (ctx.user.role !== 'admin' && ctx.user.role !== 'gerente') {
+      return NextResponse.json({ success: false, error: 'Acesso negado' }, { status: 403 });
+    }
+
     const params = await context.params;
     const workspaceId = parseInt(params.id);
 

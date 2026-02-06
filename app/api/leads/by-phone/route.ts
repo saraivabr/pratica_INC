@@ -303,7 +303,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Erro ao buscar lead por telefone:', error);
     return NextResponse.json(
-      { error: 'Erro ao buscar lead', details: String(error) },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }

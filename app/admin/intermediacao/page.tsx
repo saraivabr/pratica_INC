@@ -263,7 +263,6 @@ export default function IntermediacaoPage() {
 
   const handleExport = () => {
     // TODO: Implement export functionality
-    console.log("Exporting report...")
   }
 
   // Access denied

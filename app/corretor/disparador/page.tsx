@@ -230,7 +230,7 @@ export default function DisparadorPage() {
       const res = await fetch("/api/disparador")
       const data = await res.json()
       if (data.success) setDisparos(data.data)
-    } catch { /* ignore */ } finally {
+    } catch (err) { console.error('Erro ao buscar disparos:', err) } finally {
       setLoadingDisparos(false)
     }
   }, [])
@@ -306,7 +306,7 @@ export default function DisparadorPage() {
         setActiveDisparo((prev: any) => prev ? { ...prev, status: "cancelado" } : null)
       }
       fetchDisparos()
-    } catch { /* ignore */ }
+    } catch (err) { console.error('Erro ao cancelar disparo:', err) }
   }
 
   // Polling for active disparo progress
@@ -327,7 +327,7 @@ export default function DisparadorPage() {
             fetchDisparos()
           }
         }
-      } catch { /* ignore */ }
+      } catch (err) { console.error('Erro ao verificar progresso do disparo:', err) }
     }, 3000)
 
     return () => clearInterval(interval)

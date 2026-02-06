@@ -26,6 +26,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -436,11 +437,11 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
         await loadConversations();
         inputRef.current?.focus();
       } else {
-        alert('Erro ao enviar mensagem: ' + data.error);
+        toast.error('Erro ao enviar mensagem: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
-      alert('Erro ao enviar mensagem');
+      toast.error('Erro ao enviar mensagem');
     } finally {
       setSending(false);
     }

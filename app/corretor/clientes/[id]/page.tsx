@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import { AnimatedBackground } from "@/components/animated-background"
 import useScore from "@/lib/hooks/useScore"
 import { ScoreDisplay } from "@/components/lead/ScoreDisplay"
@@ -284,11 +285,11 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
         setIsEditingCpf(false)
         handleRefresh()
       } else {
-        alert(data.error || 'Erro ao salvar CPF')
+        toast.error(data.error || 'Erro ao salvar CPF')
       }
     } catch (error) {
       console.error('Erro ao salvar CPF:', error)
-      alert('Erro ao salvar CPF')
+      toast.error('Erro ao salvar CPF')
     } finally {
       setSavingCpf(false)
     }

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 type TipoPessoa = "fisica" | "juridica"
 type Cargo = "corretor" | "gerente" | "proprietario" | "imobiliaria" | "outro"
@@ -269,11 +270,11 @@ export default function NovoBeneficiarioPage() {
         router.push(`/admin/intermediacao/beneficiarios/${data.beneficiario.id}`)
       } else {
         const data = await res.json()
-        alert(data.error || "Erro ao salvar beneficiario")
+        toast.error(data.error || "Erro ao salvar beneficiario")
       }
     } catch (error) {
       console.error("Error saving beneficiario:", error)
-      alert("Erro ao salvar beneficiario")
+      toast.error("Erro ao salvar beneficiario")
     }
     setSaving(false)
   }

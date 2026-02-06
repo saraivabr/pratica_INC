@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Validate session with backend
+        // Validate session with backend (server sets httpOnly auth cookie via Set-Cookie)
         const response = await fetch('/api/auth/validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -49,17 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (data.valid && data.user) {
             setUser(data.user);
             setSessionId(storedSessionId);
-            // Update stored user with latest data
+            // Update stored user with latest data (localStorage for UI state only)
             localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-            // Update cookie with role and workspace_id for middleware
-            const cookieValue = JSON.stringify({ 
-              userId: data.user.id, 
-              phone: data.user.telefone, 
-              sessionId: storedSessionId, 
-              role: data.user.role,
-              workspaceId: data.user.workspace_id || data.user.workspaceId  // NEW: User Workspace
-            });
-            document.cookie = `pratica-session=${encodeURIComponent(cookieValue)}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+            // NOTE: Server sets httpOnly auth cookie + non-httpOnly session cookie via Set-Cookie headers.
+            // No need to set document.cookie here.
           } else {
             // Session invalid, clear storage
             localStorage.removeItem(SESSION_KEY);
@@ -103,19 +96,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(userData);
     setSessionId(newSessionId);
 
-    // Persist session in localStorage
+    // Persist session in localStorage (for UI state only)
     localStorage.setItem(SESSION_KEY, newSessionId);
     localStorage.setItem(USER_KEY, JSON.stringify(userData));
 
-    // Also set cookie for middleware (7 days expiry) - include role and workspace_id for server-side redirects
-    const cookieValue = JSON.stringify({ 
-      userId: userData.id, 
-      phone: userData.telefone, 
-      sessionId: newSessionId, 
-      role: userData.role,
-      workspaceId: (userData as any).workspace_id || (userData as any).workspaceId  // NEW: User Workspace
-    });
-    document.cookie = `pratica-session=${encodeURIComponent(cookieValue)}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    // NOTE: Server sets httpOnly auth cookie + non-httpOnly session cookie via Set-Cookie headers
+    // in the verify-otp response. No need to set document.cookie here.
 
     // Track login event (fire-and-forget, don't block login)
     fetch('/api/track', {
@@ -149,8 +135,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(USER_KEY);
 
-    // Clear cookie
-    document.cookie = 'pratica-session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    // Call server to clear httpOnly auth cookie
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    }).catch((err) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Failed to call logout endpoint:', err);
+      }
+    });
   }, [user]);
 
   const track = useCallback((eventType: string, page: string, data: Record<string, any> = {}) => {

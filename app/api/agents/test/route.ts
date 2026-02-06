@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAgentConfig } from '@/lib/agents/config';
 import { detectIntent, type IntentResult } from '@/lib/sofia/intents';
 import { analyzeSentiment } from '@/lib/sofia/sentiment';
 import { AgentTestRequestSchema } from '@/lib/agents/schemas';
 import type { AgentTestResponse } from '@/lib/agents/types';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 // Response templates based on intent category
 const CATEGORY_RESPONSES: Record<string, string> = {
@@ -30,10 +31,13 @@ const CATEGORY_RESPONSES: Record<string, string> = {
  * POST /api/agents/test
  * Testa resposta do agente com uma mensagem simulada
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const body = await request.json();
 
     // Validar dados com Zod
@@ -45,7 +49,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { message, workspaceId = 1, instanceName } = parseResult.data;
+    const { message, instanceName } = parseResult.data;
+    const workspaceId = ctx.workspaceId;
 
     // Buscar configuração do agente se instanceName fornecido
     let agentConfig = null;

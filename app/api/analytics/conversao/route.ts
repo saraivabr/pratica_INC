@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const { searchParams } = new URL(request.url);
     const periodo = searchParams.get('periodo') || '30d';
 
@@ -14,18 +18,18 @@ export async function GET(request: NextRequest) {
     };
     const dateFilter = periodoMap[periodo] || periodoMap['30d'];
 
-    const { rows: totalRows } = await dbQuery(`SELECT COUNT(*) as total FROM leads l WHERE 1=1 ${dateFilter}`, []);
+    const { rows: totalRows } = await dbQuery(`SELECT COUNT(*) as total FROM leads l WHERE l.workspace_id = $1 ${dateFilter}`, [ctx.workspaceId]);
     const total_leads = parseInt(totalRows[0].total, 10);
 
     const { rows: agendadosRows } = await dbQuery(
-      `SELECT COUNT(DISTINCT a.lead_id) as total FROM agendamentos a JOIN leads l ON a.lead_id = l.id WHERE a.status IN ('confirmado', 'realizado') ${dateFilter}`,
-      []
+      `SELECT COUNT(DISTINCT a.lead_id) as total FROM agendamentos a JOIN leads l ON a.lead_id = l.id WHERE l.workspace_id = $1 AND a.status IN ('confirmado', 'realizado') ${dateFilter}`,
+      [ctx.workspaceId]
     );
     const leads_agendados = parseInt(agendadosRows[0].total, 10);
 
     const { rows: convertidosRows } = await dbQuery(
-      `SELECT COUNT(*) as total FROM leads l WHERE (l.temperature = 'hot' OR l.score > 80) ${dateFilter}`,
-      []
+      `SELECT COUNT(*) as total FROM leads l WHERE l.workspace_id = $1 AND (l.temperature = 'hot' OR l.score > 80) ${dateFilter}`,
+      [ctx.workspaceId]
     );
     const leads_convertidos = parseInt(convertidosRows[0].total, 10);
 
@@ -42,6 +46,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[GET /api/analytics/conversao] Error:', error);
-    return NextResponse.json({ error: 'Erro ao calcular conversão', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

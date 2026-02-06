@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 interface Beneficiario {
   id: string
@@ -251,11 +252,11 @@ export default function BeneficiarioDetailPage({
         setIsEditing(false)
       } else {
         const data = await res.json()
-        alert(data.error || "Erro ao salvar")
+        toast.error(data.error || "Erro ao salvar")
       }
     } catch (error) {
       console.error("Error saving beneficiario:", error)
-      alert("Erro ao salvar")
+      toast.error("Erro ao salvar")
     }
     setSaving(false)
   }

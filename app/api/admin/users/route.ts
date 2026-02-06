@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbQuery } from "@/lib/db";
 import { normalizePhone } from "@/lib/supabase";
 import { getAuthenticatedUser } from "@/lib/api-auth";
+import { requireWorkspaceContext } from "@/lib/api-helpers";
 import { validateRequest, AdminUserCreateSchema } from "@/lib/validation-schemas";
 
 // GET - List all users
 export async function GET(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUser(request);
-    if (!user || (user.role !== "admin" && user.role !== "gerente")) {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
+    if (ctx.user.role !== "admin" && ctx.user.role !== "gerente") {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
@@ -21,11 +24,12 @@ export async function GET(request: NextRequest) {
       FROM users u
       LEFT JOIN imobiliarias i ON i.id = u.imobiliaria_id
       LEFT JOIN users g ON g.id = u.gerente_id
+      WHERE u.workspace_id = $1
     `;
-    const params: any[] = [];
+    const params: any[] = [ctx.workspaceId];
 
     if (imobiliariaId) {
-      query += ` WHERE u.imobiliaria_id = $1`;
+      query += ` AND u.imobiliaria_id = $2`;
       params.push(imobiliariaId);
     }
 

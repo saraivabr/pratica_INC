@@ -76,9 +76,8 @@ function CertificateCard({
           text: `Conquistei o certificado do modulo "${moduleName}" na CP Academy! Codigo: ${code}`,
           url: window.location.href,
         })
-      } catch (error) {
-        // User cancelled or share failed
-        console.log('Share cancelled or failed:', error)
+      } catch {
+        // User cancelled or share failed - no action needed
       }
     } else {
       // Fallback: copy to clipboard

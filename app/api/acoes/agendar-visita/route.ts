@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
 import { sendTextMessage } from '@/lib/zapi';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const body = await request.json();
     const {
       lead_id,

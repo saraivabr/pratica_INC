@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbQuery } from "@/lib/db";
+import { requireWorkspaceContext } from "@/lib/api-helpers";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +10,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const searchParams = request.nextUrl.searchParams;
-    const workspaceId = searchParams.get("workspaceId");
     const userId = searchParams.get("userId");
 
     // Datas para filtros
@@ -292,7 +295,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error("[Sofia Metrics] GET Error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch Sofia metrics", details: error.message },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
@@ -332,6 +335,9 @@ interface SofiaMetricEvent {
 
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const body: SofiaMetricEvent = await request.json();
     const { eventType, userId, conversationId, data, timestamp } = body;
 
@@ -395,7 +401,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("[Sofia Metrics] POST Error:", error);
     return NextResponse.json(
-      { error: "Failed to record metric event", details: error.message },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { calculateLeadScore, calculateScoreStatistics } from "@/utils/leadScore"
 import type { Lead } from "@/types/lead"
+import { requireWorkspaceContext } from "@/lib/api-helpers"
 
 /**
  * GET /api/leads/score/stats
@@ -14,8 +15,9 @@ import type { Lead } from "@/types/lead"
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    
+    const ctx = await requireWorkspaceContext(request)
+    if (ctx.error) return ctx.error
+
     // Buscar todos os leads da API
     const leadsResponse = await fetch(
       `${request.nextUrl.origin}/api/leads?limit=1000`,
@@ -73,6 +75,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request)
+    if (ctx.error) return ctx.error
+
     const body = await request.json()
     const { leadIds, leads: providedLeads } = body
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { dbQuery } from '@/lib/db'
 import { cookies, headers } from 'next/headers'
+import { setAuthCookie } from '@/lib/api-auth'
 
 async function getBaseUrl(): Promise<string> {
   const headersList = await headers()
@@ -49,26 +50,17 @@ export async function GET(request: Request) {
 
     const sessionId = sessionRows[0]?.id
 
-    // Build session cookie value
-    const sessionData = {
-      sessionId,
-      userId: adminUser.id,
-      phone: adminUser.telefone || 'admin',
+    // Build redirect response with signed auth cookies
+    const response = NextResponse.redirect(new URL(redirect, baseUrl))
+
+    // Set signed httpOnly auth cookie + non-httpOnly session cookie
+    setAuthCookie(response, sessionId, adminUser.id, {
       role: 'admin',
       nome: adminUser.nome,
-    }
-
-    // Set session cookie (reuse cookieStore from above)
-    cookieStore.set('pratica-session', JSON.stringify(sessionData), {
-      httpOnly: true, // Security: Prevent XSS attacks by making cookie inaccessible to JavaScript
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: '/',
     })
 
     // SECURITY: Clean up the one-time admin auth token
-    cookieStore.delete('admin-auth-token')
+    response.cookies.delete('admin-auth-token')
 
     // Update last login
     await dbQuery(
@@ -77,7 +69,7 @@ export async function GET(request: Request) {
     )
 
     // Redirect to admin page (without the key in URL)
-    return NextResponse.redirect(new URL(redirect, baseUrl))
+    return response
   } catch (error) {
     console.error('Error in admin-login:', error)
     const baseUrl = await getBaseUrl()

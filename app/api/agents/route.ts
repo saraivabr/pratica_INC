@@ -1,15 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAgentConfigs, upsertAgentConfig } from '@/lib/agents/config';
 import { AgentConfigRequestSchema } from '@/lib/agents/schemas';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 /**
  * GET /api/agents
  * Lista todas as configurações de agentes do tenant
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const workspaceId = parseInt(searchParams.get('workspaceId') || '1', 10);
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
+    const workspaceId = ctx.workspaceId;
 
     const configs = await getAgentConfigs(workspaceId);
 
@@ -30,8 +33,11 @@ export async function GET(request: Request) {
  * POST /api/agents
  * Cria ou atualiza configuração de agente
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const body = await request.json();
 
     // Validar dados com Zod
@@ -43,9 +49,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const { workspaceId = 1, userId, ...input } = parseResult.data;
+    const { userId, ...input } = parseResult.data;
 
-    const config = await upsertAgentConfig(workspaceId, input, userId);
+    const config = await upsertAgentConfig(ctx.workspaceId, input, userId);
 
     if (!config) {
       return NextResponse.json(

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const { searchParams } = new URL(request.url);
     const periodo = searchParams.get('periodo') || '30d';
 
@@ -15,14 +19,14 @@ export async function GET(request: NextRequest) {
     const dateFilter = periodoMap[periodo] || periodoMap['30d'];
 
     const { rows: agendamentosRows } = await dbQuery(
-      `SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'realizado') as realizados FROM agendamentos WHERE 1=1 ${dateFilter}`,
-      []
+      `SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'realizado') as realizados FROM agendamentos WHERE workspace_id = $1 ${dateFilter}`,
+      [ctx.workspaceId]
     );
     const agendamentos = agendamentosRows[0];
 
     const { rows: simulacoesRows } = await dbQuery(
-      `SELECT COUNT(*) as total, 0 as enviadas FROM cvcrm_venda_simulacoes WHERE 1=1 ${dateFilter.replace('created_at', 'synced_at')}`,
-      []
+      `SELECT COUNT(*) as total, 0 as enviadas FROM cvcrm_venda_simulacoes WHERE workspace_id = $1 ${dateFilter.replace('created_at', 'synced_at')}`,
+      [ctx.workspaceId]
     );
     const simulacoes = simulacoesRows[0];
 

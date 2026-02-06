@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
 import { validateRequest, ValidateSessionSchema } from '@/lib/validation-schemas';
+import { setAuthCookie } from '@/lib/api-auth';
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
 
     // Find and validate session
     const { rows } = await dbQuery(
-      `select s.*, u.id as user_id, u.telefone, u.nome, u.role, u.gerente_id, u.avatar_url, u.is_active
+      `select s.*, u.id as user_id, u.telefone, u.nome, u.role, u.gerente_id, u.avatar_url, u.is_active, u.workspace_id
        from sessions s
        join users u on u.id = s.user_id
        where s.id = $1 and s.is_verified = true and s.expires_at > now()
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ valid: false });
     }
 
-    return NextResponse.json({
+    const responseData = {
       valid: true,
       sessionId: sessionId,
       user: {
@@ -40,8 +41,21 @@ export async function POST(request: Request) {
         role: session.role,
         gerente_id: session.gerente_id,
         avatar_url: session.avatar_url,
+        workspace_id: session.workspace_id,
+        workspaceId: session.workspace_id,
       },
+    };
+
+    const response = NextResponse.json(responseData);
+
+    // Refresh/set signed httpOnly auth cookie + non-httpOnly session cookie
+    setAuthCookie(response, sessionId, session.user_id, {
+      role: session.role,
+      workspaceId: session.workspace_id,
+      nome: session.nome,
     });
+
+    return response;
   } catch (error) {
     console.error('Error in validate:', error);
     return NextResponse.json({ valid: false });

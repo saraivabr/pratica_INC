@@ -7,12 +7,20 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getWorkspace, updateWorkspace } from '@/lib/tenant-context';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
+    if (ctx.user.role !== 'admin' && ctx.user.role !== 'gerente') {
+      return NextResponse.json({ success: false, error: 'Acesso negado' }, { status: 403 });
+    }
+
     const { id } = await params;
     const workspaceId = parseInt(id);
 
@@ -39,7 +47,7 @@ export async function GET(
   } catch (error: any) {
     console.error('Error getting tenant:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
@@ -50,6 +58,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
+    if (ctx.user.role !== 'admin' && ctx.user.role !== 'gerente') {
+      return NextResponse.json({ success: false, error: 'Acesso negado' }, { status: 403 });
+    }
+
     const { id } = await params;
     const workspaceId = parseInt(id);
 
@@ -71,7 +86,7 @@ export async function PATCH(
   } catch (error: any) {
     console.error('Error updating tenant:', error);
 
-    if (error.message.includes('not found')) {
+    if (error.message && error.message.includes('not found')) {
       return NextResponse.json(
         { success: false, error: 'Tenant not found' },
         { status: 404 }
@@ -79,7 +94,7 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }

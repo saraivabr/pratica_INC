@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   getAgentConfig,
   upsertAgentConfig,
   deleteAgentConfig,
 } from '@/lib/agents/config';
 import type { AgentConfigInput } from '@/lib/agents/types';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 interface RouteParams {
   params: Promise<{ instanceName: string }>;
@@ -14,11 +15,13 @@ interface RouteParams {
  * GET /api/agents/[instanceName]
  * Obtém configuração específica de um agente
  */
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const { instanceName } = await params;
-    const { searchParams } = new URL(request.url);
-    const workspaceId = parseInt(searchParams.get('workspaceId') || '1', 10);
+    const workspaceId = ctx.workspaceId;
 
     const config = await getAgentConfig(workspaceId, instanceName);
 
@@ -46,11 +49,13 @@ export async function GET(request: Request, { params }: RouteParams) {
  * PUT /api/agents/[instanceName]
  * Atualiza configuração de um agente
  */
-export async function PUT(request: Request, { params }: RouteParams) {
+export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const { instanceName } = await params;
-    const { searchParams } = new URL(request.url);
-    const workspaceId = parseInt(searchParams.get('workspaceId') || '1', 10);
+    const workspaceId = ctx.workspaceId;
 
     const body = await request.json();
     const { userId, ...input } = body as AgentConfigInput & { userId?: string };
@@ -88,11 +93,13 @@ export async function PUT(request: Request, { params }: RouteParams) {
  * DELETE /api/agents/[instanceName]
  * Deleta configuração de um agente
  */
-export async function DELETE(request: Request, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const { instanceName } = await params;
-    const { searchParams } = new URL(request.url);
-    const workspaceId = parseInt(searchParams.get('workspaceId') || '1', 10);
+    const workspaceId = ctx.workspaceId;
 
     const deleted = await deleteAgentConfig(workspaceId, instanceName);
 

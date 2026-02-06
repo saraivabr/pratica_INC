@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Printer, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface PrintButtonProps {
   contentRef: React.RefObject<HTMLElement | null>;
@@ -283,7 +284,7 @@ export function PrintButton({
       }
     } catch (error) {
       console.error('Erro ao imprimir:', error);
-      alert(error instanceof Error ? error.message : 'Erro ao imprimir');
+      toast.error(error instanceof Error ? error.message : 'Erro ao imprimir');
     } finally {
       setIsPrinting(false);
     }

@@ -1,14 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { dbQuery } from '@/lib/db';
+import { requireWorkspaceContext } from '@/lib/api-helpers';
 
 /**
  * GET /api/sofia/config
  * Busca configuração do agente Sofia para o tenant
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const workspaceId = searchParams.get('workspaceId') || '1';
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
+    const workspaceId = ctx.workspaceId;
 
     // Buscar configuração do tenant
     const { rows: tenants } = await dbQuery(
@@ -54,10 +57,14 @@ export async function GET(request: Request) {
  * POST /api/sofia/config
  * Atualiza configuração do agente Sofia
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireWorkspaceContext(request);
+    if (ctx.error) return ctx.error;
+
     const body = await request.json();
-    const { workspaceId = 1, config } = body;
+    const { config } = body;
+    const workspaceId = ctx.workspaceId;
 
     if (!config) {
       return NextResponse.json({ error: 'Configuração é obrigatória' }, { status: 400 });
