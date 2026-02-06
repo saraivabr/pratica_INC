@@ -12,7 +12,6 @@ import { getAuthenticatedUser } from "@/lib/api-auth";
 import { findUserWorkspace, withTenant } from "@/lib/tenant-context";
 import { getConnectionStatus, getQRCode, fetchInstances } from "@/lib/evolution-api";
 
-
 export const runtime = "nodejs";
 
 // Extrai número do JID do WhatsApp (5511999999999@s.whatsapp.net -> 5511999999999)

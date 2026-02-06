@@ -119,7 +119,8 @@ async function fetchUserLeads(userId: string, client?: PoolClient): Promise<Lead
         AND temperature >= 80
       ORDER BY last_contact_at ASC NULLS FIRST
       LIMIT 50`,
-      [userId]
+      [userId],
+      client
     );
 
     return rows.map((row) => ({
@@ -157,7 +158,8 @@ async function fetchUserMeta(userId: string, client?: PoolClient): Promise<MetaI
         AND g.status = 'active'
       ORDER BY g.created_at DESC
       LIMIT 1`,
-      [userId, endOfMonth.toISOString(), startOfMonth.toISOString()]
+      [userId, endOfMonth.toISOString(), startOfMonth.toISOString()],
+      client
     );
 
     if (rows.length === 0) return undefined;
@@ -198,7 +200,8 @@ async function fetchUserAtividades(userId: string, client?: PoolClient): Promise
         AND a.scheduled_at <= NOW() + INTERVAL '2 hours'
       ORDER BY a.scheduled_at ASC
       LIMIT 10`,
-      [userId]
+      [userId],
+      client
     );
 
     return rows.map((row) => ({
@@ -236,7 +239,8 @@ async function fetchUserVendas(userId: string, client?: PoolClient): Promise<Ven
         AND r.created_at <= NOW() - INTERVAL '6 days'
       ORDER BY r.created_at DESC
       LIMIT 10`,
-      [userId]
+      [userId],
+      client
     );
 
     return rows.map((row) => ({
@@ -302,7 +306,8 @@ async function fetchLastTriggerTimes(
         AND event_type = 'sofia_proactive_sent'
         AND created_at >= NOW() - INTERVAL '7 days'
       GROUP BY data->>'triggerId'`,
-      [userId]
+      [userId],
+      client
     );
 
     const times: Record<string, Date> = {};
@@ -516,7 +521,8 @@ async function getActiveUsersForTenant(
          AND u.telefone != ''
          AND u.onboarding_status = 'completed'
        ORDER BY u.nome ASC`,
-      [workspaceId]
+      [workspaceId],
+      client
     );
 
     return rows;
