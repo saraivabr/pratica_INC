@@ -1,11 +1,10 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   Users,
-  AlertTriangle,
   TrendingUp,
   ChevronRight,
   ChevronDown,
@@ -13,27 +12,23 @@ import {
   MessageSquare,
   Sparkles,
   Loader2,
-  CheckCircle2,
   Calendar,
   Zap,
   Target,
   Flame,
   ShieldAlert,
   CalendarX,
-  ArrowUpRight,
-  X,
-  BarChart3,
   DollarSign,
   Trophy,
-  Clock,
+  Send,
+  Plus,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { useAuth, usePageTracking } from "@/lib/auth-context"
 import { AnimatedBackground } from "@/components/animated-background"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { UrgentLeadsQueue } from "@/components/dashboard/urgent-leads-queue"
-import { EmptyState } from "@/components/ui/empty-state"
+import ReactMarkdown from "react-markdown"
 
 interface Lead {
   id: string
@@ -58,6 +53,12 @@ interface CategorizedLeads {
   overdue: CategorizedItem[]
 }
 
+interface Mensagem {
+  id?: number
+  role: "user" | "assistant"
+  content: string
+}
+
 // Helper function to categorize leads by urgency
 function categorizeLeads(leads: Lead[]): CategorizedLeads {
   const contactNow: CategorizedItem[] = []
@@ -72,20 +73,13 @@ function categorizeLeads(leads: Lead[]): CategorizedLeads {
     const lastDate = lastInteraction?.data_cad ? new Date(lastInteraction.data_cad) : null
     const daysSinceContact = lastDate ? Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)) : 999
 
-    // Critical: needs immediate contact
     if (daysSinceContact > 7 && lead.situacao === "quente") {
       contactNow.push({ lead, reason: `Sem contato há ${daysSinceContact} dias`, priority: 1 })
-    }
-    // At risk of loss
-    else if (daysSinceContact > 14 || lead.situacao === "frio") {
+    } else if (daysSinceContact > 14 || lead.situacao === "frio") {
       lossRisks.push({ lead, reason: `Lead esfriando - ${daysSinceContact} dias sem contato`, priority: 2 })
-    }
-    // Hot opportunities
-    else if (lead.situacao === "quente" && daysSinceContact <= 3) {
+    } else if (lead.situacao === "quente" && daysSinceContact <= 3) {
       opportunities.push({ lead, reason: "Lead quente - pronto para avançar", priority: 3 })
-    }
-    // Overdue follow-ups
-    else if (daysSinceContact > 5) {
+    } else if (daysSinceContact > 5) {
       overdue.push({ lead, reason: `Follow-up atrasado - ${daysSinceContact} dias`, priority: 4 })
     }
   })
@@ -93,7 +87,6 @@ function categorizeLeads(leads: Lead[]): CategorizedLeads {
   return { contactNow, lossRisks, opportunities, overdue }
 }
 
-// Helper function to get urgency stats
 function getUrgencyStats(leads: Lead[]) {
   const categorized = categorizeLeads(leads)
   return {
@@ -105,240 +98,14 @@ function getUrgencyStats(leads: Lead[]) {
   }
 }
 
-// Glow Card component with animated gradient border
-function GlowCard({
-  children,
-  className,
-  glowColor = "emerald",
-}: {
-  children: React.ReactNode
-  className?: string
-  glowColor?: "emerald" | "amber" | "red" | "blue" | "purple"
-}) {
-  const glowColors = {
-    emerald: "from-emerald-400 via-green-400 to-teal-400",
-    amber: "from-amber-400 via-orange-400 to-yellow-400",
-    red: "from-red-400 via-rose-400 to-pink-400",
-    blue: "from-blue-400 via-cyan-400 to-sky-400",
-    purple: "from-purple-400 via-violet-400 to-indigo-400",
-  }
-
-  return (
-    <div className="relative group">
-      {/* Outer glow */}
-      <div
-        className={cn(
-          "absolute -inset-0.5 bg-gradient-to-r rounded-2xl blur opacity-20 group-hover:opacity-40 transition-all duration-500",
-          glowColors[glowColor]
-        )}
-      />
-      {/* Card */}
-      <div
-        className={cn(
-          "relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-2xl rounded-2xl shadow-xl border border-white/60 dark:border-zinc-800/60 overflow-hidden will-change-[backdrop-filter]",
-          className
-        )}
-      >
-        {children}
-      </div>
-    </div>
-  )
-}
-
-// Metric Card component
-function MetricCard({
-  icon: Icon,
-  title,
-  value,
-  subtitle,
-  trend,
-  glowColor = "emerald",
-  delay = 0,
-}: {
-  icon: React.ElementType
-  title: string
-  value: string | number
-  subtitle?: string
-  trend?: { value: number; positive: boolean }
-  glowColor?: "emerald" | "amber" | "red" | "blue" | "purple"
-  delay?: number
-}) {
-  const iconColors = {
-    emerald: "from-emerald-400 to-green-500",
-    amber: "from-amber-400 to-orange-500",
-    red: "from-red-400 to-rose-500",
-    blue: "from-blue-400 to-cyan-500",
-    purple: "from-purple-400 to-violet-500",
-  }
-
-  return (
-    <div
-      className="animate-fadeInUp"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <GlowCard glowColor={glowColor} className="p-3 sm:p-5 h-full">
-        <div className="flex items-start justify-between gap-2">
-          <div className="space-y-2 sm:space-y-3 min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div
-                className={cn(
-                  "h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg flex-shrink-0",
-                  iconColors[glowColor]
-                )}
-              >
-                <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-              </div>
-              <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">
-                {title}
-              </span>
-            </div>
-            <div>
-              <p className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                {value}
-              </p>
-              {subtitle && (
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5 sm:mt-1 truncate">
-                  {subtitle}
-                </p>
-              )}
-            </div>
-          </div>
-          {trend && (
-            <div
-              className={cn(
-                "flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium flex-shrink-0",
-                trend.positive
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-              )}
-            >
-              <ArrowUpRight
-                className={cn("h-2.5 w-2.5 sm:h-3 sm:w-3", !trend.positive && "rotate-180")}
-              />
-              {trend.value}%
-            </div>
-          )}
-        </div>
-      </GlowCard>
-    </div>
-  )
-}
-
-// Urgent Lead Card component
-function UrgentLeadCard({
-  lead,
-  urgency,
-  rank,
-  onContact,
-}: {
-  lead: Lead
-  urgency?: string
-  rank: number
-  onContact: (lead: Lead, method: "phone" | "whatsapp") => void
-}) {
-  return (
-    <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg sm:rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-      <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center text-xs sm:text-sm font-bold text-gray-600 dark:text-gray-300">
-        {rank}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm sm:text-base text-gray-900 dark:text-white truncate">{lead.nome}</p>
-        <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 truncate">
-          {urgency || lead.empreendimento?.nome || "Sem empreendimento"}
-        </p>
-      </div>
-      <div className="flex gap-1 sm:gap-2 flex-shrink-0">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => onContact(lead, "whatsapp")}
-          className="h-7 w-7 sm:h-8 sm:w-8 p-0"
-        >
-          <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-// Dashboard Section component for lead categories
-function DashboardSection({
-  title,
-  subtitle,
-  count,
-  emptyMessage,
-  emptyIcon: EmptyIcon,
-  priority = 4,
-  accentColor = "gray",
-  dotColor = "bg-gray-400",
-  children,
-}: {
-  title: string
-  subtitle: string
-  icon?: React.ElementType
-  glowColor?: string
-  count: number
-  emptyMessage: string
-  emptyIcon: React.ElementType
-  priority?: 1 | 2 | 3 | 4
-  accentColor?: string
-  dotColor?: string
-  children?: React.ReactNode
-}) {
-  const borderAccentColors: Record<string, string> = {
-    red: "border-l-red-500",
-    amber: "border-l-amber-500",
-    emerald: "border-l-emerald-500",
-    gray: "border-l-gray-400",
-  }
-
-  const titleSizeClass = priority === 1 ? "text-base sm:text-lg" : "text-sm sm:text-base"
-  const opacityClass = priority === 4 ? "opacity-90" : ""
-
-  return (
-    <div className={cn("relative group mb-4 sm:mb-6", opacityClass)}>
-      <div className={cn(
-        "relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-2xl rounded-xl sm:rounded-2xl shadow-lg border border-white/60 dark:border-zinc-800/60 overflow-hidden border-l-4 will-change-[backdrop-filter]",
-        borderAccentColors[accentColor] || borderAccentColors.gray
-      )}>
-        <div className="p-3 sm:p-4 border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className={cn("h-2 w-2 rounded-full flex-shrink-0", dotColor)} />
-                <h3 className={cn("font-semibold text-gray-900 dark:text-white truncate", titleSizeClass)}>{title}</h3>
-                {count > 0 && (
-                  <span className="px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex-shrink-0">
-                    {count}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate ml-3.5 sm:ml-4">{subtitle}</p>
-            </div>
-          </div>
-        </div>
-        {count === 0 ? (
-          <div className="p-4 sm:p-6 text-center">
-            <EmptyIcon className="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-green-500 mb-1.5 sm:mb-2" />
-            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{emptyMessage}</p>
-          </div>
-        ) : (
-          children
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function CorretorDashboard() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth()
   const router = useRouter()
   usePageTracking("corretor-dashboard")
 
+  // Data states
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
-  const [aiSummaryExpanded, setAiSummaryExpanded] = useState(false)
-  const [whatsappBannerDismissed, setWhatsappBannerDismissed] = useState(false)
   const [goals, setGoals] = useState<{
     goals: { leads: number; conversions: number; revenue: number }
     current: { leads: number; conversions: number; revenue: number }
@@ -354,17 +121,22 @@ export default function CorretorDashboard() {
     activity_type?: string
     status?: string
   }>>([])
-  const [pipeline, setPipeline] = useState<{
-    stages: Array<{ id: string; name: string; color: string; count: number; isWonStage?: boolean; isLostStage?: boolean }>
-    stats: { totalLeads: number }
-  } | null>(null)
   const [whatsappData, setWhatsappData] = useState<{
     status: "loading" | "connected" | "disconnected"
-    pairedPhone?: string | null
-    profileName?: string | null
-    profilePicUrl?: string | null
-    error?: string | null
   }>({ status: "loading" })
+
+  // Chat states
+  const [conversaAtiva, setConversaAtiva] = useState<number | null>(null)
+  const [mensagens, setMensagens] = useState<Mensagem[]>([])
+  const [chatInput, setChatInput] = useState("")
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  // Leads accordion
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
 
   // Redirect non-authenticated users
   useEffect(() => {
@@ -375,68 +147,44 @@ export default function CorretorDashboard() {
 
   // Check WhatsApp status
   useEffect(() => {
-    const checkWhatsApp = async () => {
-      try {
-        const res = await fetch("/api/whatsapp/session/status")
-        const data = await res.json()
-        setWhatsappData({
-          status: data.status === "ready" ? "connected" : "disconnected",
-          pairedPhone: data.pairedPhone,
-          profileName: data.profileName,
-          profilePicUrl: data.profilePicUrl,
-          error: data.error,
-        })
-      } catch {
-        setWhatsappData({ status: "disconnected" })
-      }
-    }
-    if (isAuthenticated) {
-      checkWhatsApp()
-    }
+    if (!isAuthenticated) return
+    fetch("/api/whatsapp/session/status")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) {
+          setWhatsappData({ status: data.status === "ready" ? "connected" : "disconnected" })
+        } else {
+          setWhatsappData({ status: "disconnected" })
+        }
+      })
+      .catch(() => setWhatsappData({ status: "disconnected" }))
   }, [isAuthenticated])
 
   // Fetch leads
   useEffect(() => {
-    const fetchLeads = async () => {
-      setLoading(true)
-      try {
-        const res = await fetch("/api/leads?limit=100")
-        const data = await res.json()
-        setLeads(data.data || [])
-      } catch (error) {
-        console.error("Erro ao buscar leads:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    if (isAuthenticated) {
-      fetchLeads()
-    }
+    if (!isAuthenticated) return
+    setLoading(true)
+    fetch("/api/leads?limit=100")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setLeads(data.data || []) })
+      .catch((e) => console.error("Erro ao buscar leads:", e))
+      .finally(() => setLoading(false))
   }, [isAuthenticated])
 
-  // Fetch goals, activities, pipeline
+  // Fetch goals, activities
   useEffect(() => {
     if (!isAuthenticated) return
 
-    const fetchGoals = async () => {
-      try {
-        const res = await fetch("/api/crm/goals")
-        if (res.ok) {
-          const data = await res.json()
-          setGoals(data)
-        }
-      } catch (e) {
-        console.error("Erro ao buscar metas:", e)
-      }
-    }
+    fetch("/api/crm/goals")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setGoals(data) })
+      .catch((e) => console.error("Erro ao buscar metas:", e))
 
-    const fetchActivities = async () => {
-      try {
-        const params = user?.id ? `?userId=${user.id}` : ""
-        const res = await fetch(`/api/crm/activities${params}`)
-        if (res.ok) {
-          const data = await res.json()
-          // Filter future activities and take first 3
+    const params = user?.id ? `?userId=${user.id}` : ""
+    fetch(`/api/crm/activities${params}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) {
           const now = new Date()
           const upcoming = (data || [])
             .filter((a: any) => a.scheduled_at && new Date(a.scheduled_at) >= now && a.status !== "completed")
@@ -444,29 +192,11 @@ export default function CorretorDashboard() {
             .slice(0, 3)
           setActivities(upcoming)
         }
-      } catch (e) {
-        console.error("Erro ao buscar atividades:", e)
-      }
-    }
-
-    const fetchPipeline = async () => {
-      try {
-        const res = await fetch("/api/crm/pipeline-cvcrm")
-        if (res.ok) {
-          const data = await res.json()
-          setPipeline(data)
-        }
-      } catch (e) {
-        console.error("Erro ao buscar pipeline:", e)
-      }
-    }
-
-    fetchGoals()
-    fetchActivities()
-    fetchPipeline()
+      })
+      .catch((e) => console.error("Erro ao buscar atividades:", e))
   }, [isAuthenticated, user?.id])
 
-  // Process leads for urgency and categorization
+  // Process leads
   const categorizedLeads = useMemo(() => {
     if (!leads.length) return null
     return categorizeLeads(leads)
@@ -477,35 +207,205 @@ export default function CorretorDashboard() {
     return getUrgencyStats(leads)
   }, [leads])
 
-  // Calculate metrics for header
   const metrics = useMemo(() => {
-    if (!urgencyStats) return { score: 0, total: 0 }
-    
-    const { totalLeads, criticalActions, atRisk, hotOpportunities } = urgencyStats
-    
-    // Performance score based on urgency handling
-    const scoreBase = Math.min(100, Math.max(0, 
-      70 + 
-      (hotOpportunities * 8) - // Reward hot opportunities
-      (criticalActions * 3) - // Penalize critical actions pending
-      (atRisk * 5) // Penalize leads at risk
+    if (!urgencyStats) return { score: 0 }
+    const { criticalActions, atRisk, hotOpportunities } = urgencyStats
+    const scoreBase = Math.min(100, Math.max(0,
+      70 + (hotOpportunities * 8) - (criticalActions * 3) - (atRisk * 5)
     ))
-    
-    return {
-      score: Math.round(scoreBase),
-      total: totalLeads,
-    }
+    return { score: Math.round(scoreBase) }
   }, [urgencyStats])
 
-  // Handle contact actions
+  // Smart suggestions based on real data
+  const smartSuggestions = useMemo(() => {
+    const suggestions: Array<{ icon: typeof Users; label: string; prompt: string }> = []
+
+    if (urgencyStats && urgencyStats.criticalActions > 0) {
+      suggestions.push({
+        icon: Flame,
+        label: `${urgencyStats.criticalActions} urgentes`,
+        prompt: `Tenho ${urgencyStats.criticalActions} leads urgentes que precisam de contato imediato. Me ajude a priorizar e montar um plano de ação.`,
+      })
+    }
+
+    if (goals && goals.overallProgress < 70) {
+      suggestions.push({
+        icon: Target,
+        label: `Meta ${goals.overallProgress}%`,
+        prompt: `Estou em ${goals.overallProgress}% da minha meta mensal com ${goals.period.daysRemaining} dias restantes. O que posso fazer para acelerar?`,
+      })
+    }
+
+    if (activities.length > 0) {
+      suggestions.push({
+        icon: Calendar,
+        label: `${activities.length} compromisso${activities.length > 1 ? "s" : ""}`,
+        prompt: "Quais são meus compromissos de hoje e amanhã? Me ajude a me preparar.",
+      })
+    }
+
+    if (urgencyStats && urgencyStats.overdueFollowups > 0) {
+      suggestions.push({
+        icon: CalendarX,
+        label: `${urgencyStats.overdueFollowups} atrasados`,
+        prompt: `Tenho ${urgencyStats.overdueFollowups} follow-ups atrasados. Como posso recuperar esses leads?`,
+      })
+    }
+
+    // Fallbacks
+    if (suggestions.length < 2) {
+      suggestions.push({
+        icon: Users,
+        label: "Meu funil",
+        prompt: "Quantos leads tenho em cada etapa do funil? Me dê um resumo.",
+      })
+    }
+    if (suggestions.length < 3) {
+      suggestions.push({
+        icon: Building2,
+        label: "Disponibilidade",
+        prompt: "Quais empreendimentos têm unidades disponíveis?",
+      })
+    }
+    if (suggestions.length < 4) {
+      suggestions.push({
+        icon: TrendingUp,
+        label: "Estatísticas",
+        prompt: "Me dê um resumo geral dos meus números no CRM.",
+      })
+    }
+
+    return suggestions.slice(0, 4)
+  }, [urgencyStats, goals, activities])
+
+  // Chat scroll
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [mensagens, statusMessage])
+
+  // Auto-resize textarea
+  const handleChatInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setChatInput(e.target.value)
+    e.target.style.height = "auto"
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
+  }
+
+  // Send message with SSE streaming
+  const enviarMensagem = useCallback(async (texto?: string) => {
+    const msg = (texto || chatInput).trim()
+    if (!msg || isStreaming) return
+
+    setChatInput("")
+    if (chatInputRef.current) chatInputRef.current.style.height = "auto"
+
+    setMensagens((prev) => [...prev, { role: "user", content: msg }])
+    setIsStreaming(true)
+    setStatusMessage(null)
+    setMensagens((prev) => [...prev, { role: "assistant", content: "" }])
+
+    try {
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      const res = await fetch("/api/assistente/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversaId: conversaAtiva, message: msg }),
+        signal: controller.signal,
+      })
+
+      if (!res.ok) throw new Error("Erro na resposta")
+
+      const reader = res.body?.getReader()
+      if (!reader) throw new Error("Sem stream")
+
+      const decoder = new TextDecoder()
+      let buffer = ""
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() || ""
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue
+          try {
+            const event = JSON.parse(line.slice(6))
+            if (event.type === "meta" && event.conversaId) {
+              setConversaAtiva(event.conversaId)
+            } else if (event.type === "status") {
+              setStatusMessage(event.message)
+            } else if (event.type === "text") {
+              setStatusMessage(null)
+              setMensagens((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (last?.role === "assistant") {
+                  updated[updated.length - 1] = { ...last, content: last.content + event.content }
+                }
+                return updated
+              })
+            } else if (event.type === "error") {
+              setMensagens((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (last?.role === "assistant") {
+                  updated[updated.length - 1] = { ...last, content: "Desculpe, ocorreu um erro. Tente novamente." }
+                }
+                return updated
+              })
+            }
+          } catch {}
+        }
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setMensagens((prev) => {
+          const updated = [...prev]
+          const last = updated[updated.length - 1]
+          if (last?.role === "assistant" && !last.content) {
+            updated[updated.length - 1] = { ...last, content: "Erro de conexão. Tente novamente." }
+          }
+          return updated
+        })
+      }
+    } finally {
+      setIsStreaming(false)
+      setStatusMessage(null)
+      abortRef.current = null
+    }
+  }, [chatInput, isStreaming, conversaAtiva])
+
+  const novaConversa = () => {
+    setConversaAtiva(null)
+    setMensagens([])
+    setChatInput("")
+    chatInputRef.current?.focus()
+  }
+
+  const handleChatKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      enviarMensagem()
+    }
+  }
+
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return "Bom dia"
+    if (hour < 18) return "Boa tarde"
+    return "Boa noite"
+  }
+
   const handleContact = (lead: Lead, method: "phone" | "whatsapp") => {
     if (method === "whatsapp") {
       const phoneNumber = lead.telefone.replace(/\D/g, "")
       const firstName = lead.nome?.split(" ")[0] || "cliente"
       const propertyName = lead.empreendimento?.nome || "as oportunidades disponíveis"
-      const message = encodeURIComponent(
-        `Olá ${firstName}! Como vai? Gostaria de conversar sobre ${propertyName}.`
-      )
+      const message = encodeURIComponent(`Olá ${firstName}! Como vai? Gostaria de conversar sobre ${propertyName}.`)
       window.open(`https://wa.me/55${phoneNumber}?text=${message}`, "_blank")
     } else {
       const phoneNumber = lead.telefone.replace(/\D/g, "")
@@ -513,13 +413,26 @@ export default function CorretorDashboard() {
     }
   }
 
-  // Get greeting based on time
-  const getGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return "Bom dia"
-    if (hour < 18) return "Boa tarde"
-    return "Boa noite"
-  }
+  // Lead category config for compact view
+  const leadCategories = useMemo(() => {
+    if (!categorizedLeads) return []
+    return [
+      { key: "contactNow", label: "Urgentes", icon: Flame, color: "text-red-500", dot: "bg-red-500", items: categorizedLeads.contactNow, href: "/leads?filter=urgente" },
+      { key: "lossRisks", label: "Em risco", icon: ShieldAlert, color: "text-amber-500", dot: "bg-amber-500", items: categorizedLeads.lossRisks, href: "/leads?filter=risco" },
+      { key: "opportunities", label: "Quentes", icon: TrendingUp, color: "text-emerald-500", dot: "bg-emerald-500", items: categorizedLeads.opportunities, href: "/leads?filter=quente" },
+      { key: "overdue", label: "Atrasados", icon: CalendarX, color: "text-gray-500", dot: "bg-gray-400", items: categorizedLeads.overdue, href: "/leads?filter=atrasado" },
+    ].filter((c) => c.items.length > 0)
+  }, [categorizedLeads])
+
+  // Context strip items
+  const contextItems = useMemo(() => {
+    return [
+      { icon: Users, label: "Leads", value: goals?.current.leads ?? "-", prompt: "Me fale sobre meus leads do mês. Quantos tenho e como estão distribuídos?" },
+      { icon: Trophy, label: "Conversões", value: goals?.current.conversions ?? "-", prompt: "Quantas conversões tive este mês? Como posso melhorar?" },
+      { icon: DollarSign, label: "Receita", value: goals ? `R$${(goals.current.revenue / 1000).toFixed(0)}k` : "-", prompt: "Qual minha receita do mês? Estou batendo a meta?" },
+      { icon: Target, label: "Meta", value: goals ? `${goals.overallProgress}%` : "-", prompt: "Como está meu progresso geral da meta? O que posso fazer para melhorar?" },
+    ]
+  }, [goals])
 
   // Loading state
   if (authLoading) {
@@ -537,631 +450,302 @@ export default function CorretorDashboard() {
   return (
     <AppShell title="Dashboard">
       <div className="min-h-screen relative">
-        {/* Animated Background */}
         <AnimatedBackground />
 
-        <div className="relative z-10 space-y-6 animate-page-in">
-          {/* Welcome Section */}
-          <section className="relative">
-            <GlowCard className="p-6 md:p-8">
-              {/* Decorative gradient */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-emerald-400/20 to-teal-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="relative z-10 max-w-4xl mx-auto space-y-3 sm:space-y-4 animate-page-in">
 
-              <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="space-y-1.5 sm:space-y-2 animate-fadeInUp flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                    <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    <span>{getGreeting()}</span>
+          {/* ===== SECTION 1: Compact Header ===== */}
+          <section className="flex items-center justify-between gap-3 px-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate">
+                {getGreeting()}, {user?.nome?.split(" ")[0] || "Corretor"}!
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Score badge */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-sm">
+                <Sparkles className="h-3 w-3" />
+                <span className="text-xs font-bold">{metrics.score}</span>
+              </div>
+              {/* WhatsApp status */}
+              <div
+                className={cn(
+                  "h-2.5 w-2.5 rounded-full flex-shrink-0",
+                  whatsappData.status === "connected" ? "bg-green-500 shadow-sm shadow-green-500/50" :
+                  whatsappData.status === "loading" ? "bg-gray-300 animate-pulse" :
+                  "bg-gray-300"
+                )}
+                title={whatsappData.status === "connected" ? "WhatsApp conectado" : "WhatsApp desconectado"}
+              />
+            </div>
+          </section>
+
+          {/* ===== SECTION 2: Context Strip ===== */}
+          <section className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide px-1">
+            {contextItems.map((item) => (
+              <button
+                key={item.label}
+                onClick={() => enviarMensagem(item.prompt)}
+                disabled={isStreaming}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/80 dark:bg-zinc-800/80 border border-gray-200/80 dark:border-zinc-700/80 backdrop-blur-sm hover:border-violet-300 dark:hover:border-violet-600 hover:bg-violet-50/50 dark:hover:bg-violet-900/10 transition-all flex-shrink-0 group"
+              >
+                <item.icon className="h-3.5 w-3.5 text-gray-400 group-hover:text-violet-500 transition-colors" />
+                <span className="text-xs text-gray-500 dark:text-gray-400">{item.label}</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">{item.value}</span>
+              </button>
+            ))}
+          </section>
+
+          {/* ===== SECTION 3: AI Chat (HERO) ===== */}
+          <section className="relative">
+            <div className="relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-2xl rounded-2xl shadow-xl border border-white/60 dark:border-zinc-800/60 overflow-hidden">
+              {/* Chat area */}
+              <div className="flex flex-col" style={{ minHeight: "55vh", maxHeight: "65vh" }}>
+                {/* Messages or Welcome */}
+                <div className="flex-1 overflow-y-auto">
+                  {mensagens.length === 0 ? (
+                    /* Welcome Screen */
+                    <div className="flex flex-col items-center justify-center h-full px-4 py-8">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-violet-500/20">
+                        <Sparkles className="h-7 w-7 text-white" />
+                      </div>
+                      <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
+                        Prática IA
+                      </h2>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-sm mb-6">
+                        Seu assistente com acesso ao CRM. Pergunte sobre leads, empreendimentos e vendas.
+                      </p>
+
+                      {/* Smart suggestions */}
+                      <div className="grid grid-cols-2 gap-2 w-full max-w-md">
+                        {smartSuggestions.map((s) => (
+                          <button
+                            key={s.label}
+                            onClick={() => enviarMensagem(s.prompt)}
+                            disabled={isStreaming}
+                            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/50 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition-all text-left group"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center group-hover:bg-violet-100 dark:group-hover:bg-violet-900/30 transition-colors flex-shrink-0">
+                              <s.icon className="h-4 w-4 text-zinc-500 dark:text-zinc-400 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors" />
+                            </div>
+                            <span className="text-xs font-medium text-zinc-700 dark:text-zinc-200 line-clamp-2">{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Messages */
+                    <div className="space-y-4 py-4 px-3 sm:px-4">
+                      {mensagens.map((msg, i) => (
+                        <div key={i} className={cn("flex gap-2.5", msg.role === "user" ? "justify-end" : "justify-start")}>
+                          {msg.role === "assistant" && (
+                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                              <Sparkles className="h-3.5 w-3.5 text-white" />
+                            </div>
+                          )}
+                          <div
+                            className={cn(
+                              "max-w-[85%] rounded-2xl px-3.5 py-2.5",
+                              msg.role === "user"
+                                ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                            )}
+                          >
+                            {msg.role === "assistant" ? (
+                              <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-table:my-2 prose-table:text-sm">
+                                {msg.content ? (
+                                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                ) : (
+                                  <div className="flex items-center gap-2 text-zinc-400">
+                                    <div className="flex gap-1">
+                                      <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                                      <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                                      <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {statusMessage && (
+                        <div className="flex items-center gap-2 text-sm text-violet-600 dark:text-violet-400 pl-10">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          {statusMessage}
+                        </div>
+                      )}
+
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Input bar */}
+                <div className="border-t border-zinc-200/80 dark:border-zinc-800/80 px-3 sm:px-4 pt-3 pb-3">
+                  {mensagens.length > 0 && (
+                    <div className="flex justify-center mb-2">
+                      <button
+                        onClick={novaConversa}
+                        className="flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Nova conversa
+                      </button>
+                    </div>
+                  )}
+                  <div className="relative flex items-end gap-2 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 focus-within:border-violet-400 dark:focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-400/20 transition-all">
+                    <textarea
+                      ref={chatInputRef}
+                      value={chatInput}
+                      onChange={handleChatInputChange}
+                      onKeyDown={handleChatKeyDown}
+                      placeholder="Pergunte sobre leads, empreendimentos..."
+                      rows={1}
+                      className="flex-1 bg-transparent text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 resize-none outline-none max-h-[120px]"
+                      disabled={isStreaming}
+                    />
+                    <Button
+                      size="icon"
+                      onClick={() => enviarMensagem()}
+                      disabled={!chatInput.trim() || isStreaming}
+                      className={cn(
+                        "shrink-0 rounded-lg h-8 w-8 transition-all",
+                        chatInput.trim() && !isStreaming
+                          ? "bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-md shadow-violet-500/20"
+                          : "bg-zinc-200 dark:bg-zinc-700 text-zinc-400"
+                      )}
+                    >
+                      {isStreaming ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Send className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
                   </div>
-                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white truncate">
-                    {user?.nome?.split(" ")[0] || "Corretor"}!
-                  </h1>
-                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-md line-clamp-2 sm:line-clamp-none">
-                    Aqui esta o resumo da sua performance. Acompanhe seus leads
-                    e conquiste mais vendas.
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 text-center mt-1.5">
+                    Prática IA consulta dados reais do CRM
                   </p>
                 </div>
-
-                <div
-                  className="flex items-center gap-3 sm:gap-4 animate-fadeInUp"
-                  style={{ animationDelay: "100ms" }}
-                >
-                  {/* Performance Ring */}
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full blur-lg opacity-30 animate-pulse" />
-                    <div className="relative h-16 w-16 sm:h-20 md:h-24 sm:w-20 md:w-24 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-2xl shadow-emerald-500/30">
-                      <div className="h-[52px] w-[52px] sm:h-16 sm:w-16 md:h-20 md:w-20 rounded-full bg-white dark:bg-zinc-900 flex flex-col items-center justify-center">
-                        <span className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
-                          {metrics.score}
-                        </span>
-                        <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
-                          Score
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="hidden sm:block">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      Performance
-                    </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      {metrics.score >= 80
-                        ? "Excelente!"
-                        : metrics.score >= 60
-                        ? "Muito bom"
-                        : "Pode melhorar"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </GlowCard>
-          </section>
-
-          {/* Meu Mês - Monthly Performance */}
-          <section className="animate-fadeInUp" style={{ animationDelay: "50ms" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <BarChart3 className="h-4 w-4 text-blue-500" />
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Meu Mês</h2>
-              {goals?.period?.month && (
-                <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                  {goals.period.month}
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-              <MetricCard
-                icon={Users}
-                title="Leads do Mês"
-                value={goals ? goals.current.leads : "-"}
-                subtitle={goals ? `Meta: ${goals.goals.leads}` : "Carregando..."}
-                trend={goals && goals.goals.leads > 0 ? { value: goals.progress.leads, positive: goals.progress.leads >= 50 } : undefined}
-                glowColor="blue"
-                delay={0}
-              />
-              <MetricCard
-                icon={Trophy}
-                title="Conversões"
-                value={goals ? goals.current.conversions : "-"}
-                subtitle={goals ? `Meta: ${goals.goals.conversions}` : "Carregando..."}
-                trend={goals && goals.goals.conversions > 0 ? { value: goals.progress.conversions, positive: goals.progress.conversions >= 50 } : undefined}
-                glowColor="emerald"
-                delay={100}
-              />
-              <MetricCard
-                icon={DollarSign}
-                title="Receita"
-                value={goals ? `R$ ${(goals.current.revenue / 1000).toFixed(0)}k` : "-"}
-                subtitle={goals ? `Meta: R$ ${(goals.goals.revenue / 1000).toFixed(0)}k` : "Carregando..."}
-                trend={goals && goals.goals.revenue > 0 ? { value: goals.progress.revenue, positive: goals.progress.revenue >= 50 } : undefined}
-                glowColor="purple"
-                delay={200}
-              />
-              <div className="animate-fadeInUp" style={{ animationDelay: "300ms" }}>
-                <GlowCard glowColor="amber" className="p-3 sm:p-5 h-full">
-                  <div className="space-y-2 sm:space-y-3">
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg flex-shrink-0">
-                        <Target className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                      </div>
-                      <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">
-                        Meta Geral
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                        {goals ? `${goals.overallProgress}%` : "-"}
-                      </p>
-                      {goals && (
-                        <div className="mt-1.5 sm:mt-2">
-                          <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                            <div
-                              className={cn(
-                                "h-full rounded-full transition-all duration-1000",
-                                goals.overallProgress >= 100 ? "bg-emerald-500" :
-                                goals.overallProgress >= 70 ? "bg-amber-500" :
-                                "bg-red-500"
-                              )}
-                              style={{ width: `${Math.min(goals.overallProgress, 100)}%` }}
-                            />
-                          </div>
-                          <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {goals.period.daysRemaining} dias restantes
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </GlowCard>
               </div>
             </div>
           </section>
 
-          {/* WhatsApp Connection Banner - Disconnected */}
-          {whatsappData.status === "disconnected" && (
-            <section className="animate-fadeInUp" style={{ animationDelay: "50ms" }}>
-              <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-all duration-500" />
-                <div className="relative bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50 backdrop-blur-sm md:backdrop-blur-xl rounded-2xl border border-green-200 dark:border-green-800 p-5 overflow-hidden">
-                  {/* Decorative background */}
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-green-400/20 to-emerald-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-
-                  <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-green-500 rounded-xl blur-lg opacity-40 animate-pulse" />
-                        <div className="relative h-14 w-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
-                          <MessageSquare className="h-7 w-7 text-white" />
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                          Conecte seu WhatsApp
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-medium">
-                            <Sparkles className="h-3 w-3" />
-                            Recomendado
-                          </span>
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
-                          {whatsappData.error || "Envie mensagens direto para seus leads sem sair da plataforma"}
-                        </p>
-                      </div>
-                    </div>
-                    <Link
-                      href="/onboarding/whatsapp"
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium text-sm hover:shadow-lg hover:shadow-green-500/30 transition-all duration-300 hover:scale-[1.02]"
+          {/* ===== SECTION 4: Compact Lead Categories ===== */}
+          {!loading && leadCategories.length > 0 && (
+            <section className="px-1">
+              <div className="bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-2xl rounded-2xl shadow-lg border border-white/60 dark:border-zinc-800/60 overflow-hidden">
+                {leadCategories.map((cat, idx) => (
+                  <div key={cat.key}>
+                    {idx > 0 && <div className="border-t border-gray-100 dark:border-zinc-800" />}
+                    <button
+                      onClick={() => setExpandedCategory(expandedCategory === cat.key ? null : cat.key)}
+                      className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-gray-50/50 dark:hover:bg-zinc-800/30 transition-colors text-left"
                     >
-                      <Zap className="h-4 w-4" />
-                      Conectar agora
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
+                      <span className={cn("h-2 w-2 rounded-full flex-shrink-0", cat.dot)} />
+                      <cat.icon className={cn("h-4 w-4 flex-shrink-0", cat.color)} />
+                      <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{cat.label}</span>
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                        {cat.items.length}
+                      </span>
+                      <ChevronDown className={cn(
+                        "h-4 w-4 text-gray-400 transition-transform duration-200",
+                        expandedCategory === cat.key && "rotate-180"
+                      )} />
+                    </button>
 
-          {/* WhatsApp Connection Bar - Connected (compact) */}
-          {whatsappData.status === "connected" && !whatsappBannerDismissed && (
-            <section className="animate-fadeInUp" style={{ animationDelay: "50ms" }}>
-              <div className="relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm rounded-xl border border-green-200 dark:border-green-800/50 px-3 sm:px-4 h-10 flex items-center gap-2 sm:gap-3">
-                {/* Green dot */}
-                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
-
-                {/* Status text */}
-                <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  WhatsApp conectado
-                </span>
-
-                {/* Profile name / phone */}
-                {(whatsappData.profileName || whatsappData.pairedPhone) && (
-                  <span className="text-xs text-gray-600 dark:text-gray-400 truncate hidden sm:inline">
-                    {whatsappData.profileName}
-                    {whatsappData.profileName && whatsappData.pairedPhone ? " - " : ""}
-                    {whatsappData.pairedPhone}
-                  </span>
-                )}
-
-                <div className="ml-auto flex items-center gap-1 flex-shrink-0">
-                  {/* Manage link */}
-                  <Link
-                    href="/onboarding/whatsapp"
-                    className="text-xs text-green-600 dark:text-green-400 hover:underline hidden sm:inline"
-                  >
-                    Gerenciar
-                  </Link>
-
-                  {/* Dismiss button */}
-                  <button
-                    onClick={() => setWhatsappBannerDismissed(true)}
-                    className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                    title="Ocultar"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Urgent Leads Queue */}
-          <section className="animate-fadeInUp" style={{ animationDelay: "150ms" }}>
-            <UrgentLeadsQueue
-              corretorId={user?.id?.toString()}
-              maxDisplay={5}
-              autoRefresh={true}
-              refreshInterval={60}
-            />
-          </section>
-
-          {/* Metrics Grid */}
-          <section className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-            <MetricCard
-              icon={Flame}
-              title="Contatar Agora"
-              value={loading ? "-" : urgencyStats?.criticalActions || 0}
-              subtitle="Ações críticas"
-              glowColor="red"
-              delay={0}
-            />
-            <MetricCard
-              icon={ShieldAlert}
-              title="Risco de Perda"
-              value={loading ? "-" : urgencyStats?.atRisk || 0}
-              subtitle="Leads esfriando"
-              glowColor="amber"
-              delay={100}
-            />
-            <MetricCard
-              icon={TrendingUp}
-              title="Oportunidades"
-              value={loading ? "-" : urgencyStats?.hotOpportunities || 0}
-              subtitle="Quentes hoje"
-              trend={{ value: 15, positive: true }}
-              glowColor="emerald"
-              delay={200}
-            />
-            <MetricCard
-              icon={CalendarX}
-              title="Atrasados"
-              value={loading ? "-" : urgencyStats?.overdueFollowups || 0}
-              subtitle="Follow-ups pendentes"
-              glowColor="purple"
-              delay={300}
-            />
-          </section>
-
-          {/* Próximos Compromissos */}
-          <section className="animate-fadeInUp" style={{ animationDelay: "250ms" }}>
-            <GlowCard glowColor="blue" className="p-4 sm:p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-blue-500" />
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Próximos Compromissos</h3>
-                </div>
-                <Link
-                  href="/corretor/agenda"
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                >
-                  Ver agenda
-                  <ChevronRight className="h-3 w-3" />
-                </Link>
-              </div>
-              {activities.length === 0 ? (
-                <div className="text-center py-4">
-                  <Calendar className="h-6 w-6 mx-auto text-gray-300 dark:text-gray-600 mb-1.5" />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Nenhum compromisso agendado</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {activities.map((activity) => {
-                    const scheduledDate = new Date(activity.scheduled_at)
-                    const now = new Date()
-                    const diffMs = scheduledDate.getTime() - now.getTime()
-                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-                    let relativeTime = ""
-                    if (diffDays > 0) relativeTime = `em ${diffDays}d`
-                    else if (diffHours > 0) relativeTime = `em ${diffHours}h`
-                    else relativeTime = "agora"
-
-                    return (
-                      <div
-                        key={activity.id}
-                        className="flex items-center gap-3 p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center flex-shrink-0">
-                          <Clock className="h-4 w-4 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                            {activity.title || "Atividade"}
-                          </p>
-                          <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {activity.lead_name ? `${activity.lead_name} · ` : ""}
-                            {scheduledDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
-                            {" "}
-                            {scheduledDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                        <span className={cn(
-                          "text-[10px] sm:text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0",
-                          diffHours < 2
-                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                            : diffDays < 1
-                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                            : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                        )}>
-                          {relativeTime}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </GlowCard>
-          </section>
-
-          {/* Meu Funil - Pipeline */}
-          {pipeline && pipeline.stages.length > 0 && (
-            <section className="animate-fadeInUp" style={{ animationDelay: "300ms" }}>
-              <GlowCard glowColor="purple" className="p-4 sm:p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-purple-500" />
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Meu Funil</h3>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {pipeline.stats.totalLeads} leads
-                    </span>
-                  </div>
-                  <Link
-                    href="/pipeline"
-                    className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
-                  >
-                    Ver pipeline
-                    <ChevronRight className="h-3 w-3" />
-                  </Link>
-                </div>
-                <div className="space-y-2">
-                  {pipeline.stages
-                    .filter((s) => !s.isLostStage && s.count > 0)
-                    .map((stage) => {
-                      const maxCount = Math.max(...pipeline.stages.filter(s => !s.isLostStage).map((s) => s.count), 1)
-                      const widthPercent = Math.max((stage.count / maxCount) * 100, 8)
-                      return (
-                        <div key={stage.id} className="flex items-center gap-3">
-                          <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 w-24 sm:w-32 truncate text-right flex-shrink-0">
-                            {stage.name}
-                          </span>
-                          <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden">
-                            <div
-                              className="h-full rounded-md flex items-center justify-end px-2 transition-all duration-700"
-                              style={{ width: `${widthPercent}%`, backgroundColor: stage.color }}
-                            >
-                              <span className="text-[10px] sm:text-xs font-bold text-white drop-shadow-sm">
-                                {stage.count}
-                              </span>
+                    {/* Expanded content */}
+                    {expandedCategory === cat.key && (
+                      <div className="px-4 pb-3 space-y-1.5">
+                        {cat.items.slice(0, 5).map((item, i) => (
+                          <div
+                            key={item.lead.id}
+                            className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-zinc-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                          >
+                            <span className="text-[10px] font-bold text-gray-400 w-4 text-center flex-shrink-0">{i + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.lead.nome}</p>
+                              <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{item.reason}</p>
                             </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleContact(item.lead, "whatsapp") }}
+                              className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors flex-shrink-0"
+                              title="WhatsApp"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                            </button>
                           </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              </GlowCard>
+                        ))}
+                        {cat.items.length > 5 && (
+                          <Link
+                            href={cat.href}
+                            className="flex items-center justify-center gap-1 text-xs text-violet-600 dark:text-violet-400 hover:underline py-1"
+                          >
+                            Ver todos ({cat.items.length})
+                            <ChevronRight className="h-3 w-3" />
+                          </Link>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </section>
           )}
 
-          {/* Main Priority Sections */}
-          <div className="space-y-6">
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-              </div>
-            ) : leads.length === 0 ? (
-              <EmptyState
-                icon={Users}
-                title="Nenhum lead encontrado"
-                description="Seus leads aparecerão aqui quando forem atribuídos a você."
-                action={{ label: "Ver empreendimentos", href: "/corretor/imoveis" }}
-              />
-            ) : (
-              <>
-                {/* AI Summary Banner - Collapsible */}
-                {urgencyStats && (urgencyStats.criticalActions > 0 || urgencyStats.atRisk > 0 || urgencyStats.hotOpportunities > 0) && (
-                  <section className="animate-fadeInUp">
-                    <div className="relative bg-white/90 md:bg-white/70 dark:bg-zinc-900/90 md:dark:bg-zinc-900/70 backdrop-blur-sm md:backdrop-blur-xl rounded-xl sm:rounded-2xl border border-purple-100 dark:border-purple-900/30 overflow-hidden will-change-[backdrop-filter]">
-                      <button
-                        onClick={() => setAiSummaryExpanded(!aiSummaryExpanded)}
-                        className="w-full p-3 sm:p-4 flex items-center gap-2 sm:gap-3 text-left hover:bg-gray-50/50 dark:hover:bg-zinc-800/50 transition-colors"
-                      >
-                        <Sparkles className="h-4 w-4 text-purple-500 flex-shrink-0" />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1">
-                          Resumo de Urgencia
-                        </span>
-                        <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 flex-shrink-0">
-                          {urgencyStats.criticalActions > 0 && (
-                            <span className="flex items-center gap-1">
-                              <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                              {urgencyStats.criticalActions}
-                            </span>
-                          )}
-                          {urgencyStats.atRisk > 0 && (
-                            <span className="flex items-center gap-1">
-                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                              {urgencyStats.atRisk}
-                            </span>
-                          )}
-                          {urgencyStats.hotOpportunities > 0 && (
-                            <span className="flex items-center gap-1">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                              {urgencyStats.hotOpportunities}
-                            </span>
-                          )}
-                          <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", aiSummaryExpanded && "rotate-180")} />
-                        </div>
-                      </button>
-                      {aiSummaryExpanded && (
-                        <div className="px-3 sm:px-4 pb-3 sm:pb-4 border-t border-gray-100 dark:border-gray-800 pt-3">
-                          <div className="space-y-1.5 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
-                            <p>
-                              <span className="text-red-600 dark:text-red-400 font-medium">Contatar: </span>
-                              {urgencyStats.criticalActions > 0
-                                ? `${urgencyStats.criticalActions} lead(s) urgente(s)`
-                                : "Nenhuma acao critica"}
-                            </p>
-                            <p>
-                              <span className="text-amber-600 dark:text-amber-400 font-medium">Em risco: </span>
-                              {urgencyStats.atRisk > 0
-                                ? `${urgencyStats.atRisk} lead(s) esfriando`
-                                : "Nenhum em risco"}
-                            </p>
-                            <p>
-                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Quentes: </span>
-                              {urgencyStats.hotOpportunities > 0
-                                ? `${urgencyStats.hotOpportunities} oportunidade(s)`
-                                : "Continue aquecendo"}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </section>
-                )}
-
-                {/* 1. Contatar Agora - Critical Actions */}
-                <DashboardSection
-                  title="Contatar Agora"
-                  subtitle="Leads que precisam de atenção imediata"
-                  icon={Flame}
-                  glowColor="from-red-400 via-rose-400 to-pink-400"
-                  count={categorizedLeads?.contactNow.length || 0}
-                  emptyMessage="Nenhuma ação critica pendente no momento."
-                  emptyIcon={CheckCircle2}
-                  priority={1}
-                  accentColor="red"
-                  dotColor="bg-red-500"
-                >
-                  {categorizedLeads && categorizedLeads.contactNow.length > 0 && (
-                    <div className="p-4 space-y-3">
-                      {categorizedLeads.contactNow.map((item, index) => (
-                        <UrgentLeadCard
-                          key={item.lead.id}
-                          lead={item.lead}
-                          urgency={item.reason}
-                          rank={index + 1}
-                          onContact={handleContact}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </DashboardSection>
-
-                {/* 2. Riscos de Perda - Loss Risks */}
-                <DashboardSection
-                  title="Riscos de Perda"
-                  subtitle="Leads esfriando que precisam de recuperação"
-                  icon={ShieldAlert}
-                  glowColor="from-amber-400 via-orange-400 to-yellow-400"
-                  count={categorizedLeads?.lossRisks.length || 0}
-                  emptyMessage="Sem leads em risco. Continue mantendo o ritmo!"
-                  emptyIcon={CheckCircle2}
-                  priority={2}
-                  accentColor="amber"
-                  dotColor="bg-amber-500"
-                >
-                  {categorizedLeads && categorizedLeads.lossRisks.length > 0 && (
-                    <div className="p-4 space-y-3">
-                      {categorizedLeads.lossRisks.map((item, index) => (
-                        <UrgentLeadCard
-                          key={item.lead.id}
-                          lead={item.lead}
-                          urgency={item.reason}
-                          rank={index + 1}
-                          onContact={handleContact}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </DashboardSection>
-
-                {/* 3. Oportunidades - Hot Opportunities */}
-                <DashboardSection
-                  title="Oportunidades"
-                  subtitle="Leads quentes prontos para conversão"
-                  icon={TrendingUp}
-                  glowColor="from-emerald-400 via-green-400 to-teal-400"
-                  count={categorizedLeads?.opportunities.length || 0}
-                  emptyMessage="Continue prospectando para encontrar mais oportunidades."
-                  emptyIcon={Target}
-                  priority={3}
-                  accentColor="emerald"
-                  dotColor="bg-emerald-500"
-                >
-                  {categorizedLeads && categorizedLeads.opportunities.length > 0 && (
-                    <div className="p-4 space-y-3">
-                      {categorizedLeads.opportunities.map((item, index) => (
-                        <UrgentLeadCard
-                          key={item.lead.id}
-                          lead={item.lead}
-                          urgency={item.reason}
-                          rank={index + 1}
-                          onContact={handleContact}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </DashboardSection>
-
-                {/* 4. Follow-ups Atrasados - Overdue Actions */}
-                <DashboardSection
-                  title="Follow-ups Atrasados"
-                  subtitle="Ações pendentes que precisam ser retomadas"
-                  icon={CalendarX}
-                  glowColor="from-gray-400 via-slate-400 to-zinc-400"
-                  count={categorizedLeads?.overdue.length || 0}
-                  emptyMessage="Todas as ações estão em dia."
-                  emptyIcon={CheckCircle2}
-                  priority={4}
-                  accentColor="gray"
-                  dotColor="bg-gray-400"
-                >
-                  {categorizedLeads && categorizedLeads.overdue.length > 0 && (
-                    <div className="p-4 space-y-3">
-                      {categorizedLeads.overdue.map((item, index) => (
-                        <UrgentLeadCard
-                          key={item.lead.id}
-                          lead={item.lead}
-                          urgency={item.reason}
-                          rank={index + 1}
-                          onContact={handleContact}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </DashboardSection>
-
-                {/* Quick Actions Footer */}
-                <section className="animate-fadeInUp" style={{ animationDelay: "400ms" }}>
-                  <GlowCard glowColor="blue" className="p-4 sm:p-5">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center shadow-lg flex-shrink-0">
-                          <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900 dark:text-white text-xs sm:text-sm">
-                            Ações Rápidas
-                          </h3>
-                          <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
-                            Ferramentas importantes
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 sm:gap-2 w-full sm:w-auto">
-                        <Button variant="outline" size="sm" asChild className="h-8 text-xs flex-1 sm:flex-none">
-                          <Link href="/leads">
-                            <Users className="h-3.5 w-3.5 mr-1 sm:mr-2" />
-                            <span className="hidden sm:inline">Todos os </span>Leads
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild className="h-8 text-xs flex-1 sm:flex-none">
-                          <Link href="/empreendimentos">
-                            <Building2 className="h-3.5 w-3.5 mr-1 sm:mr-2" />
-                            Imóveis
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild className="h-8 text-xs flex-1 sm:flex-none">
-                          <Link href="/corretor/agenda">
-                            <Calendar className="h-3.5 w-3.5 mr-1 sm:mr-2" />
-                            Agenda
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </GlowCard>
-                </section>
-              </>
+          {/* ===== SECTION 5: Quick Actions Slim ===== */}
+          <section className="flex flex-wrap gap-2 px-1 pb-4">
+            <Link
+              href="/leads"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/80 dark:bg-zinc-800/80 border border-gray-200/80 dark:border-zinc-700/80 text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition-all"
+            >
+              <Users className="h-3.5 w-3.5" />
+              Leads
+            </Link>
+            <Link
+              href="/empreendimentos"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/80 dark:bg-zinc-800/80 border border-gray-200/80 dark:border-zinc-700/80 text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition-all"
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              Imóveis
+            </Link>
+            <Link
+              href="/corretor/agenda"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/80 dark:bg-zinc-800/80 border border-gray-200/80 dark:border-zinc-700/80 text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition-all"
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              Agenda
+            </Link>
+            {whatsappData.status === "connected" && (
+              <Link
+                href="/corretor/whatsapp"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/80 dark:bg-zinc-800/80 border border-gray-200/80 dark:border-zinc-700/80 text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-green-300 dark:hover:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 transition-all"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                WhatsApp
+              </Link>
             )}
-          </div>
+            {whatsappData.status === "disconnected" && (
+              <Link
+                href="/onboarding/whatsapp"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-medium hover:shadow-md hover:shadow-green-500/20 transition-all"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                Conectar WhatsApp
+              </Link>
+            )}
+            <Link
+              href="/corretor/assistente"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/80 dark:bg-zinc-800/80 border border-gray-200/80 dark:border-zinc-700/80 text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition-all"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              IA tela cheia
+            </Link>
+          </section>
+
         </div>
       </div>
     </AppShell>
