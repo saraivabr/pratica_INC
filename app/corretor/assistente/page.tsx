@@ -164,6 +164,7 @@ export default function AssistentePage() {
             const event = JSON.parse(line.slice(6))
             if (event.type === "meta" && event.conversaId) {
               setConversaAtiva(event.conversaId)
+              localStorage.setItem("chat-conversa-id", String(event.conversaId))
             } else if (event.type === "status") {
               setStatusMessage(event.message)
             } else if (event.type === "text") {

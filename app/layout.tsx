@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/lib/auth-context"
 import { ToastContainer } from "@/components/toast-container"
 import { ComparisonFloatingBar } from "@/components/comparison-floating-bar"
+import { ChatWidget } from "@/components/chat-widget"
 import { ErrorBoundary } from "@/components/error-boundary"
 import "./globals.css"
 
@@ -82,6 +83,7 @@ export default function RootLayout({
               </ErrorBoundary>
               <ToastContainer />
               <ComparisonFloatingBar />
+              <ChatWidget />
             </AuthProvider>
           </ThemeProvider>
         </Providers>

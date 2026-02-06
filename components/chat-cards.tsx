@@ -2,7 +2,12 @@
 
 import React from "react"
 import ReactMarkdown from "react-markdown"
-import { MessageSquare, MapPin, Ruler, Building2, Home, ChevronRight } from "lucide-react"
+import { MessageSquare, MapPin, Ruler, Building2, Home, ChevronRight, Search } from "lucide-react"
+
+// Dispatch a prompt to the chat widget
+function sendChatPrompt(message: string) {
+  window.dispatchEvent(new CustomEvent("chat-prompt", { detail: { message } }))
+}
 
 // ─── Markdown Table Parser (from raw text) ──────────────────
 
@@ -190,7 +195,8 @@ function PropertyCards({ headers, rows }: { headers: string[]; rows: string[][] 
           return (
             <div
               key={i}
-              className="chat-card snap-start shrink-0 w-[260px] rounded-2xl border border-zinc-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-800/80 overflow-hidden"
+              onClick={() => sendChatPrompt(`Me mostre as unidades disponíveis do ${name} com preços e metragens`)}
+              className="chat-card snap-start shrink-0 w-[260px] rounded-2xl border border-zinc-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-800/80 overflow-hidden cursor-pointer"
             >
               <div className={`bg-gradient-to-r ${gradient} px-4 pt-4 pb-3 relative`}>
                 {available && (
@@ -225,6 +231,10 @@ function PropertyCards({ headers, rows }: { headers: string[]; rows: string[][] 
                     <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{preco}</span>
                   </div>
                 )}
+                <div className="flex items-center gap-1 pt-1">
+                  <Search className="h-3 w-3 text-violet-500" />
+                  <span className="text-[10px] font-medium text-violet-500">Ver unidades</span>
+                </div>
               </div>
             </div>
           )
@@ -258,7 +268,11 @@ function LeadCards({ headers, rows }: { headers: string[]; rows: string[][] }) {
         const phoneDigits = phone ? cleanPhone(phone) : ""
 
         return (
-          <div key={i} className="chat-card flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/60">
+          <div
+            key={i}
+            onClick={() => sendChatPrompt(`Me fale sobre o lead ${name}. Qual o histórico e próximos passos?`)}
+            className="chat-card flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/60 cursor-pointer"
+          >
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 ${getAvatarColor(name)}`}>
               {initial}
             </div>
@@ -287,6 +301,7 @@ function LeadCards({ headers, rows }: { headers: string[]; rows: string[][] }) {
                 href={`https://wa.me/55${phoneDigits}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
                 className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 transition-colors text-white text-xs font-medium shadow-sm shadow-green-500/20"
                 title="WhatsApp"
               >

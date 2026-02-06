@@ -1133,21 +1133,7 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
           </main>
         </div>
 
-        {/* Floating Prática IA Button */}
-        {!isRecepcionista && (isCorretor || currentView === "corretor") && !pathname.startsWith("/corretor/assistente") && (
-          <Link
-            href="/corretor/assistente"
-            className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 group"
-          >
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-indigo-600 rounded-full blur-lg opacity-30 group-hover:opacity-50 transition-opacity" />
-              <div className="relative flex items-center gap-2 bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white rounded-full shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all px-4 py-3 md:px-5 md:py-3.5">
-                <Sparkles className="h-5 w-5" />
-                <span className="text-sm font-medium hidden sm:inline">Assistente IA</span>
-              </div>
-            </div>
-          </Link>
-        )}
+        {/* ChatWidget is now in layout.tsx */}
 
         {/* Mobile Bottom Nav */}
         <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-t border-zinc-200/80 dark:border-zinc-800/80 px-2 pb-safe">
