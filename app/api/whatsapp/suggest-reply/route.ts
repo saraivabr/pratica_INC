@@ -46,10 +46,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Pass user's instance_name for isolation
+    const instanceName = user.evolution_instance_name || undefined;
+
     const suggestions =
       mode === "quick"
-        ? await suggestQuickReply(tenant.id, phone_number, context_messages)
-        : await suggestReply(tenant.id, phone_number, context_messages);
+        ? await suggestQuickReply(tenant.id, phone_number, context_messages, instanceName)
+        : await suggestReply(tenant.id, phone_number, context_messages, instanceName);
 
     return NextResponse.json({ success: true, suggestions });
   } catch (error: any) {

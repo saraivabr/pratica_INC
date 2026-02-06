@@ -58,6 +58,11 @@ export function useMessages(instanceName: string, phone: string | null) {
     enabled: !!instanceName && !!phone,
   });
 
+  // Reset counter when switching conversations
+  useEffect(() => {
+    prevCountRef.current = 0;
+  }, [phone]);
+
   // Auto-scroll when new messages arrive
   useEffect(() => {
     const count = data?.messages?.length ?? 0;

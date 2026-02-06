@@ -34,12 +34,15 @@ export function useWhatsAppNotifications(
   const previousUnreadRef = useRef<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Refs to break dependency cycles in checkNewMessages
+  const playSoundRef = useRef<() => void>(() => {});
+  const showNotifRef = useRef<(title: string, body: string, icon?: string) => void>(() => {});
+
   // Inicializar áudio
   useEffect(() => {
     if (typeof window !== 'undefined' && soundEnabled) {
       const audio = new Audio('/sounds/notification.mp3');
       audio.volume = 0.5;
-      // Only keep reference if audio can load
       audio.addEventListener('canplaythrough', () => { audioRef.current = audio; }, { once: true });
       audio.addEventListener('error', () => { audioRef.current = null; }, { once: true });
     }
@@ -66,9 +69,7 @@ export function useWhatsAppNotifications(
   const playSound = useCallback(() => {
     if (audioRef.current && soundEnabled) {
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {
-        // Ignorar erros de autoplay (browser pode bloquear)
-      });
+      audioRef.current.play().catch(() => {});
     }
   }, [soundEnabled]);
 
@@ -88,14 +89,17 @@ export function useWhatsAppNotifications(
           notification.close();
         };
 
-        // Auto-fechar após 5 segundos
         setTimeout(() => notification.close(), 5000);
       }
     },
     [hasPermission, browserNotifications]
   );
 
-  // Verificar novas mensagens
+  // Keep refs in sync (avoids re-creating checkNewMessages on every render)
+  playSoundRef.current = playSound;
+  showNotifRef.current = showBrowserNotification;
+
+  // Verificar novas mensagens — depends ONLY on instanceName (stable)
   const checkNewMessages = useCallback(async () => {
     if (!instanceName) return;
 
@@ -117,23 +121,23 @@ export function useWhatsAppNotifications(
         if (totalUnread > previousUnreadRef.current) {
           const newMessages = totalUnread - previousUnreadRef.current;
 
-          // Tocar som
-          playSound();
+          // Tocar som (via ref — no dep cycle)
+          playSoundRef.current();
 
-          // Mostrar notificação do browser
+          // Mostrar notificação do browser (via ref — no dep cycle)
           if (newMessages === 1) {
             const newConv = data.data?.find(
               (c: any) => c.unread_count > 0 && !c.is_from_me
             );
             if (newConv) {
-              showBrowserNotification(
+              showNotifRef.current(
                 newConv.contact_name || 'Nova mensagem',
                 newConv.last_message || 'Você recebeu uma nova mensagem',
                 newConv.profile_picture_url
               );
             }
           } else {
-            showBrowserNotification(
+            showNotifRef.current(
               'Novas mensagens',
               `Você tem ${newMessages} nova(s) mensagem(ns)`
             );
@@ -146,16 +150,14 @@ export function useWhatsAppNotifications(
     } catch (error) {
       console.error('Error checking messages:', error);
     }
-  }, [instanceName, playSound, showBrowserNotification]);
+  }, [instanceName]);
 
   // Polling para verificar novas mensagens
   useEffect(() => {
     if (!instanceName) return;
 
-    // Verificar imediatamente
     checkNewMessages();
 
-    // Polling
     const interval = setInterval(checkNewMessages, pollInterval);
     return () => clearInterval(interval);
   }, [instanceName, pollInterval, checkNewMessages]);
@@ -172,27 +174,24 @@ export function useWhatsAppNotifications(
           body: JSON.stringify({ instanceName, phoneNumber }),
         });
 
-        // Atualizar estado local
         setUnread((prev) => {
           const newByConversation = { ...prev.byConversation };
           const readCount = newByConversation[phoneNumber] || 0;
           delete newByConversation[phoneNumber];
 
+          const newTotal = Math.max(0, prev.total - readCount);
+          previousUnreadRef.current = newTotal;
+
           return {
-            total: Math.max(0, prev.total - readCount),
+            total: newTotal,
             byConversation: newByConversation,
           };
         });
-
-        previousUnreadRef.current = Math.max(
-          0,
-          previousUnreadRef.current - (unread.byConversation[phoneNumber] || 0)
-        );
       } catch (error) {
         console.error('Error marking as read:', error);
       }
     },
-    [instanceName, unread.byConversation]
+    [instanceName]
   );
 
   return {

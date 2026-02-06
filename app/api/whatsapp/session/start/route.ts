@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/api-auth";
-import { updateWorkspace, findUserWorkspace, createTenant, withTenant } from "@/lib/tenant-context";
+import { findUserWorkspace, createTenant, withTenant } from "@/lib/tenant-context";
 import { dbQuery } from "@/lib/db";
 import {
   createInstance,
@@ -114,8 +114,9 @@ export async function POST(request: NextRequest) {
         console.warn(`[WhatsApp] Usuário ${(user as any).id} sem telefone cadastrado. Pairing code não estará disponível, apenas QR Code.`);
       }
 
-      // Verificar se já existe instância para este workspace
-      let instanceName = (tenant as any).evolution_instance_name || null;
+      // Verificar se já existe instância para este USUÁRIO (não workspace!)
+      // Bug fix: instância é per-user, não per-workspace
+      let instanceName = (user as any).evolution_instance_name || null;
 
       // Se freshConnection=true, deletar instância existente para criar uma nova
       if (freshConnection && instanceName) {
@@ -128,7 +129,11 @@ export async function POST(request: NextRequest) {
           // Continuar mesmo se falhar a deleção
         }
         instanceName = null;
-        await updateWorkspace(workspaceId, { evolution_instance_name: null, evolution_connected: false });
+        // Clear user's instance (not workspace — instance is per-user)
+        await client.query(
+          `UPDATE users SET evolution_instance_name = NULL, evolution_connected = false, updated_at = NOW() WHERE id = $1`,
+          [userId]
+        );
       }
 
       // Se não existe instância, criar uma nova
@@ -208,13 +213,12 @@ export async function POST(request: NextRequest) {
             console.error(`[WhatsApp] Erro ao configurar webhook:`, whError.message);
           }
 
-          // Salvar instância no workspace e no usuário
-          await updateWorkspace(workspaceId, { evolution_instance_name: instanceName });
+          // Salvar instância APENAS no usuário (instância é per-user, não per-workspace)
           await client.query(
             `UPDATE users SET evolution_instance_name = $1, updated_at = NOW() WHERE id = $2`,
             [instanceName, userId]
           );
-          console.log(`[WhatsApp] Instância ${instanceName} salva no workspace ${workspaceId} e usuário ${userId}`);
+          console.log(`[WhatsApp] Instância ${instanceName} salva no usuário ${userId}`);
         } catch (createError: any) {
           console.error("Error creating Evolution instance:", createError);
           return NextResponse.json(

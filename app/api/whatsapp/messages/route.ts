@@ -40,10 +40,9 @@ export async function GET(request: NextRequest) {
       let aiAnalysis = null;
       try {
         const db = getMongoDb();
-        const conv = await db.collection('conversations').findOne({
-          workspace_id: workspaceId,
-          phone_number: phoneNumber,
-        });
+        const filter: Record<string, any> = { workspace_id: workspaceId, phone_number: phoneNumber };
+        if (userInstanceName) filter.instance_name = userInstanceName;
+        const conv = await db.collection('conversations').findOne(filter);
         aiAnalysis = conv?.ai_analysis || null;
       } catch {
         // MongoDB unavailable
@@ -96,13 +95,14 @@ export async function GET(request: NextRequest) {
           (m: any) => !m.is_from_me && m.status !== 'read'
         ).length;
 
-        // AI analysis from MongoDB
+        // AI analysis from MongoDB (filtered by instance)
         let aiAnalysis = null;
         try {
           const db = getMongoDb();
           const conv = await db.collection('conversations').findOne({
             workspace_id: workspaceId,
             phone_number: phoneNumber,
+            instance_name: instanceName,
           });
           aiAnalysis = conv?.ai_analysis || null;
         } catch {
@@ -163,10 +163,10 @@ export async function GET(request: NextRequest) {
 
         const [mongoContacts, mongoConvs] = await Promise.all([
           db.collection('contacts')
-            .find({ workspace_id: workspaceId, phone_number: { $in: phones } })
+            .find({ workspace_id: workspaceId, instance_name: instanceName, phone_number: { $in: phones } })
             .toArray(),
           db.collection('conversations')
-            .find({ workspace_id: workspaceId, phone_number: { $in: phones } })
+            .find({ workspace_id: workspaceId, instance_name: instanceName, phone_number: { $in: phones } })
             .toArray(),
         ]);
 

@@ -54,14 +54,18 @@ export interface AIAnalysis {
  */
 export async function analyzeConversation(
   workspaceId: number,
-  phoneNumber: string
+  phoneNumber: string,
+  instanceName?: string
 ): Promise<AIAnalysis | null> {
   const db = getMongoDb();
 
-  // Fetch last 50 messages for analysis
+  // Fetch last 50 messages for analysis (filtered by instance if provided)
+  const msgFilter: Record<string, any> = { workspace_id: workspaceId, phone_number: phoneNumber };
+  if (instanceName) msgFilter.instance_name = instanceName;
+
   const messages = await db
     .collection("messages")
-    .find({ workspace_id: workspaceId, phone_number: phoneNumber })
+    .find(msgFilter)
     .sort({ timestamp: -1 })
     .limit(50)
     .toArray();
@@ -156,10 +160,13 @@ Regras:
       message_count: messages.length,
     };
 
-    // Store in MongoDB conversations collection
+    // Store in MongoDB conversations collection (filtered by instance)
     const remoteJid = `${phoneNumber}@s.whatsapp.net`;
+    const convFilter: Record<string, any> = { workspace_id: workspaceId, remote_jid: remoteJid };
+    if (instanceName) convFilter.instance_name = instanceName;
+
     await db.collection("conversations").updateOne(
-      { workspace_id: workspaceId, remote_jid: remoteJid },
+      convFilter,
       {
         $set: {
           ai_analysis: analysis,
@@ -183,14 +190,18 @@ Regras:
 export async function suggestReply(
   workspaceId: number,
   phoneNumber: string,
-  contextMessages: number = 10
+  contextMessages: number = 10,
+  instanceName?: string
 ): Promise<string[]> {
   const db = getMongoDb();
 
-  // Fetch recent messages
+  // Fetch recent messages (filtered by instance)
+  const msgFilter: Record<string, any> = { workspace_id: workspaceId, phone_number: phoneNumber };
+  if (instanceName) msgFilter.instance_name = instanceName;
+
   const messages = await db
     .collection("messages")
-    .find({ workspace_id: workspaceId, phone_number: phoneNumber })
+    .find(msgFilter)
     .sort({ timestamp: -1 })
     .limit(contextMessages)
     .toArray();
@@ -200,10 +211,10 @@ export async function suggestReply(
   }
 
   // Get conversation analysis if available
-  const conv = await db.collection("conversations").findOne({
-    workspace_id: workspaceId,
-    phone_number: phoneNumber,
-  });
+  const convFilter: Record<string, any> = { workspace_id: workspaceId, phone_number: phoneNumber };
+  if (instanceName) convFilter.instance_name = instanceName;
+
+  const conv = await db.collection("conversations").findOne(convFilter);
   const analysis = conv?.ai_analysis;
 
   const transcript = messages
@@ -262,13 +273,17 @@ Regras:
 export async function suggestQuickReply(
   workspaceId: number,
   phoneNumber: string,
-  contextMessages: number = 5
+  contextMessages: number = 5,
+  instanceName?: string
 ): Promise<string[]> {
   const db = getMongoDb();
 
+  const msgFilter: Record<string, any> = { workspace_id: workspaceId, phone_number: phoneNumber };
+  if (instanceName) msgFilter.instance_name = instanceName;
+
   const messages = await db
     .collection("messages")
-    .find({ workspace_id: workspaceId, phone_number: phoneNumber })
+    .find(msgFilter)
     .sort({ timestamp: -1 })
     .limit(contextMessages)
     .toArray();
@@ -277,10 +292,10 @@ export async function suggestQuickReply(
     return ["Ola! Como posso ajudar?", "Bom dia! Em que posso te ajudar?", "Oi! Tudo bem?"];
   }
 
-  const conv = await db.collection("conversations").findOne({
-    workspace_id: workspaceId,
-    phone_number: phoneNumber,
-  });
+  const convFilter: Record<string, any> = { workspace_id: workspaceId, phone_number: phoneNumber };
+  if (instanceName) convFilter.instance_name = instanceName;
+
+  const conv = await db.collection("conversations").findOne(convFilter);
   const analysis = conv?.ai_analysis;
 
   const transcript = messages
@@ -338,13 +353,14 @@ Regras:
  */
 export async function shouldReanalyze(
   workspaceId: number,
-  phoneNumber: string
+  phoneNumber: string,
+  instanceName?: string
 ): Promise<boolean> {
   const db = getMongoDb();
-  const conv = await db.collection("conversations").findOne({
-    workspace_id: workspaceId,
-    phone_number: phoneNumber,
-  });
+  const filter: Record<string, any> = { workspace_id: workspaceId, phone_number: phoneNumber };
+  if (instanceName) filter.instance_name = instanceName;
+
+  const conv = await db.collection("conversations").findOne(filter);
 
   if (!conv?.ai_analysis) return true; // Never analyzed
 

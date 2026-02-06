@@ -70,6 +70,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Security: verify instance ownership
+    const userInstanceName = user.evolution_instance_name;
+    if (!userInstanceName || instanceName !== userInstanceName) {
+      return NextResponse.json(
+        { success: false, error: 'Instância não autorizada' },
+        { status: 403 }
+      );
+    }
+
     // Detectar ou usar tipo de mídia explícito
     const mediaType = explicitType || detectMediaType(fileName || mediaUrl);
 

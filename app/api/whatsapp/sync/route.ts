@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getWorkspace, tenantQuery, withTenant } from '@/lib/tenant-context';
+import { tenantQuery, withTenant } from '@/lib/tenant-context';
 import { getAuthenticatedUser } from '@/lib/api-auth';
 import { findUserWorkspace } from '@/lib/tenant-context';
 import { syncChatsToDatabase, syncContactsToDatabase, syncMessagesToDatabase } from '@/lib/whatsapp-sync/fetch';
@@ -69,34 +69,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obter workspaceId do body ou do usuário autenticado
-    const body = await request.json().catch(() => ({}));
-
-    if (body.workspaceId) {
-      workspaceId = Number(body.workspaceId);
-    } else {
-      // Buscar tenant do usuário
-      const tenant = await findUserWorkspace(user);
-      if (!tenant) {
-        return NextResponse.json(
-          { success: false, error: 'Empresa não configurada. Configure sua empresa primeiro.' },
-          { status: 400 }
-        );
-      }
-      workspaceId = tenant.id;
-    }
-
-    // Validar tenant
-    const tenant = await getWorkspace(workspaceId);
+    // Security: always use workspaceId from authenticated user (no override from body)
+    const tenant = await findUserWorkspace(user);
     if (!tenant) {
       return NextResponse.json(
-        { success: false, error: `Tenant ID ${workspaceId} não encontrado.` },
-        { status: 404 }
+        { success: false, error: 'Empresa não configurada. Configure sua empresa primeiro.' },
+        { status: 400 }
       );
     }
+    workspaceId = tenant.id;
 
-    // Verificar se há instância WhatsApp configurada
-    const instanceName = (tenant as any).evolution_instance_name || null;
+    // Verificar se há instância WhatsApp configurada (from user, not workspace)
+    const instanceName = user.evolution_instance_name || null;
 
     if (!instanceName) {
       return NextResponse.json(
@@ -265,23 +249,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Obter workspaceId da query ou do usuário
-    const searchParams = request.nextUrl.searchParams;
+    // Security: always use workspaceId from authenticated user (no query param override)
     let workspaceId: number;
-
-    const queryTenantId = searchParams.get('workspaceId');
-    if (queryTenantId) {
-      workspaceId = Number(queryTenantId);
-    } else {
-      const tenant = await findUserWorkspace(user);
-      if (!tenant) {
-        return NextResponse.json(
-          { success: false, error: 'Empresa não configurada.' },
-          { status: 400 }
-        );
-      }
-      workspaceId = tenant.id;
+    const tenant = await findUserWorkspace(user);
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Empresa não configurada.' },
+        { status: 400 }
+      );
     }
+    workspaceId = tenant.id;
 
     return await withTenant(workspaceId, async (client) => {
       // Buscar última sincronização

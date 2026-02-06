@@ -124,19 +124,24 @@ export async function indexMessage(
 export async function upsertConversation(
   workspaceId: number,
   phoneNumber: string,
-  update: Partial<ConversationDoc>
+  update: Partial<ConversationDoc>,
+  instanceName?: string
 ): Promise<void> {
   const db = getMongoDb();
   const remoteJid = `${phoneNumber}@s.whatsapp.net`;
 
+  const filter: Record<string, any> = { workspace_id: workspaceId, remote_jid: remoteJid };
+  if (instanceName) filter.instance_name = instanceName;
+
   await db.collection("conversations").updateOne(
-    { workspace_id: workspaceId, remote_jid: remoteJid },
+    filter,
     {
       $set: {
         ...update,
         workspace_id: workspaceId,
         remote_jid: remoteJid,
         phone_number: phoneNumber,
+        ...(instanceName ? { instance_name: instanceName } : {}),
         updated_at: new Date(),
       },
       $setOnInsert: {
@@ -158,10 +163,14 @@ export async function updateConversationOnMessage(
   phoneNumber: string,
   messageText: string | null,
   isFromMe: boolean,
-  timestamp: Date
+  timestamp: Date,
+  instanceName?: string
 ): Promise<void> {
   const db = getMongoDb();
   const remoteJid = `${phoneNumber}@s.whatsapp.net`;
+
+  const filter: Record<string, any> = { workspace_id: workspaceId, remote_jid: remoteJid };
+  if (instanceName) filter.instance_name = instanceName;
 
   const inc: any = { total_messages: 1 };
   if (isFromMe) {
@@ -172,12 +181,13 @@ export async function updateConversationOnMessage(
   }
 
   await db.collection("conversations").updateOne(
-    { workspace_id: workspaceId, remote_jid: remoteJid },
+    filter,
     {
       $set: {
         last_message_at: timestamp,
         last_message_text: messageText,
         last_message_from_me: isFromMe,
+        ...(instanceName ? { instance_name: instanceName } : {}),
         updated_at: new Date(),
       },
       $inc: inc,
@@ -206,16 +216,21 @@ export async function updateConversationOnMessage(
  */
 export async function upsertContact(
   workspaceId: number,
-  doc: Partial<ContactDoc> & { phone_number: string }
+  doc: Partial<ContactDoc> & { phone_number: string },
+  instanceName?: string
 ): Promise<void> {
   const db = getMongoDb();
 
+  const filter: Record<string, any> = { workspace_id: workspaceId, phone_number: doc.phone_number };
+  if (instanceName) filter.instance_name = instanceName;
+
   await db.collection("contacts").updateOne(
-    { workspace_id: workspaceId, phone_number: doc.phone_number },
+    filter,
     {
       $set: {
         ...doc,
         workspace_id: workspaceId,
+        ...(instanceName ? { instance_name: instanceName } : {}),
         last_seen_at: new Date(),
         synced_at: new Date(),
       },

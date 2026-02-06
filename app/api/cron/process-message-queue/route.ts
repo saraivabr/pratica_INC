@@ -8,7 +8,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getActiveQueues, dequeueMessages } from "@/lib/message-queue";
+import { getActiveQueues, dequeueMessages, enqueueMessage } from "@/lib/message-queue";
+import { getRedis } from "@/lib/redis";
 import {
   indexMessage,
   updateConversationOnMessage,
@@ -65,13 +66,14 @@ export async function GET(request: NextRequest) {
 
               await indexMessage(workspaceId, doc);
 
-              // Update conversation aggregate
+              // Update conversation aggregate (with instance_name for isolation)
               await updateConversationOnMessage(
                 workspaceId,
                 doc.phone_number,
                 doc.message_text,
                 doc.is_from_me,
-                doc.timestamp
+                doc.timestamp,
+                doc.instance_name
               );
 
               // Update Redis unread count for incoming messages
@@ -92,7 +94,7 @@ export async function GET(request: NextRequest) {
                 profile_picture_url: p.profile_picture_url,
                 about: p.about,
                 is_business: p.is_business || false,
-              });
+              }, p.instance_name);
               break;
             }
 
@@ -100,10 +102,11 @@ export async function GET(request: NextRequest) {
               const p = item.payload;
               const shouldRun = await shouldReanalyze(
                 workspaceId,
-                p.phone_number
+                p.phone_number,
+                p.instance_name
               );
               if (shouldRun) {
-                await analyzeConversation(workspaceId, p.phone_number);
+                await analyzeConversation(workspaceId, p.phone_number, p.instance_name);
               }
               break;
             }
@@ -116,6 +119,34 @@ export async function GET(request: NextRequest) {
             `[MQ] Error processing ${item.action}:`,
             err.message
           );
+
+          // Retry with backoff: re-enqueue with retry_count
+          const retryCount = (item.payload._retry_count || 0) + 1;
+          if (retryCount <= 3) {
+            try {
+              await enqueueMessage(workspaceId, item.action, {
+                ...item.payload,
+                _retry_count: retryCount,
+              });
+              console.log(`[MQ] Re-enqueued ${item.action} (retry ${retryCount}/3)`);
+            } catch {
+              // Can't re-enqueue — message is lost
+            }
+          } else {
+            // DLQ: push to dead-letter queue
+            try {
+              const redis = getRedis();
+              if (redis) {
+                await redis.lpush(
+                  `mq:whatsapp:dlq:${workspaceId}`,
+                  JSON.stringify({ ...item, error: err.message, failed_at: Date.now() })
+                );
+                console.warn(`[MQ] Moved to DLQ: ${item.action} after ${retryCount} retries`);
+              }
+            } catch {
+              // DLQ write failed
+            }
+          }
         }
       }
     }

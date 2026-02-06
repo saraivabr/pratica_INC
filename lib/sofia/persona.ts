@@ -5,6 +5,7 @@
  */
 
 import { dbQuery } from '@/lib/db';
+import { withTenant } from '@/lib/tenant-context';
 import type { PsychologicalAnalysis, PsychologicalProfile } from './psychology/types';
 
 export interface PersonaConfig {
@@ -57,6 +58,7 @@ export interface UserForPersona {
   id: string;
   role: 'corretor' | 'gerente' | 'admin';
   cvcrm_id?: number;
+  workspace_id?: number;
 }
 
 export interface PersonaTracos {
@@ -123,7 +125,7 @@ export const MESSAGE_LIMITS = {
 /**
  * Busca estatisticas do corretor para determinar senioridade
  */
-export async function getCorretorStats(userId: string, cvcrmId?: number): Promise<CorretorStats> {
+export async function getCorretorStats(userId: string, cvcrmId?: number, workspaceId?: number): Promise<CorretorStats> {
   const stats: CorretorStats = {
     totalVendas: 0,
     mesesAtivo: 0,
@@ -131,7 +133,7 @@ export async function getCorretorStats(userId: string, cvcrmId?: number): Promis
   };
 
   try {
-    // Calcular meses ativo desde created_at
+    // Calcular meses ativo desde created_at (users table — no RLS)
     const { rows: userRows } = await dbQuery(
       `SELECT created_at FROM users WHERE id = $1 LIMIT 1`,
       [userId]
@@ -145,23 +147,25 @@ export async function getCorretorStats(userId: string, cvcrmId?: number): Promis
       stats.mesesAtivo = Math.max(0, diffMonths);
     }
 
-    // Se tiver cvcrm_id, buscar vendas e leads
-    if (cvcrmId) {
-      // Total de vendas (reservas com status de venda)
-      const { rows: vendasRows } = await dbQuery(
-        `SELECT COUNT(*) as total FROM cvcrm_reservas
-         WHERE corretor_id = $1
-         AND status IN ('vendido', 'concluido', 'ativo', 'aprovado', 'vendida')`,
-        [cvcrmId]
-      );
-      stats.totalVendas = parseInt(vendasRows[0]?.total || '0', 10);
+    // Se tiver cvcrm_id E workspaceId, buscar vendas e leads via withTenant (RLS)
+    if (cvcrmId && workspaceId) {
+      await withTenant(workspaceId, async (client) => {
+        // Total de vendas (reservas com status de venda)
+        const { rows: vendasRows } = await client.query(
+          `SELECT COUNT(*) as total FROM cvcrm_reservas
+           WHERE corretor_id = $1
+           AND status IN ('vendido', 'concluido', 'ativo', 'aprovado', 'vendida')`,
+          [cvcrmId]
+        );
+        stats.totalVendas = parseInt(vendasRows[0]?.total || '0', 10);
 
-      // Total de leads atribuidos
-      const { rows: leadsRows } = await dbQuery(
-        `SELECT COUNT(*) as total FROM cvcrm_leads WHERE corretor_id = $1`,
-        [cvcrmId]
-      );
-      stats.totalLeads = parseInt(leadsRows[0]?.total || '0', 10);
+        // Total de leads atribuidos
+        const { rows: leadsRows } = await client.query(
+          `SELECT COUNT(*) as total FROM cvcrm_leads WHERE corretor_id = $1`,
+          [cvcrmId]
+        );
+        stats.totalLeads = parseInt(leadsRows[0]?.total || '0', 10);
+      });
     }
   } catch (error) {
     console.error('[Sofia] Erro ao buscar stats do corretor:', error);
@@ -192,8 +196,8 @@ export async function getPersonaByUser(user: UserForPersona): Promise<PersonaAda
     };
   }
 
-  // Corretor - precisa verificar senioridade
-  const stats = await getCorretorStats(user.id, user.cvcrm_id);
+  // Corretor - precisa verificar senioridade (pass workspaceId for RLS)
+  const stats = await getCorretorStats(user.id, user.cvcrm_id, user.workspace_id);
 
   // Criterios de Junior: menos de 6 meses OU menos de 5 vendas
   const isJunior = stats.mesesAtivo < 6 || stats.totalVendas < 5;

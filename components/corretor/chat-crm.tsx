@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Search,
@@ -95,11 +95,16 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
     await send({ phone: selectedPhone, message });
   };
 
+  // Use ref to avoid stale closure in LeadPanel callback
+  const selectedPhoneRef = useRef(selectedPhone);
+  selectedPhoneRef.current = selectedPhone;
+
   // Handler for sending messages to arbitrary phone (used by LeadPanel + agents)
   const handleSendToPhone = useCallback(async (message: string) => {
-    if (!selectedPhone) return;
-    await send({ phone: selectedPhone, message });
-  }, [selectedPhone, send]);
+    const phone = selectedPhoneRef.current;
+    if (!phone) return;
+    await send({ phone, message });
+  }, [send]);
 
   const handleTyping = () => {
     if (selectedPhone) sendTyping(selectedPhone);

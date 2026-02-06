@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,43 +15,62 @@ export function SmartReplyBar({ phoneNumber, lastMessageIsFromMe, onSend }: Smar
   const [loading, setLoading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [sendingIndex, setSendingIndex] = useState<number | null>(null);
-  const [lastPhone, setLastPhone] = useState('');
+  const abortRef = useRef<AbortController | null>(null);
+  const lastPhoneRef = useRef('');
 
-  const fetchSuggestions = useCallback(async () => {
-    if (!phoneNumber || lastMessageIsFromMe) return;
+  const fetchSuggestions = useCallback(async (phone: string) => {
+    if (!phone || lastMessageIsFromMe) return;
+
+    // Abort previous request to prevent race condition
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     try {
       const res = await fetch('/api/whatsapp/suggest-reply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone_number: phoneNumber,
+          phone_number: phone,
           context_messages: 5,
           mode: 'quick',
         }),
+        signal: controller.signal,
       });
       if (res.ok) {
         const json = await res.json();
-        setReplies((json.suggestions || []).slice(0, 3));
+        // Only set if this request wasn't aborted
+        if (!controller.signal.aborted) {
+          setReplies((json.suggestions || []).slice(0, 3));
+        }
       }
-    } catch {
-      // Silently fail
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        // Silently fail non-abort errors
+      }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, [phoneNumber, lastMessageIsFromMe]);
+  }, [lastMessageIsFromMe]);
 
   // Fetch when phone changes or when last message is from client
   useEffect(() => {
-    if (phoneNumber !== lastPhone) {
-      setLastPhone(phoneNumber);
+    if (phoneNumber !== lastPhoneRef.current) {
+      lastPhoneRef.current = phoneNumber;
       setDismissed(false);
       setReplies([]);
     }
     if (!lastMessageIsFromMe && !dismissed) {
-      fetchSuggestions();
+      fetchSuggestions(phoneNumber);
     }
-  }, [phoneNumber, lastMessageIsFromMe, dismissed, lastPhone, fetchSuggestions]);
+
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, [phoneNumber, lastMessageIsFromMe, dismissed, fetchSuggestions]);
 
   // Don't render if dismissed, no suggestions, or last message is from corretor
   if (dismissed || lastMessageIsFromMe || (replies.length === 0 && !loading)) {
