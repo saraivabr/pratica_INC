@@ -41,7 +41,7 @@ import { Badge } from "@/components/ui/badge"
 
 interface Lead {
   id: string
-  idlead: number
+  id_lead: number
   nome: string
   telefone: string
   empreendimento: string
@@ -189,7 +189,7 @@ export default function DisparadorPage() {
   // Get the effective lead list depending on source
   const effectiveLeads = leadSource === "crm" ? leads : importedLeads.map((l, i) => ({
     id: `imp-${i}`,
-    idlead: 0,
+    id_lead: 0,
     nome: l.nome,
     telefone: l.telefone,
     empreendimento: l.empreendimento || "",

@@ -120,7 +120,7 @@ async function fetchApi<T>(
 /**
  * Agenda uma visita para um lead
  *
- * @param leadId - ID do lead no sistema (idlead do cvcrm_leads)
+ * @param leadId - ID do lead no sistema (id_lead do cvcrm_leads)
  * @param data - Data da visita
  * @param horario - Horario da visita (formato HH:MM)
  * @param options - Opcoes adicionais

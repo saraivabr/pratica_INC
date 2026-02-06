@@ -849,7 +849,7 @@ export default function SalvaLeadsPage() {
             suggested_message: opp.suggested_message || "",
             linked_lead: opp.lead
               ? {
-                  id: Number(opp.lead.idlead ?? opp.matched_lead_id ?? 0),
+                  id: Number(opp.lead.id_lead ?? opp.matched_lead_id ?? 0),
                   name: opp.lead.nome,
                   empreendimento: opp.lead.empreendimento,
                 }

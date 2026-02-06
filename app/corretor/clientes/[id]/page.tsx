@@ -56,7 +56,7 @@ import {
 
 interface Lead {
   id: number
-  idlead: number
+  id_lead: number
   nome: string
   email: string
   telefone: string
@@ -266,14 +266,14 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const handleSaveCpf = async () => {
-    if (!cpfInput || !lead?.idlead) {
+    if (!cpfInput || !lead?.id_lead) {
       setIsEditingCpf(false)
       return
     }
 
     setSavingCpf(true)
     try {
-      const response = await fetch(`/api/leads/${lead.idlead}/cpf`, {
+      const response = await fetch(`/api/leads/${lead.id_lead}/cpf`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cpf: cpfInput }),
