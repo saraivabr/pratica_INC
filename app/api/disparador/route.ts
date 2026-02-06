@@ -133,19 +133,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!userData.evolution_connected) {
+    // Verificar conexao real via Evolution API (nao depender do flag do banco que pode estar desatualizado)
+    const connected = await isInstanceConnected(userData.evolution_instance_name);
+    if (!connected) {
+      // Atualizar banco para refletir estado real
+      await pool.query(
+        `UPDATE users SET evolution_connected = false, updated_at = NOW() WHERE id = $1`,
+        [userId]
+      );
       return NextResponse.json(
-        { error: 'WhatsApp desconectado. Reconecte antes de disparar.' },
+        { error: 'WhatsApp desconectado. Verifique a conexao e tente novamente.' },
         { status: 400 }
       );
     }
 
-    // Verificar conexao real
-    const connected = await isInstanceConnected(userData.evolution_instance_name);
-    if (!connected) {
-      return NextResponse.json(
-        { error: 'WhatsApp desconectado. Verifique a conexao.' },
-        { status: 400 }
+    // Garantir que banco reflete estado real (connected)
+    if (!userData.evolution_connected) {
+      await pool.query(
+        `UPDATE users SET evolution_connected = true, updated_at = NOW() WHERE id = $1`,
+        [userId]
       );
     }
 
@@ -345,9 +351,10 @@ Responda APENAS com a mensagem, sem explicacoes.`;
       for (let i = 0; i < leads.length; i++) {
         const lead = leads[i];
         insertValues.push(
-          `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6})`
+          `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7})`
         );
         insertParams.push(
+          workspaceId,
           disparoId,
           lead.id_lead || null,
           lead.nome,
@@ -356,14 +363,26 @@ Responda APENAS com a mensagem, sem explicacoes.`;
           mensagensMap.get(i) || `Ola, ${lead.nome.split(' ')[0]}! ${intencao}`,
           'pendente'
         );
-        pIdx += 7;
+        pIdx += 8;
       }
 
       await client.query(
-        `INSERT INTO disparo_leads (disparo_id, lead_cvcrm_id, lead_nome, lead_telefone, lead_empreendimento, mensagem_gerada, status)
+        `INSERT INTO disparo_leads (workspace_id, disparo_id, lead_cvcrm_id, lead_nome, lead_telefone, lead_empreendimento, mensagem_gerada, status)
          VALUES ${insertValues.join(', ')}`,
         insertParams
       );
+
+      // Trigger dispatch cron immediately (fire and forget, don't wait)
+      const cronSecret = process.env.CRON_SECRET;
+      if (cronSecret) {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        setTimeout(() => {
+          fetch(`${baseUrl}/api/cron/dispatch-disparos`, {
+            method: 'GET',
+            headers: { 'x-cron-secret': cronSecret },
+          }).catch(() => {});
+        }, 2000);
+      }
 
       return NextResponse.json({
         success: true,

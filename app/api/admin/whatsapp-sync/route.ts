@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
       let isConnected = false;
       try {
         const status = await getConnectionStatus(instanceName);
-        isConnected = status.state === 'open';
+        isConnected = status.instance?.state === 'open';
       } catch {
         isConnected = false;
       }

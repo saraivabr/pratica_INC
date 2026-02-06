@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'status') {
       const status = await getConnectionStatus(instanceName);
-      return NextResponse.json({ success: true, instanceName, status: status?.state || 'unknown' });
+      return NextResponse.json({ success: true, instanceName, status: status?.instance?.state || 'unknown' });
     }
 
     return NextResponse.json({ success: false, error: 'Action invalida' }, { status: 400 });

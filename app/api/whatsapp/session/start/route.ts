@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
       try {
         const connectionStatus = await getConnectionStatus(instanceName);
 
-        if (connectionStatus.state === 'open') {
+        if (connectionStatus.instance?.state === 'open') {
           return NextResponse.json({
             status: "ready",
             pairedPhone: userPhone || null,

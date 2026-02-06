@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
         let connectionStatus = 'unknown';
         try {
           const status = await getConnectionStatus(instanceName);
-          connectionStatus = status.state || 'unknown';
+          connectionStatus = status.instance?.state || 'unknown';
         } catch {
           connectionStatus = 'error';
         }

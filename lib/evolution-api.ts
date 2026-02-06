@@ -221,8 +221,10 @@ export interface QRCodeData {
 }
 
 export interface ConnectionStatus {
-  instance: string;
-  state: 'open' | 'close' | 'connecting';
+  instance: {
+    instanceName: string;
+    state: 'open' | 'close' | 'connecting';
+  };
 }
 
 /**
@@ -687,7 +689,7 @@ export async function isWhatsAppNumber(
 export async function isInstanceConnected(instanceName: string): Promise<boolean> {
   try {
     const status = await getConnectionStatus(instanceName);
-    return status.state === 'open';
+    return status.instance?.state === 'open';
   } catch {
     return false;
   }

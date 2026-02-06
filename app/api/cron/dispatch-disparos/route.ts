@@ -222,19 +222,22 @@ export async function GET(request: NextRequest) {
       const remaining = parseInt(remainingResult.rows[0].remaining);
       const isComplete = remaining === 0;
 
+      const newStatus = isComplete ? 'concluido' : 'enviando';
       await client.query(
         `UPDATE disparos SET
           processed_count = $1, sent_count = $2, failed_count = $3,
-          status = $4, error_log = error_log || $5::jsonb,
-          completed_at = CASE WHEN $4 IN ('concluido', 'falhou') THEN NOW() ELSE completed_at END,
+          status = $4,
+          error_log = COALESCE(error_log, '[]'::jsonb) || $5::jsonb,
+          completed_at = CASE WHEN $6 THEN NOW() ELSE completed_at END,
           updated_at = NOW()
-         WHERE id = $6`,
+         WHERE id = $7`,
         [
           newProcessed,
           newSent,
           newFailed,
-          isComplete ? 'concluido' : 'enviando',
+          newStatus,
           JSON.stringify(errors),
+          isComplete,
           disparoId,
         ]
       );
