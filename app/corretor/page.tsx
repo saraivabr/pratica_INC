@@ -22,6 +22,10 @@ import {
   CalendarX,
   ArrowUpRight,
   X,
+  BarChart3,
+  DollarSign,
+  Trophy,
+  Clock,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { useAuth, usePageTracking } from "@/lib/auth-context"
@@ -335,6 +339,25 @@ export default function CorretorDashboard() {
   const [loading, setLoading] = useState(true)
   const [aiSummaryExpanded, setAiSummaryExpanded] = useState(false)
   const [whatsappBannerDismissed, setWhatsappBannerDismissed] = useState(false)
+  const [goals, setGoals] = useState<{
+    goals: { leads: number; conversions: number; revenue: number }
+    current: { leads: number; conversions: number; revenue: number }
+    progress: { leads: number; conversions: number; revenue: number }
+    overallProgress: number
+    period: { month: string; daysRemaining: number }
+  } | null>(null)
+  const [activities, setActivities] = useState<Array<{
+    id: string
+    title: string
+    scheduled_at: string
+    lead_name?: string
+    activity_type?: string
+    status?: string
+  }>>([])
+  const [pipeline, setPipeline] = useState<{
+    stages: Array<{ id: string; name: string; color: string; count: number; isWonStage?: boolean; isLostStage?: boolean }>
+    stats: { totalLeads: number }
+  } | null>(null)
   const [whatsappData, setWhatsappData] = useState<{
     status: "loading" | "connected" | "disconnected"
     pairedPhone?: string | null
@@ -390,6 +413,58 @@ export default function CorretorDashboard() {
       fetchLeads()
     }
   }, [isAuthenticated])
+
+  // Fetch goals, activities, pipeline
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const fetchGoals = async () => {
+      try {
+        const res = await fetch("/api/crm/goals")
+        if (res.ok) {
+          const data = await res.json()
+          setGoals(data)
+        }
+      } catch (e) {
+        console.error("Erro ao buscar metas:", e)
+      }
+    }
+
+    const fetchActivities = async () => {
+      try {
+        const params = user?.id ? `?userId=${user.id}` : ""
+        const res = await fetch(`/api/crm/activities${params}`)
+        if (res.ok) {
+          const data = await res.json()
+          // Filter future activities and take first 3
+          const now = new Date()
+          const upcoming = (data || [])
+            .filter((a: any) => a.scheduled_at && new Date(a.scheduled_at) >= now && a.status !== "completed")
+            .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+            .slice(0, 3)
+          setActivities(upcoming)
+        }
+      } catch (e) {
+        console.error("Erro ao buscar atividades:", e)
+      }
+    }
+
+    const fetchPipeline = async () => {
+      try {
+        const res = await fetch("/api/crm/pipeline-cvcrm")
+        if (res.ok) {
+          const data = await res.json()
+          setPipeline(data)
+        }
+      } catch (e) {
+        console.error("Erro ao buscar pipeline:", e)
+      }
+    }
+
+    fetchGoals()
+    fetchActivities()
+    fetchPipeline()
+  }, [isAuthenticated, user?.id])
 
   // Process leads for urgency and categorization
   const categorizedLeads = useMemo(() => {
@@ -520,6 +595,85 @@ export default function CorretorDashboard() {
                 </div>
               </div>
             </GlowCard>
+          </section>
+
+          {/* Meu Mês - Monthly Performance */}
+          <section className="animate-fadeInUp" style={{ animationDelay: "50ms" }}>
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="h-4 w-4 text-blue-500" />
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Meu Mês</h2>
+              {goals?.period?.month && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                  {goals.period.month}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+              <MetricCard
+                icon={Users}
+                title="Leads do Mês"
+                value={goals ? goals.current.leads : "-"}
+                subtitle={goals ? `Meta: ${goals.goals.leads}` : "Carregando..."}
+                trend={goals && goals.goals.leads > 0 ? { value: goals.progress.leads, positive: goals.progress.leads >= 50 } : undefined}
+                glowColor="blue"
+                delay={0}
+              />
+              <MetricCard
+                icon={Trophy}
+                title="Conversões"
+                value={goals ? goals.current.conversions : "-"}
+                subtitle={goals ? `Meta: ${goals.goals.conversions}` : "Carregando..."}
+                trend={goals && goals.goals.conversions > 0 ? { value: goals.progress.conversions, positive: goals.progress.conversions >= 50 } : undefined}
+                glowColor="emerald"
+                delay={100}
+              />
+              <MetricCard
+                icon={DollarSign}
+                title="Receita"
+                value={goals ? `R$ ${(goals.current.revenue / 1000).toFixed(0)}k` : "-"}
+                subtitle={goals ? `Meta: R$ ${(goals.goals.revenue / 1000).toFixed(0)}k` : "Carregando..."}
+                trend={goals && goals.goals.revenue > 0 ? { value: goals.progress.revenue, positive: goals.progress.revenue >= 50 } : undefined}
+                glowColor="purple"
+                delay={200}
+              />
+              <div className="animate-fadeInUp" style={{ animationDelay: "300ms" }}>
+                <GlowCard glowColor="amber" className="p-3 sm:p-5 h-full">
+                  <div className="space-y-2 sm:space-y-3">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg flex-shrink-0">
+                        <Target className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                      </div>
+                      <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">
+                        Meta Geral
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                        {goals ? `${goals.overallProgress}%` : "-"}
+                      </p>
+                      {goals && (
+                        <div className="mt-1.5 sm:mt-2">
+                          <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-all duration-1000",
+                                goals.overallProgress >= 100 ? "bg-emerald-500" :
+                                goals.overallProgress >= 70 ? "bg-amber-500" :
+                                "bg-red-500"
+                              )}
+                              style={{ width: `${Math.min(goals.overallProgress, 100)}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {goals.period.daysRemaining} dias restantes
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </GlowCard>
+              </div>
+            </div>
           </section>
 
           {/* WhatsApp Connection Banner - Disconnected */}
@@ -655,6 +809,126 @@ export default function CorretorDashboard() {
               delay={300}
             />
           </section>
+
+          {/* Próximos Compromissos */}
+          <section className="animate-fadeInUp" style={{ animationDelay: "250ms" }}>
+            <GlowCard glowColor="blue" className="p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-blue-500" />
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Próximos Compromissos</h3>
+                </div>
+                <Link
+                  href="/corretor/agenda"
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                >
+                  Ver agenda
+                  <ChevronRight className="h-3 w-3" />
+                </Link>
+              </div>
+              {activities.length === 0 ? (
+                <div className="text-center py-4">
+                  <Calendar className="h-6 w-6 mx-auto text-gray-300 dark:text-gray-600 mb-1.5" />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Nenhum compromisso agendado</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {activities.map((activity) => {
+                    const scheduledDate = new Date(activity.scheduled_at)
+                    const now = new Date()
+                    const diffMs = scheduledDate.getTime() - now.getTime()
+                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+                    let relativeTime = ""
+                    if (diffDays > 0) relativeTime = `em ${diffDays}d`
+                    else if (diffHours > 0) relativeTime = `em ${diffHours}h`
+                    else relativeTime = "agora"
+
+                    return (
+                      <div
+                        key={activity.id}
+                        className="flex items-center gap-3 p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                          <Clock className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            {activity.title || "Atividade"}
+                          </p>
+                          <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {activity.lead_name ? `${activity.lead_name} · ` : ""}
+                            {scheduledDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                            {" "}
+                            {scheduledDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                        <span className={cn(
+                          "text-[10px] sm:text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0",
+                          diffHours < 2
+                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                            : diffDays < 1
+                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                            : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        )}>
+                          {relativeTime}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </GlowCard>
+          </section>
+
+          {/* Meu Funil - Pipeline */}
+          {pipeline && pipeline.stages.length > 0 && (
+            <section className="animate-fadeInUp" style={{ animationDelay: "300ms" }}>
+              <GlowCard glowColor="purple" className="p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-purple-500" />
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Meu Funil</h3>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {pipeline.stats.totalLeads} leads
+                    </span>
+                  </div>
+                  <Link
+                    href="/pipeline"
+                    className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                  >
+                    Ver pipeline
+                    <ChevronRight className="h-3 w-3" />
+                  </Link>
+                </div>
+                <div className="space-y-2">
+                  {pipeline.stages
+                    .filter((s) => !s.isLostStage && s.count > 0)
+                    .map((stage) => {
+                      const maxCount = Math.max(...pipeline.stages.filter(s => !s.isLostStage).map((s) => s.count), 1)
+                      const widthPercent = Math.max((stage.count / maxCount) * 100, 8)
+                      return (
+                        <div key={stage.id} className="flex items-center gap-3">
+                          <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 w-24 sm:w-32 truncate text-right flex-shrink-0">
+                            {stage.name}
+                          </span>
+                          <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden">
+                            <div
+                              className="h-full rounded-md flex items-center justify-end px-2 transition-all duration-700"
+                              style={{ width: `${widthPercent}%`, backgroundColor: stage.color }}
+                            >
+                              <span className="text-[10px] sm:text-xs font-bold text-white drop-shadow-sm">
+                                {stage.count}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              </GlowCard>
+            </section>
+          )}
 
           {/* Main Priority Sections */}
           <div className="space-y-6">
