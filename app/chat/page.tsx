@@ -3,12 +3,11 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { MessageCircle, Loader2, User, Clock, ChevronRight, RefreshCw } from "lucide-react"
-import { WhatsAppConnectionPanel } from "@/components/whatsapp-connection-panel"
 import { AppShell } from "@/components/app-shell"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { format, formatDistanceToNow } from "date-fns"
+import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/lib/auth-context"
 
@@ -112,14 +111,9 @@ export default function ChatPage() {
           </Button>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* WhatsApp Connection Status */}
-          <div className="lg:col-span-1">
-            <WhatsAppConnectionPanel title="Status do WhatsApp" />
-          </div>
-
+        <div className="grid grid-cols-1 gap-6">
           {/* Conversations List */}
-          <div className="lg:col-span-2">
+          <div>
             <Card className="border-none shadow-sm">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">

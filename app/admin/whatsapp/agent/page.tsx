@@ -66,9 +66,10 @@ interface AgentConfig {
 
 interface WhatsAppInstance {
   instance_name: string;
-  display_name: string;
-  status: string;
-  connection_state?: string;
+  user_id: string;
+  user_name: string;
+  user_phone?: string | null;
+  connection_state?: string | null;
 }
 
 interface TestMessage {
@@ -167,7 +168,19 @@ export default function SofiaAgentOnboarding() {
   const [testLoading, setTestLoading] = useState(false);
 
   const hasAccess = user && (user.role === 'admin' || user.role === 'gerente');
-  const workspaceId = (user as any)?.workspace_id || 1;
+  const workspaceId = (user as any)?.workspace_id;
+
+  if (!workspaceId && !authLoading) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <AlertTriangle className="w-12 h-12 text-red-500" />
+          <h2 className="text-xl font-semibold">Erro de Configuração</h2>
+          <p className="text-muted-foreground">Workspace não encontrado. Entre em contato com o suporte.</p>
+        </div>
+      </AppShell>
+    );
+  }
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -180,18 +193,27 @@ export default function SofiaAgentOnboarding() {
     const loadData = async () => {
       setLoading(true);
       try {
-        // Load WhatsApp instances
-        const instancesRes = await fetch(`/api/tenants/${workspaceId}/whatsapp`);
+        const instancesRes = await fetch('/api/admin/whatsapp/instances');
         const instancesData = await instancesRes.json();
         if (instancesData.success) {
-          setInstances(instancesData.data || []);
-          if (instancesData.data?.length > 0) {
-            const firstInstance = instancesData.data[0].instance_name;
-            setSelectedInstance(firstInstance);
+          const list = (instancesData.data || [])
+            .filter((i: any) => !!i.instance_name)
+            .map((i: any) => ({
+              instance_name: i.instance_name,
+              user_id: i.user_id,
+              user_name: i.user_name,
+              user_phone: i.user_phone || null,
+              connection_state: i.connection_state || null,
+            }));
 
-            // Load agent config for the first instance
+          setInstances(list);
+          if (list.length > 0) {
+            const firstInstance = list[0].instance_name;
+            setSelectedInstance(firstInstance);
             await loadAgentConfig(firstInstance);
           }
+        } else {
+          setError(instancesData.error || 'Erro ao carregar instâncias');
         }
       } catch (err) {
         console.error('Error loading data:', err);
@@ -536,7 +558,9 @@ export default function SofiaAgentOnboarding() {
                         instance.connection_state === 'open' ? 'bg-green-500' : 'bg-red-500'
                       )} />
                       <div>
-                        <p className="font-medium">{instance.display_name}</p>
+                        <p className="font-medium">
+                          {instance.user_name} {instance.user_phone ? `(${instance.user_phone})` : ''}
+                        </p>
                         <p className="text-sm text-muted-foreground">{instance.instance_name}</p>
                       </div>
                     </div>

@@ -33,6 +33,7 @@ import { ConnectionIndicator } from './chat/connection-indicator';
 import { ChatHeader } from './chat/chat-header';
 import { ChatInput } from './chat/chat-input';
 import { useRealtime } from '@/hooks/use-realtime';
+import { useAuth } from '@/lib/auth-context';
 
 // Lazy load LeadPanel
 const LeadPanel = dynamic(() => import('./lead-panel').then(mod => mod.LeadPanel), {
@@ -51,6 +52,8 @@ interface ChatCRMProps {
 
 export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdminView = user?.role === 'admin' || user?.role === 'gerente';
 
   // UI state only
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
@@ -62,9 +65,9 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
   // Data hooks
   const { conversations, totalUnread, isLoading } = useConversations(instanceName);
   const { messages, scrollRef } = useMessages(instanceName, selectedPhone);
-  const { isConnected } = useConnectionStatus();
+  const { isConnected } = useConnectionStatus(instanceName, isAdminView);
   const { send, isSending } = useSendMessage(instanceName);
-  const { results: searchResults, isSearching } = useServerSearch(searchQuery);
+  const { results: searchResults, isSearching } = useServerSearch(searchQuery, instanceName);
   const sendTyping = useSendTyping(instanceName);
 
   // Real-time SSE updates (invalidates React Query on new messages)
@@ -359,12 +362,13 @@ export function ChatCRM({ instanceName, userId }: ChatCRMProps) {
         )}
       >
         {selectedPhone && (
-          <LeadPanel
-            phone={selectedPhone}
-            userId={userId}
-            contactName={selectedConversation?.contact_name}
-            onSendMessage={handleSendToPhone}
-          />
+            <LeadPanel
+              phone={selectedPhone}
+              userId={userId}
+              instanceName={instanceName}
+              contactName={selectedConversation?.contact_name}
+              onSendMessage={handleSendToPhone}
+            />
         )}
       </div>
     </div>

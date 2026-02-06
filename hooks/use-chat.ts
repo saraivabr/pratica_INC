@@ -105,15 +105,23 @@ export function useMessages(instanceName: string, phone: string | null) {
 // useConnectionStatus — polls every 30s
 // ============================================================================
 
-export function useConnectionStatus() {
+export function useConnectionStatus(instanceName?: string | null, adminMode?: boolean) {
   const { data } = useQuery<boolean>({
-    queryKey: ['chat-connection-status'],
+    queryKey: ['chat-connection-status', instanceName || '', adminMode ? 'admin' : 'user'],
     queryFn: async () => {
+      if (adminMode && instanceName) {
+        const res = await fetch('/api/admin/whatsapp/instances');
+        const json = await res.json();
+        if (!json.success) return false;
+        const inst = (json.data || []).find((i: any) => i.instance_name === instanceName);
+        return inst?.connection_state === 'open';
+      }
       const res = await fetch('/api/whatsapp/session/status');
       const json = await res.json();
       return json.status === 'ready' || json.status === 'open';
     },
     refetchInterval: 15000,
+    enabled: adminMode ? !!instanceName : true,
     initialData: false,
   });
 
@@ -161,7 +169,7 @@ export function useSendMessage(instanceName: string) {
 // useServerSearch — debounced search with React Query
 // ============================================================================
 
-export function useServerSearch(query: string) {
+export function useServerSearch(query: string, instanceName?: string | null) {
   const [debouncedQuery, setDebouncedQuery] = useState(query);
 
   useEffect(() => {
@@ -174,9 +182,11 @@ export function useServerSearch(query: string) {
   }, [query]);
 
   const { data, isLoading } = useQuery<SearchResult[]>({
-    queryKey: ['chat-search', debouncedQuery],
+    queryKey: ['chat-search', debouncedQuery, instanceName || ''],
     queryFn: async () => {
-      const res = await fetch(`/api/whatsapp/search/suggest?q=${encodeURIComponent(debouncedQuery)}`);
+      const params = new URLSearchParams({ q: debouncedQuery });
+      if (instanceName) params.set('instance', instanceName);
+      const res = await fetch(`/api/whatsapp/search/suggest?${params.toString()}`);
       const json = await res.json();
       return json.success ? (json.data || []) : [];
     },

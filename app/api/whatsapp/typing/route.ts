@@ -11,6 +11,8 @@ import { sendTyping, sendPresence } from '@/lib/evolution-api';
 import { getAuthenticatedUser } from '@/lib/api-auth';
 import { validateRequest, WhatsAppTypingSchema } from '@/lib/validation-schemas';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
+import { findUserWorkspace } from '@/lib/tenant-context';
+import { canAccessInstance } from '@/lib/whatsapp-access';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,8 +38,12 @@ export async function POST(request: NextRequest) {
     const { instanceName, phoneNumber, action, duration } = validation.data;
 
     // Validate instance ownership — user can only send typing to their own instance
-    const userInstance = user.evolution_instance_name;
-    if (!userInstance || userInstance !== instanceName) {
+    const tenant = await findUserWorkspace(user);
+    if (!tenant) {
+      return NextResponse.json({ success: false, error: 'Empresa não configurada' }, { status: 400 });
+    }
+
+    if (!(await canAccessInstance(user, tenant.id, instanceName))) {
       return NextResponse.json(
         { success: false, error: 'Instância não pertence a este usuário' },
         { status: 403 }

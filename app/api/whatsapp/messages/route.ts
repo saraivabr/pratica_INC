@@ -15,6 +15,7 @@ import { getAuthenticatedUser } from '@/lib/api-auth';
 import { markAsRead as markAsReadEvolution } from '@/lib/evolution-api';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 import { getMongoDb } from '@/lib/mongodb';
+import { canAccessInstance } from '@/lib/whatsapp-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,13 +36,29 @@ export async function GET(request: NextRequest) {
     const instanceName = searchParams.get('instance');
     const phoneNumber = searchParams.get('phone');
 
+    const isAdmin = user.role === 'admin' || user.role === 'gerente';
+
     // If phone is provided without instance, return just the AI analysis (for lead-panel)
+    const effectiveInstance = instanceName || userInstanceName || null;
+
     if (!instanceName && phoneNumber) {
+      if (!effectiveInstance) {
+        return NextResponse.json(
+          { success: false, error: 'Nome da instância é obrigatório' },
+          { status: 400 }
+        );
+      }
+      if (!(await canAccessInstance(user, workspaceId, effectiveInstance))) {
+        return NextResponse.json(
+          { success: false, error: 'Acesso negado: instância não pertence a este usuário' },
+          { status: 403 }
+        );
+      }
       let aiAnalysis = null;
       try {
         const db = getMongoDb();
         const filter: Record<string, any> = { workspace_id: workspaceId, phone_number: phoneNumber };
-        if (userInstanceName) filter.instance_name = userInstanceName;
+        if (effectiveInstance) filter.instance_name = effectiveInstance;
         const conv = await db.collection('conversations').findOne(filter);
         aiAnalysis = conv?.ai_analysis || null;
       } catch {
@@ -64,7 +81,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Security: ensure the user can only query their own instance
-    if (userInstanceName && instanceName !== userInstanceName) {
+    if (!(await canAccessInstance(user, workspaceId, instanceName))) {
       return NextResponse.json(
         { success: false, error: 'Acesso negado: instância não pertence a este usuário' },
         { status: 403 }
@@ -72,7 +89,7 @@ export async function GET(request: NextRequest) {
     }
 
     // If user has no instance connected, return empty
-    if (!userInstanceName) {
+    if (!userInstanceName && !isAdmin) {
       return NextResponse.json({
         success: true,
         data: [],
@@ -305,8 +322,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Security: ensure user can only mark-read their own instance's messages
-    const userInstanceName = user.evolution_instance_name;
-    if (userInstanceName && instanceName !== userInstanceName) {
+    if (!(await canAccessInstance(user, workspaceId, instanceName))) {
       return NextResponse.json(
         { success: false, error: 'Acesso negado' },
         { status: 403 }

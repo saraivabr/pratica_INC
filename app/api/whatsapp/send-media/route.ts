@@ -9,6 +9,7 @@ import { sendMediaMessage, formatPhoneNumber } from '@/lib/evolution-api';
 import { tenantQuery, findUserWorkspace } from '@/lib/tenant-context';
 import { getAuthenticatedUser } from '@/lib/api-auth';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
+import { canAccessInstance } from '@/lib/whatsapp-access';
 
 // Tipos de mídia suportados
 const MEDIA_TYPES = {
@@ -71,8 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Security: verify instance ownership
-    const userInstanceName = user.evolution_instance_name;
-    if (!userInstanceName || instanceName !== userInstanceName) {
+    if (!(await canAccessInstance(user, workspaceId, instanceName))) {
       return NextResponse.json(
         { success: false, error: 'Instância não autorizada' },
         { status: 403 }
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: userMessage, details: error.message },
+      { success: false, error: userMessage },
       { status: 500 }
     );
   }

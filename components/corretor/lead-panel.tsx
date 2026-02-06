@@ -61,6 +61,7 @@ import { toast } from 'sonner';
 interface LeadPanelProps {
   phone: string;
   userId: string;
+  instanceName: string;
   contactName?: string;
   onStageChange?: (newStage: string) => void;
   onAction?: (action: 'visit' | 'simulation' | 'docs') => void;
@@ -410,7 +411,7 @@ function SuggestReplySection({
 // Main Component
 // ============================================
 
-export function LeadPanel({ phone, userId, contactName, onStageChange, onAction, onSendMessage }: LeadPanelProps) {
+export function LeadPanel({ phone, userId, instanceName, contactName, onStageChange, onAction, onSendMessage }: LeadPanelProps) {
   const [showStageSelect, setShowStageSelect] = useState(false);
   const [selectedStage, setSelectedStage] = useState<string>('');
 
@@ -432,14 +433,14 @@ export function LeadPanel({ phone, userId, contactName, onStageChange, onAction,
 
   // Fetch AI analysis for this conversation
   const { data: aiData } = useQuery<any>({
-    queryKey: ['ai-analysis', phone],
+    queryKey: ['ai-analysis', phone, instanceName],
     queryFn: async () => {
-      const res = await fetch(`/api/whatsapp/messages?instance=&phone=${encodeURIComponent(phone)}`);
+      const res = await fetch(`/api/whatsapp/messages?instance=${encodeURIComponent(instanceName)}&phone=${encodeURIComponent(phone)}`);
       if (!res.ok) return null;
       const json = await res.json();
       return json.ai_analysis || null;
     },
-    enabled: !!phone && phone.length >= 8,
+    enabled: !!phone && phone.length >= 8 && !!instanceName,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
   });

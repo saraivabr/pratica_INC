@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/api-auth";
 import { findUserWorkspace } from "@/lib/tenant-context";
 import { getElasticsearch, ES_INDEX } from "@/lib/elasticsearch";
+import { canAccessInstance } from "@/lib/whatsapp-access";
 
 export const runtime = "nodejs";
 
@@ -33,14 +34,22 @@ export async function GET(request: NextRequest) {
     const workspaceId = tenant.id;
     const userInstanceName = user.evolution_instance_name;
     const q = request.nextUrl.searchParams.get("q")?.trim();
+    const instanceParam = request.nextUrl.searchParams.get("instance")?.trim() || null;
 
     if (!q || q.length < 2) {
       return NextResponse.json({ success: true, data: [] });
     }
 
+    const effectiveInstance = instanceParam || userInstanceName || null;
+
     // If user has no instance connected, return empty
-    if (!userInstanceName) {
+    if (!effectiveInstance) {
       return NextResponse.json({ success: true, data: [] });
+    }
+
+    // Validate instance access
+    if (!(await canAccessInstance(user, workspaceId, effectiveInstance))) {
+      return NextResponse.json({ success: false, error: 'Acesso negado' }, { status: 403 });
     }
 
     const es = getElasticsearch();
@@ -55,7 +64,7 @@ export async function GET(request: NextRequest) {
           bool: {
             must: [
               { term: { workspace_id: workspaceId } },
-              { term: { instance_name: userInstanceName } },
+              { term: { instance_name: effectiveInstance } },
               {
                 bool: {
                   should: [

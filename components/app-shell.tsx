@@ -99,7 +99,7 @@ const adminGroups = {
     icon: MessageSquare,
     defaultOpen: true,
     items: [
-      { href: "/admin/whatsapp", icon: Smartphone, label: "WhatsApp", description: "Instâncias e conexões" },
+      { href: "/admin/whatsapp", icon: Smartphone, label: "WhatsApp", description: "Supervisão de instâncias" },
     ],
   },
   inteligencia: {

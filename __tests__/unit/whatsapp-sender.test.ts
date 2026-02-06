@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ============================================
 
 // Mock Z-API
-vi.mock('@/lib/zapi', () => ({
+vi.mock('../../lib/zapi', () => ({
   sendTextMessage: vi.fn().mockResolvedValue({ messageId: 'zapi-msg-1' }),
   sendQuickButtons: vi.fn().mockResolvedValue({ messageId: 'zapi-btn-1' }),
   sendOptionList: vi.fn().mockResolvedValue({ messageId: 'zapi-list-1' }),
@@ -30,7 +30,7 @@ vi.mock('@/lib/zapi', () => ({
 }));
 
 // Mock Evolution API
-vi.mock('@/lib/evolution-api', () => ({
+vi.mock('../../lib/evolution-api', () => ({
   sendTextMessage: vi.fn().mockResolvedValue({ key: { id: 'evo-msg-1', remoteJid: '5511999999999@s.whatsapp.net' } }),
   sendMediaMessage: vi.fn().mockResolvedValue({ key: { id: 'evo-media-1' } }),
   sendTyping: vi.fn().mockResolvedValue(undefined),
@@ -41,7 +41,7 @@ vi.mock('@/lib/evolution-api', () => ({
 }));
 
 // Mock zapi-client (transitive dep of zapi)
-vi.mock('@/lib/zapi-client', () => ({
+vi.mock('../../lib/zapi-client', () => ({
   zapiRequestWithRetry: vi.fn().mockResolvedValue({ ok: true, messageId: 'zapi-raw-1' }),
 }));
 
@@ -63,10 +63,10 @@ import {
   askPostSimulacao,
   sendButtonMessage,
   sendButtonActions,
-} from '@/lib/whatsapp-sender';
+} from '../../lib/whatsapp-sender';
 
-import * as zapi from '@/lib/zapi';
-import * as evolution from '@/lib/evolution-api';
+import * as zapi from '../../lib/zapi';
+import * as evolution from '../../lib/evolution-api';
 
 // ============================================
 // TESTS

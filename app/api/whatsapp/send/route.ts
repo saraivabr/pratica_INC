@@ -11,6 +11,7 @@ import { getAuthenticatedUser } from '@/lib/api-auth';
 import rateLimiter, { RateLimitConfigs } from '@/lib/rate-limiter';
 import { z } from 'zod';
 import { messageTextSchema } from '@/lib/validation-schemas';
+import { canAccessInstance } from '@/lib/whatsapp-access';
 
 // Phone schema that accepts E.164 (5511999999999), local (11999999999),
 // and formatted ((11) 99999-9999) — strips to digits only
@@ -62,8 +63,7 @@ export async function POST(request: NextRequest) {
     const { instanceName, phoneNumber, message } = validationResult.data;
 
     // Validate instance ownership — user can only send from their own instance
-    const userInstance = user.evolution_instance_name;
-    if (!userInstance || userInstance !== instanceName) {
+    if (!(await canAccessInstance(user, workspaceId, instanceName))) {
       return NextResponse.json(
         { success: false, error: 'Instância não pertence a este usuário' },
         { status: 403 }
