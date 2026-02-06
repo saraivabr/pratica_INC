@@ -18,12 +18,9 @@ import {
   Users,
   Settings,
   LogOut,
-  Megaphone,
   MessageSquare,
-  Zap,
   Calendar,
   BarChart3,
-  UserCircle,
   ShieldCheck,
   Merge,
   Bot,
@@ -55,6 +52,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/lib/auth-context"
 import { useRoletaStatus } from "@/hooks/use-roleta-status"
+import { useSidebarGoals, useSidebarLeads, useWhatsAppSidebarData } from "@/hooks/use-sidebar-data"
+import { RoletaCard, WhatsAppCard, LeadsCard, PainelCard } from "@/components/sidebar/sidebar-cards"
 import {
   Tooltip,
   TooltipContent,
@@ -69,30 +68,20 @@ import {
 } from "@/components/ui/popover"
 
 // ────────────────────────────────────────────────────────
-// Corretor Navigation - Primary (core) + Secondary (bonificados)
-// Prioridade: Empreendimentos > Espelho > Tabela > Leads
+// Corretor Navigation — cards handle Roleta/WhatsApp/Leads/Painel
+// This list is the compact secondary nav below the cards
 // ────────────────────────────────────────────────────────
-const corretorPrimaryItems = [
-  { href: "/corretor/recepcao", icon: ClipboardCheck, label: "Roleta", description: "Check-in e fila de plantão", roleta: true },
-  { href: "/corretor", icon: Gauge, label: "Painel", description: "Visão geral e métricas" },
+const corretorListItems = [
   { href: "/corretor/imoveis", icon: Building2, label: "Empreendimentos", description: "Catálogo de imóveis" },
   { href: "/corretor/espelho", icon: Grid3X3, label: "Espelho", description: "Disponibilidade de unidades" },
   { href: "/corretor/tabela", icon: Table, label: "Tabela", description: "Tabela de preços" },
-  { href: "/corretor/clientes", icon: Contact, label: "Leads", description: "Gestão de clientes" },
-]
-
-const corretorSecondaryItems = [
   { href: "/corretor/propostas", icon: FileText, label: "Propostas", description: "Propostas comerciais" },
   { href: "/corretor/assistente", icon: Sparkles, label: "Assistente IA", highlight: true, description: "Tire dúvidas com a IA" },
   { href: "/corretor/salva-leads", icon: Bot, label: "Salva-Leads", description: "Follow-up automático" },
   { href: "/corretor/disparador", icon: Send, label: "Disparador", description: "Envios em massa" },
-  { href: "/corretor/whatsapp", icon: Smartphone, label: "WhatsApp", description: "Chat e automações" },
   { href: "/corretor/agenda", icon: Calendar, label: "Agenda", description: "Visitas e compromissos" },
   { href: "/corretor/configuracoes", icon: Settings, label: "Configurações", description: "Perfil e preferências" },
 ]
-
-// Combined for mobile sidebar
-const corretorNavItems = [...corretorPrimaryItems, ...corretorSecondaryItems]
 
 // ────────────────────────────────────────────────────────
 // Admin Navigation - grouped with better naming
@@ -553,7 +542,6 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
     router.push("/login")
   }
 
-  const showAdminSection = user?.role !== "corretor" && user?.role !== "recepcionista"
   const isCorretor = user?.role === "corretor"
   const isRecepcionista = user?.hierarquia?.slug === "recepcionista" || user?.role === "recepcionista"
 
@@ -566,16 +554,12 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
 
   // Roleta status polling (only for corretor views)
   const isCorretorView = !isRecepcionista && (isCorretor || currentView === "corretor")
-  const isOnRecepcaoPage = pathname.startsWith("/corretor/recepcao")
   const roletaStatus = useRoletaStatus(isCorretorView)
 
-  // Build roleta badge for sidebar
-  const roletaBadge = roletaStatus.isMyTurn
-    ? "SUA VEZ!"
-    : roletaStatus.inQueue
-      ? `#${roletaStatus.posicaoReal ?? roletaStatus.posicao ?? '?'}`
-      : undefined
-  const roletaBadgeVariant = roletaStatus.isMyTurn ? "warning" as const : "default" as const
+  // Sidebar data hooks (only for corretor view)
+  const whatsAppData = useWhatsAppSidebarData()
+  const sidebarLeads = useSidebarLeads()
+  const sidebarGoals = useSidebarGoals()
 
   // Can switch roles (admin and gerente can switch, corretor cannot)
   const canSwitchRoles = user?.role === "admin" || user?.role === "gerente"
@@ -600,26 +584,42 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
 
   // ──── Render Navigation Items ────
   const renderCorretorNav = (collapsed: boolean) => {
+    const isRecepcaoActive = pathname.startsWith("/corretor/recepcao")
+    const isWhatsAppActive = pathname.startsWith("/corretor/whatsapp")
+    const isLeadsActive = pathname.startsWith("/corretor/clientes")
+    const isPainelActive = pathname === "/corretor"
+
     return (
       <>
-        {/* Primary items - larger, more prominent */}
-        {corretorPrimaryItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
-          const enrichedItem = item.roleta && roletaBadge
-            ? { ...item, badge: roletaBadge, badgeVariant: roletaBadgeVariant }
-            : item
-          return (
-            <NavItem
-              key={item.href}
-              item={enrichedItem}
-              isActive={isActive}
-              isCollapsed={collapsed}
-            />
-          )
-        })}
+        {/* Dynamic cards */}
+        <div className={cn("space-y-1.5 mb-2", collapsed ? "px-0.5" : "px-1")}>
+          <RoletaCard
+            status={roletaStatus}
+            collapsed={collapsed}
+            isActive={isRecepcaoActive}
+          />
+          <WhatsAppCard
+            isConnected={whatsAppData.isConnected}
+            unreadCount={whatsAppData.totalUnread}
+            collapsed={collapsed}
+            isActive={isWhatsAppActive}
+          />
+          <LeadsCard
+            total={sidebarLeads.total}
+            newToday={sidebarLeads.newToday}
+            collapsed={collapsed}
+            isActive={isLeadsActive}
+          />
+          <PainelCard
+            overallProgress={sidebarGoals.overallProgress}
+            currentRevenue={sidebarGoals.currentRevenue}
+            collapsed={collapsed}
+            isActive={isPainelActive}
+          />
+        </div>
         <SidebarDivider />
-        {/* Secondary items - smaller, softer */}
-        {corretorSecondaryItems.map((item) => {
+        {/* Compact list */}
+        {corretorListItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
           return (
             <NavItemSecondary
@@ -699,7 +699,7 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
         {/* ──────────── Sidebar Desktop ──────────── */}
         <motion.aside
           initial={false}
-          animate={{ width: sidebarCollapsed ? 68 : 260 }}
+          animate={{ width: sidebarCollapsed ? 68 : 280 }}
           transition={{ duration: 0.2, ease: "easeInOut" }}
           className="fixed top-0 left-0 z-50 h-full bg-white dark:bg-zinc-900 border-r border-zinc-200/80 dark:border-zinc-800/80 hidden md:flex md:flex-col"
         >
@@ -924,64 +924,34 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
                   })
                 ) : (isCorretor || currentView === "corretor") ? (
                   <>
-                    {corretorPrimaryItems.map((item) => {
-                      const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 relative overflow-hidden",
-                            item.roleta && !isActive
-                              ? "bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-700 dark:text-emerald-300 font-medium"
-                              : item.roleta && isActive
-                                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium shadow-md shadow-emerald-500/25"
-                              : (item as any).highlight && !isActive
-                                ? "bg-gradient-to-r from-violet-500/8 to-indigo-500/8 text-violet-700 dark:text-violet-300 font-medium"
-                                : isActive
-                                  ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium shadow-sm"
-                                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60",
-                            (item as any).highlight && isActive && "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/20"
-                          )}
-                        >
-                          {item.roleta && roletaBadge && roletaBadgeVariant === "warning" && (
-                            <span className="absolute inset-0 bg-gradient-to-r from-amber-400/20 to-yellow-400/20 animate-pulse pointer-events-none" />
-                          )}
-                          {item.roleta && roletaBadge && roletaBadgeVariant !== "warning" && (
-                            <span className="absolute inset-0 bg-gradient-to-r from-emerald-400/10 to-teal-400/10 animate-pulse pointer-events-none" />
-                          )}
-                          <item.icon className={cn(
-                            "h-[18px] w-[18px] shrink-0 relative z-10",
-                            item.roleta && !isActive && "text-emerald-500 dark:text-emerald-400",
-                            item.roleta && isActive && "text-white",
-                            (item as any).highlight && !isActive && "text-violet-500 dark:text-violet-400",
-                            !item.roleta && isActive && "text-current",
-                            !isActive && !(item as any).highlight && !item.roleta && "text-zinc-400 dark:text-zinc-500",
-                          )} />
-                          <span className="text-[13px] relative z-10 flex-1">{item.label}</span>
-                          {item.roleta && roletaBadge && (
-                            <span className={cn(
-                              "relative z-10 ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full whitespace-nowrap",
-                              roletaBadgeVariant === "warning"
-                                ? "bg-amber-500 text-white shadow-sm shadow-amber-500/30 animate-pulse"
-                                : isActive
-                                  ? "bg-white/20 text-white"
-                                  : "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30"
-                            )}>
-                              {roletaBadge}
-                            </span>
-                          )}
-                          {(item as any).highlight && (
-                            <span className={cn(
-                              "ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full",
-                              isActive ? "bg-white/20 text-white" : "bg-gradient-to-r from-violet-500 to-indigo-600 text-white"
-                            )}>IA</span>
-                          )}
-                        </Link>
-                      )
-                    })}
+                    {/* Mobile sidebar cards */}
+                    <div className="px-1 space-y-1.5 mb-2">
+                      <RoletaCard
+                        status={roletaStatus}
+                        collapsed={false}
+                        isActive={pathname.startsWith("/corretor/recepcao")}
+                      />
+                      <WhatsAppCard
+                        isConnected={whatsAppData.isConnected}
+                        unreadCount={whatsAppData.totalUnread}
+                        collapsed={false}
+                        isActive={pathname.startsWith("/corretor/whatsapp")}
+                      />
+                      <LeadsCard
+                        total={sidebarLeads.total}
+                        newToday={sidebarLeads.newToday}
+                        collapsed={false}
+                        isActive={pathname.startsWith("/corretor/clientes")}
+                      />
+                      <PainelCard
+                        overallProgress={sidebarGoals.overallProgress}
+                        currentRevenue={sidebarGoals.currentRevenue}
+                        collapsed={false}
+                        isActive={pathname === "/corretor"}
+                      />
+                    </div>
                     <SidebarDivider />
-                    {corretorSecondaryItems.map((item) => {
+                    {corretorListItems.map((item) => {
                       const isActive = pathname === item.href || (item.href !== "/corretor" && pathname.startsWith(item.href))
                       return (
                         <Link
@@ -989,16 +959,25 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
                           href={item.href}
                           className={cn(
                             "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150",
-                            isActive
-                              ? "bg-zinc-900/8 dark:bg-white/8 text-zinc-900 dark:text-zinc-100 font-medium"
-                              : "text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40"
+                            (item as any).highlight && !isActive
+                              ? "bg-gradient-to-r from-violet-500/8 to-indigo-500/8 text-violet-700 dark:text-violet-300 font-medium"
+                              : isActive
+                                ? "bg-zinc-900/8 dark:bg-white/8 text-zinc-900 dark:text-zinc-100 font-medium"
+                                : "text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40"
                           )}
                         >
                           <item.icon className={cn(
                             "h-4 w-4 shrink-0",
+                            (item as any).highlight && !isActive && "text-violet-500 dark:text-violet-400",
                             isActive ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-400 dark:text-zinc-600",
                           )} />
-                          <span className="text-[12px]">{item.label}</span>
+                          <span className="text-[12px] flex-1">{item.label}</span>
+                          {(item as any).highlight && (
+                            <span className={cn(
+                              "ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full",
+                              isActive ? "bg-zinc-700/20 text-zinc-700 dark:text-zinc-300" : "bg-gradient-to-r from-violet-500 to-indigo-600 text-white"
+                            )}>IA</span>
+                          )}
                         </Link>
                       )
                     })}
@@ -1070,7 +1049,7 @@ export function AppShell({ children, title, showBackButton, backHref }: AppShell
         <div
           className={cn(
             "flex flex-col min-h-screen transition-all duration-200 ease-in-out",
-            sidebarCollapsed ? "md:pl-[68px]" : "md:pl-[260px]"
+            sidebarCollapsed ? "md:pl-[68px]" : "md:pl-[280px]"
           )}
         >
           {/* Header */}
